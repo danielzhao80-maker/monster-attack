@@ -13,6 +13,19 @@
         h1 { font-family: 'Fredoka One', cursive; font-size: 2.2em; color: #ff6b6b; text-transform: uppercase; letter-spacing: 3px; text-shadow: 3px 3px 0 #feca57, -1px -1px 0 #fff; margin-bottom: 5px; }
         .subtitle { color: #7c6fa0; letter-spacing: 3px; font-size: 0.85em; margin-bottom: 10px; font-weight: 700; }
         canvas { border: 4px solid #fff; border-radius: 16px; display: block; margin: 0 auto; background: #7ec8e3; cursor: crosshair; box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+        canvas#game { max-width: 100vw; max-height: 100vh; width: auto; height: auto; touch-action: none; }
+        /* Mobile / touch controls */
+        #touch-ui { display: none; position: fixed; left: 0; right: 0; bottom: 0; top: 0; z-index: 8; pointer-events: none; }
+        #touch-ui.show { display: block; }
+        #touch-stick { position: absolute; left: 18px; bottom: 18px; width: 110px; height: 110px; background: rgba(0,0,0,0.25); border: 3px solid rgba(255,255,255,0.6); border-radius: 50%; pointer-events: auto; touch-action: none; }
+        #touch-knob { position: absolute; left: 30px; top: 30px; width: 44px; height: 44px; background: rgba(255,255,255,0.85); border: 2px solid rgba(0,0,0,0.4); border-radius: 50%; pointer-events: none; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+        #touch-actions { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column-reverse; gap: 8px; pointer-events: auto; }
+        .touch-btn { width: 60px; height: 60px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.6); background: rgba(0,0,0,0.45); color: #fff; font-size: 24px; font-family: 'Fredoka One', sans-serif; cursor: pointer; touch-action: manipulation; user-select: none; }
+        .touch-btn:active { background: rgba(255,255,255,0.4); transform: scale(0.92); }
+        @media (pointer: coarse) {
+            .btn { font-size: 0.95em; padding: 12px 25px; }
+            #ui { font-size: 0.85em; }
+        }
         #hud { display: flex; justify-content: space-between; max-width: 900px; margin: 10px auto 0; font-size: 0.85em; flex-wrap: wrap; background: #fff; border-radius: 12px; padding: 6px 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         #hud span { padding: 3px 8px; font-weight: 700; }
         .hp { color: #ff6b6b; } .score { color: #ff9f43; } .wave-hud { color: #ee5a24; }
@@ -340,6 +353,17 @@
 
     <div id="error-overlay" style="position:fixed;top:0;left:0;right:0;background:rgba(255,45,85,0.95);color:#fff;font-family:monospace;padding:14px;z-index:9999;display:none;font-size:13px;line-height:1.4;"></div>
 
+    <!-- Mobile touch controls (auto-shows on touch devices) -->
+    <div id="touch-ui">
+        <div id="touch-stick"><div id="touch-knob"></div></div>
+        <div id="touch-actions">
+            <button class="touch-btn" id="touch-shoot" title="Shoot/Attack">🔫</button>
+            <button class="touch-btn" id="touch-reload" title="Reload">🔄</button>
+            <button class="touch-btn" id="touch-ability" title="Ability">⚡</button>
+            <button class="touch-btn" id="touch-pause" title="Pause">⏸️</button>
+        </div>
+    </div>
+
     <div id="supporter-panel" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,#fff,#e8f5e9);border-radius:18px;padding:20px 26px;display:none;flex-direction:column;align-items:center;gap:8px;z-index:30;box-shadow:0 10px 40px rgba(0,0,0,0.3);border:4px solid #26de81;min-width:340px;">
         <h2 style="font-family:'Fredoka One',cursive;font-size:1.5em;color:#1e7e44;letter-spacing:2px;">💖 Supporter Buffs</h2>
         <div style="color:#636e72;font-size:0.78em;font-weight:700;margin-bottom:6px;">Pick a target then a buff! Press [E] again to close.</div>
@@ -664,21 +688,22 @@
     console.log   = function(...a) { __pushBug('LOG', a.join(' '));  __origConsole.log.apply(console, a); };
     console.warn  = function(...a) { __pushBug('WARN', a.join(' ')); __origConsole.warn.apply(console, a); };
     console.error = function(...a) { __pushBug('ERROR', a.join(' '));__origConsole.error.apply(console, a); };
+    let __errorOverlayTimer = null;
+    function __showErrorOverlay(text) {
+        const el = document.getElementById('error-overlay');
+        if (!el) return;
+        el.style.display = 'block';
+        el.textContent = text;
+        if (__errorOverlayTimer) clearTimeout(__errorOverlayTimer);
+        __errorOverlayTimer = setTimeout(() => { el.style.display = 'none'; __errorOverlayTimer = null; }, 6000);
+    }
     window.addEventListener('error', e => {
         __pushBug('ERROR', `${e.message} @ ${e.filename||'inline'}:${e.lineno||'?'}`);
-        const el = document.getElementById('error-overlay');
-        if (el) {
-            el.style.display = 'block';
-            el.textContent = `❌ Bug: ${e.message} @ line ${e.lineno||'?'} — Press Ctrl+Shift+O for debug panel`;
-        }
+        __showErrorOverlay(`❌ Bug: ${e.message} @ line ${e.lineno||'?'} — Press Ctrl+Shift+O for debug panel`);
     });
     window.addEventListener('unhandledrejection', e => {
         __pushBug('ERROR', `Async: ${(e.reason && e.reason.message)||e.reason||'unknown'}`);
-        const el = document.getElementById('error-overlay');
-        if (el) {
-            el.style.display = 'block';
-            el.textContent = `❌ Async bug: ${(e.reason && e.reason.message)||e.reason||'unknown'} — Press Ctrl+Shift+O`;
-        }
+        __showErrorOverlay(`❌ Async bug: ${(e.reason && e.reason.message)||e.reason||'unknown'} — Press Ctrl+Shift+O`);
     });
     function emergencyReset() {
         if (!confirm('Reset all save data and reload?')) return;
@@ -1304,6 +1329,18 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             const rp = remotePlayers.find(r => r.idx === entryIdx);
             if (rp) rp.input = d;
         }
+        else if (d.t==='buff') {
+            // A client (must be Supporter class) is requesting a buff for a player.
+            // d.targetIdx: 0 = host, 1+ = remotePlayers (matches the lobby/state index).
+            // d.kind: which buff. Source player must be Supporter — verified via their class.
+            const sourceCls = entry && entry.clsName;
+            if (sourceCls === 'Supporter') {
+                let targetPlayer = null;
+                if (d.targetIdx === 0) targetPlayer = player;
+                else targetPlayer = remotePlayers.find(r => r.idx === d.targetIdx) || null;
+                if (targetPlayer) applySupporterBuffTo(targetPlayer, d.kind);
+            }
+        }
     }
 
     function mpClientOnData(d) {
@@ -1427,6 +1464,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             player.shieldUp=mine.shieldUp; player.meleeSwing=mine.meleeSwing;
             player.copiedPower=mine.copiedPower||false; player.copySpeedBonus=mine.copySpeedBonus||0;
             player.chiliBoost=mine.chiliBoost||0;
+            player.sikunaBuff=mine.sikunaBuff||0;
+            player.poisoned=mine.poisoned||0;
         }
         // Remote players = everyone except me (attach cls by name for drawing)
         remotePlayers = (s.players||[])
@@ -1484,7 +1523,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         return { x:pl.x, y:pl.y, angle:pl.angle, hp:pl.hp, maxHp:pl.maxHp, ammo:pl.ammo, maxAmmo:pl.maxAmmo, reloading:pl.reloading,
             invincible:pl.invincible, frozen:pl.frozen, stunned:pl.stunned, slow:pl.slow, teleporting:pl.teleporting, invisible:pl.invisible,
             shieldUp:pl.shieldUp, meleeSwing:pl.meleeSwing, copiedPower:pl.copiedPower||false, copySpeedBonus:pl.copySpeedBonus||0,
-            chiliBoost:pl.chiliBoost||0, clsName:pl.cls.name, name:pl.name||(pl===player?(playerName||'Host'):'Player'), idx:pl===player?0:pl.idx };
+            chiliBoost:pl.chiliBoost||0, sikunaBuff:pl.sikunaBuff||0, poisoned:pl.poisoned||0,
+            clsName:pl.cls.name, name:pl.name||(pl===player?(playerName||'Host'):'Player'), idx:pl===player?0:pl.idx };
     }
 
     function mpBroadcastState() {
@@ -6148,11 +6188,49 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (typeof remotePlayers !== 'undefined' && remotePlayers[__supporterTarget]) return remotePlayers[__supporterTarget];
         return player;
     }
+    // Apply a supporter buff directly to a player object. Used both locally
+    // and on the host when forwarding a client's buff request.
+    function applySupporterBuffTo(p, kind) {
+        if (!p) return;
+        switch (kind) {
+        case 'strength': p.sikunaBuff = Math.max(p.sikunaBuff||0, 1800); break;
+        case 'speed':    p.chiliBoost = Math.max(p.chiliBoost||0, 1800); break;
+        case 'heal':     p.hp = p.maxHp; break;
+        case 'maxhp':    p.maxHp += 100; p.hp += 100; break;
+        case 'shield':   p.invincible = Math.max(p.invincible||0, 600); break;
+        case 'ammo':     p.maxAmmo = (p.maxAmmo||0) + 30; p.ammo = p.maxAmmo; p.reloading = false; break;
+        case 'cleanse':
+            p.frozen = 0; p.stunned = 0; p.slow = 0; p.poisoned = 0;
+            p.sunBurnTimer = 0; p.swallowed = 0;
+            p.disableImmune = Math.max(p.disableImmune||0, 60);
+            break;
+        }
+    }
+
     function supBuff(kind) {
         if (!player || !gameRunning) return;
         const p = getSupporterTarget();
         if (!p) return;
         const targetName = (p === player) ? 'YOU' : ((p.name || 'TEAMMATE').toUpperCase());
+        // Multiplayer: if we're a CLIENT and target is anyone (including ourselves),
+        // forward to host so they apply it authoritatively. Local player gets
+        // overwritten by the next state broadcast otherwise.
+        const isClient = (typeof NET !== 'undefined' && NET && NET.mode === 'client');
+        if (isClient) {
+            // targetIdx in the global player array: 0=host, 1+=remotePlayers' idx
+            let targetIdx;
+            if (p === player) targetIdx = NET.myIdx;
+            else targetIdx = (p._origIdx != null) ? p._origIdx : (p.idx != null ? p.idx : 0);
+            try { NET.hostConn.send({ t:'buff', targetIdx, kind }); } catch(e){}
+            // local fast-feedback for buffs that affect visible-to-me state
+            if (p === player) applySupporterBuffTo(p, kind);
+            // particle / SFX feedback
+            for (let i=0;i<14;i++){const a=(Math.PI*2/14)*i;particles.push({x:p.x,y:p.y,vx:Math.cos(a)*3,vy:Math.sin(a)*3,life:24,maxLife:24,color:'#26de81',r:3});}
+            showStatus(`${kind.toUpperCase()} → ${targetName}!`, '#26de81');
+            SFX.pickup();
+            closeSupporterPanel();
+            return;
+        }
         switch (kind) {
         case 'strength':
             p.sikunaBuff = Math.max(p.sikunaBuff||0, 1800);
@@ -7124,6 +7202,88 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     let shooting=false;
     canvas.addEventListener('mousedown', e => { if(e.button===0)shooting=true; });
     canvas.addEventListener('mouseup', e => { if(e.button===0)shooting=false; });
+    // ======================== TOUCH CONTROLS (mobile) ========================
+    const __isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    if (__isTouch) {
+        document.getElementById('touch-ui').classList.add('show');
+    }
+    // Virtual joystick — drives keys (w/a/s/d)
+    (function setupJoystick() {
+        const stick = document.getElementById('touch-stick');
+        const knob = document.getElementById('touch-knob');
+        if (!stick || !knob) return;
+        let active = false, startX = 0, startY = 0;
+        const setKnob = (dx, dy) => {
+            const max = 30;
+            const mag = Math.hypot(dx, dy);
+            const scale = mag > max ? max / mag : 1;
+            const kx = dx * scale, ky = dy * scale;
+            knob.style.left = (30 + kx) + 'px';
+            knob.style.top = (30 + ky) + 'px';
+            // Map to keys
+            const dead = 8;
+            keys['w'] = ky < -dead;
+            keys['s'] = ky > dead;
+            keys['a'] = kx < -dead;
+            keys['d'] = kx > dead;
+        };
+        const release = () => {
+            active = false;
+            knob.style.left = '30px';
+            knob.style.top = '30px';
+            keys['w']=false; keys['s']=false; keys['a']=false; keys['d']=false;
+        };
+        stick.addEventListener('touchstart', e => {
+            e.preventDefault();
+            const t = e.touches[0]; const r = stick.getBoundingClientRect();
+            startX = r.left + r.width/2; startY = r.top + r.height/2;
+            active = true;
+            setKnob(t.clientX - startX, t.clientY - startY);
+        }, { passive: false });
+        stick.addEventListener('touchmove', e => {
+            if (!active) return;
+            e.preventDefault();
+            const t = e.touches[0];
+            setKnob(t.clientX - startX, t.clientY - startY);
+        }, { passive: false });
+        stick.addEventListener('touchend', e => { e.preventDefault(); release(); }, { passive: false });
+        stick.addEventListener('touchcancel', e => { e.preventDefault(); release(); }, { passive: false });
+    })();
+    // Touch aim+shoot on canvas (right side or anywhere not on stick/buttons)
+    canvas.addEventListener('touchstart', e => {
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        const r = canvas.getBoundingClientRect();
+        mouse.x = (t.clientX - r.left) * (W / r.width);
+        mouse.y = (t.clientY - r.top) * (H / r.height);
+        shooting = true;
+    }, { passive: false });
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        const r = canvas.getBoundingClientRect();
+        mouse.x = (t.clientX - r.left) * (W / r.width);
+        mouse.y = (t.clientY - r.top) * (H / r.height);
+    }, { passive: false });
+    canvas.addEventListener('touchend', e => { e.preventDefault(); shooting = false; }, { passive: false });
+    canvas.addEventListener('touchcancel', e => { e.preventDefault(); shooting = false; }, { passive: false });
+    // Action buttons
+    (function bindTouchActions() {
+        const reloadBtn = document.getElementById('touch-reload');
+        const abilityBtn = document.getElementById('touch-ability');
+        const pauseBtn = document.getElementById('touch-pause');
+        const shootBtn = document.getElementById('touch-shoot');
+        if (reloadBtn) reloadBtn.addEventListener('click', e => { e.preventDefault(); if (NET.mode==='client') NET._reloadFlag = true; else reload(); });
+        if (abilityBtn) abilityBtn.addEventListener('click', e => { e.preventDefault(); if (NET.mode==='client') NET._abilityFlag = true; else useAbility(); });
+        if (pauseBtn) pauseBtn.addEventListener('click', e => { e.preventDefault(); if (gameRunning) togglePause(); });
+        if (shootBtn) {
+            shootBtn.addEventListener('touchstart', e => { e.preventDefault(); shooting = true; }, { passive: false });
+            shootBtn.addEventListener('touchend', e => { e.preventDefault(); shooting = false; }, { passive: false });
+            shootBtn.addEventListener('mousedown', e => { e.preventDefault(); shooting = true; });
+            shootBtn.addEventListener('mouseup', e => { e.preventDefault(); shooting = false; });
+        }
+    })();
+
     canvas.addEventListener('contextmenu', e => {
         e.preventDefault();
         if (cheats.adminTeleport && gameRunning && player) {
