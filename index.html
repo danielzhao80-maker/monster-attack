@@ -3869,10 +3869,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         }
 
         // Monsters
-        // Freeze monsters only when the supporter panel is ACTUALLY visible right now
-        // (using DOM state instead of a flag so it can never get stuck on).
-        const __spEl = document.getElementById('supporter-panel');
-        const __freezeMonsters = !!(__spEl && __spEl.style.display === 'flex');
+        const __freezeMonsters = !!__supporterPanelOpen; // skip monster AI while supporter panel is open
         for (let i = monsters.length-1; i >= 0; i--) {
             const m = monsters[i];
             // Multiplayer: retarget to nearest living, visible player (shadows outer p)
