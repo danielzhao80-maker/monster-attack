@@ -657,7 +657,6 @@
         <h2>PAUSED</h2>
         <p>ESC / P to resume</p>
         <button class="btn" onclick="togglePause()" style="margin-top:12px; padding:10px 30px; font-size:0.9em;">Resume</button>
-        <button class="btn" onclick="openAdminPanelInGame()" style="margin-top:6px; padding:8px 24px; font-size:0.8em; background:linear-gradient(180deg,#ff2d55,#c44569);box-shadow:0 4px 0 #7d1f3d;">Admin Panel</button>
     </div>
 
     <div id="game-over-screen">
@@ -3869,7 +3868,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         }
 
         // Monsters
-        const __freezeMonsters = !!__supporterPanelOpen; // skip monster AI while supporter panel is open
+        // Freeze monsters only when the supporter panel is ACTUALLY visible right now
+        // (using DOM state instead of a flag so it can never get stuck on).
+        const __spEl = document.getElementById('supporter-panel');
+        const __freezeMonsters = !!(__spEl && __spEl.style.display === 'flex');
         for (let i = monsters.length-1; i >= 0; i--) {
             const m = monsters[i];
             // Multiplayer: retarget to nearest living, visible player (shadows outer p)
@@ -4141,7 +4143,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (monstersSpawned >= monstersToSpawn && monsters.length === 0) {
             wave++; monstersSpawned = 0; spawnTimer = 90;
             currentMonsterClass = rollMonsterClass();
-            monstersToSpawn = (wave % 10 === 0) ? 1 : (4 + wave*3);
+            monstersToSpawn = (wave % 10 === 0) ? 1 : (5 + (wave-1)*3);
             waveIntroTimer = 120;
             if (wave % 10 === 0) {
                 showStatus(`⚠️ BOSS WAVE ${wave} — ${currentMonsterClass.emoji} BOSS ${currentMonsterClass.name}!`, '#ff2d55');
@@ -6380,7 +6382,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
             bullets=[]; monsters=[]; particles=[]; pickups=[]; walls=[]; fireTiles=[]; poisonTiles=[]; allies=[]; turrets=[]; traps=[];
             score = d.score; wave = d.wave; coins = BigInt(d.coins || '200');
-            monstersToSpawn = 4 + wave*3; monstersSpawned = 0; spawnTimer = 90;
+            monstersToSpawn = (wave % 10 === 0) ? 1 : (5 + (wave-1)*3); monstersSpawned = 0; spawnTimer = 90;
 
             currentMonsterClass = MONSTER_CLASSES.find(c => c.name === d.currentMonsterName) || rollMonsterClass();
             waveIntroTimer = 120;
