@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Monster Attack!</title>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -19,12 +22,22 @@
         #touch-ui.show { display: block; }
         #touch-stick { position: absolute; left: 18px; bottom: 18px; width: 110px; height: 110px; background: rgba(0,0,0,0.25); border: 3px solid rgba(255,255,255,0.6); border-radius: 50%; pointer-events: auto; touch-action: none; }
         #touch-knob { position: absolute; left: 30px; top: 30px; width: 44px; height: 44px; background: rgba(255,255,255,0.85); border: 2px solid rgba(0,0,0,0.4); border-radius: 50%; pointer-events: none; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
-        #touch-actions { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column-reverse; gap: 8px; pointer-events: auto; }
-        .touch-btn { width: 60px; height: 60px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.6); background: rgba(0,0,0,0.45); color: #fff; font-size: 24px; font-family: 'Fredoka One', sans-serif; cursor: pointer; touch-action: manipulation; user-select: none; }
+        #touch-actions { position: absolute; right: 14px; bottom: 14px; display: grid; grid-template-columns: repeat(2, auto); gap: 8px; pointer-events: auto; }
+        .touch-btn { width: 58px; height: 58px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.6); background: rgba(0,0,0,0.45); color: #fff; font-size: 22px; font-family: 'Fredoka One', sans-serif; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; display: flex; align-items: center; justify-content: center; padding: 0; }
         .touch-btn:active { background: rgba(255,255,255,0.4); transform: scale(0.92); }
         @media (pointer: coarse) {
             .btn { font-size: 0.95em; padding: 12px 25px; }
             #ui { font-size: 0.85em; }
+            body { overflow: hidden; touch-action: none; }
+            h1, .subtitle, .controls { display: none; }
+            #game-wrapper { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
+            canvas#game { width: 100vw !important; height: auto !important; max-height: 100vh; }
+        }
+        @media (max-width: 520px) {
+            .touch-btn { width: 52px; height: 52px; font-size: 19px; }
+            #touch-stick { width: 100px; height: 100px; left: 12px; bottom: 12px; }
+            #touch-knob { width: 40px; height: 40px; left: 27px; top: 27px; }
+            #touch-actions { right: 10px; bottom: 10px; gap: 6px; }
         }
         #hud { display: flex; justify-content: space-between; max-width: 900px; margin: 10px auto 0; font-size: 0.85em; flex-wrap: wrap; background: #fff; border-radius: 12px; padding: 6px 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         #hud span { padding: 3px 8px; font-weight: 700; }
@@ -346,6 +359,7 @@
             <div id="code-msg"></div>
             <button id="worlds-btn" onclick="openWorldScreen()">Worlds</button>
             <button id="chars-btn" onclick="openCharsScreen()">Characters</button>
+            <button id="abilities-btn" onclick="openAbilitiesScreen()" style="margin-top:5px;background:linear-gradient(180deg,#a29bfe,#6c5ce7);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #4834b5;transition:all 0.2s;">⚡ Abilities</button>
             <button id="season-btn" onclick="openSeasonScreen()" style="margin-top:5px;background:linear-gradient(180deg,#feca57,#ff9f43);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #b33939;transition:all 0.2s;">Season Pass</button>
             <button id="pets-btn" onclick="openPetsScreen()" style="margin-top:5px;background:linear-gradient(180deg,#fd79a8,#c44569);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #7d1f3d;transition:all 0.2s;">🐾 Pets</button>
         </div>
@@ -359,7 +373,9 @@
         <div id="touch-actions">
             <button class="touch-btn" id="touch-shoot" title="Shoot/Attack">🔫</button>
             <button class="touch-btn" id="touch-reload" title="Reload">🔄</button>
-            <button class="touch-btn" id="touch-ability" title="Ability">⚡</button>
+            <button class="touch-btn" id="touch-ability" title="Ability (E)">⚡</button>
+            <button class="touch-btn" id="touch-movez" title="Move Z">💨</button>
+            <button class="touch-btn" id="touch-movex" title="Move X">💥</button>
             <button class="touch-btn" id="touch-pause" title="Pause">⏸️</button>
         </div>
     </div>
@@ -627,6 +643,13 @@
         <button class="btn" onclick="closeCharsScreen()" style="margin-top:20px;">Back</button>
     </div>
 
+    <div id="abilities-screen" style="position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#2d3436,#6c5ce7,#a29bfe);display:none;flex-direction:column;align-items:center;z-index:15;overflow-y:auto;padding:30px 20px;">
+        <h2 style="font-family:'Fredoka One',cursive;font-size:2em;color:#feca57;text-shadow:2px 2px 0 #c44569;margin-bottom:6px;">⚡ Abilities</h2>
+        <p style="color:#fff;font-weight:700;font-size:0.85em;margin-bottom:14px;text-align:center;max-width:520px;">Each ability auto-levels by using it. 8 uses → Lv.2 (+25% dmg). 20 uses → Lv.3 (+50% dmg).</p>
+        <div id="abilities-grid" style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:720px;"></div>
+        <button class="btn" onclick="closeAbilitiesScreen()" style="margin-top:20px;">Back</button>
+    </div>
+
     <div id="world-screen">
         <h2>Select World</h2>
         <div class="world-grid" id="world-grid"></div>
@@ -647,8 +670,10 @@
             <b style="color:#d4710e;">WASD</b>/<b style="color:#d4710e;">Arrows</b> — Move |
             <b style="color:#d4710e;">Click</b> — Attack |
             <b style="color:#d4710e;">R</b> — Reload |
-            <b style="color:#d4710e;">E</b> — Special Ability |
-            <b style="color:#d4710e;">1/2/3</b> — Speed Runner Modes |
+            <b style="color:#d4710e;">E</b> — Ability |
+            <b style="color:#d4710e;">Z</b> — Dash (Lv.2) |
+            <b style="color:#d4710e;">X</b> — Burst (Lv.3) |
+            <b style="color:#d4710e;">1/2/3</b> — Speed Modes |
             <b style="color:#d4710e;">ESC/P</b> — Pause
         </div>
     </div>
@@ -1292,7 +1317,25 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                 conn.send({ t:'welcome', idx: NET.lobby.length-1, lobby: mpSerializeLobby() });
             });
             conn.on('data', d => mpHostOnData(conn, d));
-            conn.on('close', () => { NET.conns = NET.conns.filter(c=>c!==conn); NET.lobby = NET.lobby.filter(p=>p.conn!==conn); mpUpdateLobby(); mpBroadcast({t:'lobby', lobby: mpSerializeLobby()}); });
+            conn.on('close', () => {
+                NET.conns = NET.conns.filter(c=>c!==conn);
+                const entry = NET.lobby.find(p=>p.conn===conn);
+                if (entry) {
+                    if (NET.started) {
+                        // In-game disconnect — keep lobby slot (so indices stay stable) but remove their remote player
+                        const lobbyIdx = NET.lobby.indexOf(entry);
+                        const rpI = remotePlayers.findIndex(r => r.idx === lobbyIdx);
+                        if (rpI > -1) remotePlayers.splice(rpI, 1);
+                        entry.disconnected = true;
+                        entry.conn = null;
+                    } else {
+                        // Pre-game lobby — safe to remove the entry entirely
+                        NET.lobby = NET.lobby.filter(p=>p.conn!==conn);
+                    }
+                }
+                mpUpdateLobby();
+                mpBroadcast({t:'lobby', lobby: mpSerializeLobby()});
+            });
         });
         NET.peer.on('error', err => { mpSetStatus('Host error: '+err.type, true); });
     }
@@ -1322,7 +1365,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (!entry) return;
         const entryIdx = NET.lobby.indexOf(entry);
         if (d.t==='join') { entry.name = d.name || 'Player'; mpUpdateLobby(); mpBroadcast({t:'lobby', lobby: mpSerializeLobby()}); }
-        else if (d.t==='pickClass') { entry.clsName = d.clsName; entry.ready = true; mpUpdateLobby(); mpBroadcast({t:'lobby', lobby: mpSerializeLobby()}); }
+        else if (d.t==='pickClass') { entry.clsName = d.clsName; entry.charLevel = d.charLevel || 1; entry.moveZUnlocked = !!d.moveZUnlocked; entry.moveXUnlocked = !!d.moveXUnlocked; entry.abilityLvls = d.abilityLvls || { e:1, z:1, x:1 }; entry.ready = true; mpUpdateLobby(); mpBroadcast({t:'lobby', lobby: mpSerializeLobby()}); }
         else if (d.t==='input') {
             entry.input = d;
             const rp = remotePlayers.find(r => r.idx === entryIdx);
@@ -1388,7 +1431,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             mpUpdateLobby();
             mpBroadcast({t:'lobby', lobby: mpSerializeLobby()});
         } else if (NET.mode==='client') {
-            NET.hostConn.send({t:'pickClass', clsName: c.name});
+            NET.hostConn.send({t:'pickClass', clsName: c.name, charLevel: getCharLevel(c.name), moveZUnlocked: hasMoveUnlocked(c.name,'z'), moveXUnlocked: hasMoveUnlocked(c.name,'x'), abilityLvls: { e:getAbilityLevel(c.name,'e'), z:getAbilityLevel(c.name,'z'), x:getAbilityLevel(c.name,'x') }});
         }
         SFX.rollResult(c.rarity);
         document.getElementById('mp-my-class').textContent = `${c.emoji} ${c.name} [${c.rarity}]`;
@@ -1433,8 +1476,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
     function mpClientSendInput() {
         if (NET.mode!=='client' || !NET.hostConn || !NET.hostConn.open) return;
-        NET.hostConn.send({ t:'input', keys: {...keys}, mx: mouse.x, my: mouse.y, shooting, speedMode: player?player.speedMode:1, ability: NET._abilityFlag, reload: NET._reloadFlag });
-        NET._abilityFlag=false; NET._reloadFlag=false;
+        NET.hostConn.send({ t:'input', keys: {...keys}, mx: mouse.x, my: mouse.y, shooting, speedMode: player?player.speedMode:1, ability: NET._abilityFlag, reload: NET._reloadFlag, moveQ: NET._moveQFlag, moveF: NET._moveFFlag });
+        NET._abilityFlag=false; NET._reloadFlag=false; NET._moveQFlag=false; NET._moveFFlag=false;
     }
 
     function mpClientApplyState(s) {
@@ -1475,6 +1518,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function mpHandleEvent(d) {
         if (d.type==='status') showStatus(d.text, d.color);
         else if (d.type==='sfx' && SFX[d.name]) SFX[d.name]();
+        else if (d.type==='pause') { document.getElementById('pause-screen').style.display = d.paused ? 'flex' : 'none'; }
         else if (d.type==='gameOver') { document.getElementById('game-over-screen').style.display='flex'; document.getElementById('go-title').textContent='Game Over'; document.getElementById('final-score').textContent=`Score: ${d.score}`; document.getElementById('final-wave').textContent=`Wave ${d.wave}`; gameRunning=false; cancelAnimationFrame(animFrame); if(NET._inputLoop){clearInterval(NET._inputLoop);NET._inputLoop=null;} }
     }
 
@@ -1515,6 +1559,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             shieldUp: c.hasPlayerShield||false, shieldRecharge:0, fireTrailTimer:0,
             invisible:false, invisTimer:0, invisCooldown:0, chiliBoost:0, chiliSpawnTimer:600, turretSpawnTimer:3600,
             idx, name, input:{keys:{},mx:x,my:y,shooting:false}, isRemote:true,
+            moveQCooldown:0, moveFCooldown:0,
+            charLevel: (NET.lobby[idx] && NET.lobby[idx].charLevel) || 1,
+            moveZUnlocked: !!(NET.lobby[idx] && NET.lobby[idx].moveZUnlocked),
+            moveXUnlocked: !!(NET.lobby[idx] && NET.lobby[idx].moveXUnlocked),
+            abilityLvls: (NET.lobby[idx] && NET.lobby[idx].abilityLvls) || { e:1, z:1, x:1 },
         };
     }
 
@@ -1886,6 +1935,82 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function closeCharsScreen() {
         document.getElementById('chars-screen').style.display = 'none';
         document.getElementById('start-screen').style.display = 'flex';
+    }
+
+    function openAbilitiesScreen() {
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('abilities-screen').style.display = 'flex';
+        renderAbilitiesGrid();
+    }
+    function closeAbilitiesScreen() {
+        document.getElementById('abilities-screen').style.display = 'none';
+        document.getElementById('start-screen').style.display = 'flex';
+    }
+    function renderAbilitiesGrid() {
+        const grid = document.getElementById('abilities-grid');
+        if (!grid) return;
+        const eLabel = (cls) => {
+            // Pick a short E ability label per class (reuses HUD ability text logic)
+            const c = cls;
+            if (c.canTeleport) return '⚡ Teleport';
+            if (c.canShout) return '📢 67!';
+            if (c.canBuild) return '🧱 Build';
+            if (c.canScream) return '😡 Scream';
+            if (c.canSwallow) return '🎤 Swallow';
+            if (c.speedModes) return '🏃 Speed Modes';
+            if (c.canRevive) return '💚 Revive';
+            if (c.reflectEvery) return '🔄 Reflect';
+            if (c.dodgeChance) return '💫 Dodge';
+            if (c.fireImmune) return '🔥 Fire Immune';
+            if (c.lifeSteal) return '🩸 Life Steal';
+            if (c.canCopy) return '📋 Copy';
+            if (c.hasPlayerShield) return '🛡️ Shield';
+            if (c.flamingPower) return '🔥 Fire Trail';
+            if (c.mindSwap) return '🧠 Possess';
+            if (c.ghostMode) return '👻 Vanish';
+            if (c.necromancer) return '💀 Necromancer';
+            if (c.canSpawnTurret) return '🤖 Turret';
+            if (c.sikunaPower) return '👹 Sikuna';
+            if (c.isSupporter) return '💖 Buff Panel';
+            return '— passive —';
+        };
+        const bar = (slot, cls) => {
+            const data = getAbilityData(cls.name, slot);
+            const prog = abilityProgress(cls.name, slot);
+            const pct = Math.floor(prog.ratio * 100);
+            const stars = '★'.repeat(data.lvl) + '☆'.repeat(MAX_ABILITY_LEVEL - data.lvl);
+            const txt = prog.max ? 'MAXED' : `${prog.uses} / ${prog.need} uses`;
+            return `
+                <div style="flex:1;min-width:160px;background:rgba(0,0,0,0.25);padding:8px 12px;border-radius:10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-family:'Fredoka One',cursive;font-size:0.85em;color:#feca57;">[${slot.toUpperCase()}] Lv.${data.lvl}</span>
+                        <span style="font-family:'Fredoka One',cursive;font-size:0.7em;color:#feca57;">${stars}</span>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.1);border-radius:8px;height:8px;overflow:hidden;margin-top:4px;">
+                        <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#26de81,#feca57);"></div>
+                    </div>
+                    <div style="font-size:0.7em;color:#ccc;margin-top:2px;">${txt}</div>
+                </div>`;
+        };
+        grid.innerHTML = CLASSES.map(c => {
+            const mv = MOVES[c.name] || {};
+            return `
+            <div style="background:linear-gradient(135deg, ${c.armorColor||'#444'}88, #22222288);border:3px solid ${c.rarityColor};border-radius:14px;padding:10px 14px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                    <div style="font-size:1.8em;">${c.emoji}</div>
+                    <div style="flex:1;">
+                        <div style="font-family:'Fredoka One',cursive;font-size:1em;color:#fff;letter-spacing:1px;">${c.name}</div>
+                        <div style="font-size:0.7em;color:${c.rarityColor};letter-spacing:2px;">${c.rarity.toUpperCase()}</div>
+                    </div>
+                    <div style="font-size:0.75em;color:#fff;text-align:right;">
+                        <div>[E] ${eLabel(c)}</div>
+                        <div>[Z] ${mv.z?.name||'Dash'}</div>
+                        <div>[X] ${mv.x?.name||'Burst'}</div>
+                    </div>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">${bar('e',c)}${bar('z',c)}${bar('x',c)}</div>
+            </div>`;
+        }).join('');
     }
 
     function renderCharsGrid() {
@@ -3221,6 +3346,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             sikunaBuff: 0,
             gsDef: gsData.stats.DEF || 0,
             gsCrit: gsData.stats.CRIT || 0,
+            moveQCooldown: 0, moveFCooldown: 0,
+            charLevel: lvl,
+            moveZUnlocked: hasMoveUnlocked(c.name, 'z'),
+            moveXUnlocked: hasMoveUnlocked(c.name, 'x'),
+            abilityLvls: { e:getAbilityLevel(c.name,'e'), z:getAbilityLevel(c.name,'z'), x:getAbilityLevel(c.name,'x') },
         };
         applyPetAbility(p);
         for (let i = 0; i < petRuntime.length; i++) {
@@ -3342,23 +3472,205 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
 
     // ======================== ABILITIES ========================
-    function useAbility() {
-        const p = player;
+    // ===== Per-class Move Sets (Z = Lv.2 unlock, X = Lv.3 unlock) =====
+    // Powerful classes (mythical/secret) trigger a short cutscene on their X move.
+
+    function _moveCutscene(p, name, color, emoji) {
+        if (p !== player) return; // local-only visual
+        const el = document.createElement('div');
+        el.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;z-index:90;pointer-events:none;display:flex;flex-direction:column;justify-content:center;align-items:center;background:radial-gradient(circle, ${color}aa 0%, transparent 70%);animation:moveCsFade 1s ease forwards;`;
+        el.innerHTML = `
+            <div style="font-family:'Fredoka One',cursive;font-size:5em;color:${color};text-shadow:0 0 40px ${color},0 4px 8px rgba(0,0,0,0.7);letter-spacing:6px;animation:moveCsPop 0.45s ease;">${emoji}</div>
+            <div style="font-family:'Fredoka One',cursive;font-size:2.6em;color:#fff;text-shadow:0 0 30px ${color},2px 2px 0 rgba(0,0,0,0.5);letter-spacing:6px;margin-top:6px;animation:moveCsPop 0.45s ease 0.05s both;">${name}</div>`;
+        if (!document.getElementById('moveCsKf')) {
+            const s = document.createElement('style');
+            s.id = 'moveCsKf';
+            s.textContent = `
+                @keyframes moveCsFade { 0%{opacity:0}25%{opacity:1}75%{opacity:1}100%{opacity:0} }
+                @keyframes moveCsPop { 0%{transform:scale(0.3) rotate(-10deg);opacity:0}60%{transform:scale(1.18) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(0)} }`;
+            document.head.appendChild(s);
+        }
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1000);
+    }
+
+    // Helpers (used by per-class moves)
+    function _mvDmgRadius(p, rad, dmg) {
+        for (let i = monsters.length-1; i >= 0; i--) {
+            const m = monsters[i];
+            if (Math.hypot(m.x-p.x, m.y-p.y) < rad) hitMonster(m, i, dmg);
+        }
+    }
+    function _mvRing(cx, cy, color, count, radius) {
+        for (let i=0;i<count;i++) { const a=(Math.PI*2/count)*i; particles.push({x:cx+Math.cos(a)*radius,y:cy+Math.sin(a)*radius,vx:Math.cos(a)*4,vy:Math.sin(a)*4,life:22,maxLife:22,color,r:4}); }
+    }
+    function _mvSpray(p, count, ang, spread, dmg, color, speed) {
+        for (let i=0;i<count;i++) {
+            const ba = count>1 ? ang + (i/(count-1)-0.5)*spread : ang;
+            bullets.push({ x:p.x+Math.cos(ba)*18, y:p.y+Math.sin(ba)*18, vx:Math.cos(ba)*speed, vy:Math.sin(ba)*speed, life:60, damage:dmg, color });
+        }
+    }
+    function _mvDash(p, dist, color, mx, my) {
+        const ang = Math.atan2(my - p.y, mx - p.x);
+        const tx = Math.max(p.r, Math.min(W-p.r, p.x + Math.cos(ang)*dist));
+        const ty = Math.max(p.r, Math.min(H-p.r, p.y + Math.sin(ang)*dist));
+        if (ptInBld(tx,ty,p.r) || ptInWall(tx,ty,p.r)) return false;
+        for (let i=0;i<8;i++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:15,maxLife:15,color,r:3});
+        p.x = tx; p.y = ty;
+        for (let i=0;i<8;i++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:15,maxLife:15,color,r:3});
+        p.invincible = Math.max(p.invincible, 15);
+        return true;
+    }
+    function _mvHealTeam(p, radius, amt) {
+        const all = [player, ...remotePlayers];
+        for (const pl of all) if (pl && pl.hp>0 && Math.hypot(pl.x-p.x,pl.y-p.y)<radius) pl.hp = Math.min(pl.maxHp, pl.hp + amt);
+    }
+
+    const MOVES = {
+        // ====== COMMON ======
+        'Physico': {
+            z:{ cd:120, name:'Flurry', color:'#34495e', run:(p,mx,my)=>{ p.meleeSwing=15; _mvDmgRadius(p,55,Math.floor(p.damage*1.6)); _mvRing(p.x,p.y,'#34495e',10,30); SFX.shoot(); } },
+            x:{ cd:600, name:'CRIT STRIKE', color:'#34495e', emoji:'🗡️', cs:false, run:(p,mx,my)=>{ _mvDash(p,150,'#34495e',mx,my); _mvDmgRadius(p,70,Math.floor(p.damage*3.5)); _mvRing(p.x,p.y,'#34495e',14,40); addShake(6); SFX.shoot(); } } },
+        'Scaredy Cat': {
+            z:{ cd:150, name:'Panic Dash', color:'#f78fb3', run:(p,mx,my)=>{ _mvDash(p,140,'#f78fb3',mx,my); p.invincible=Math.max(p.invincible,40); SFX.teleport(); } },
+            x:{ cd:600, name:'Scratch Storm', color:'#f78fb3', emoji:'🙀', cs:false, run:(p,mx,my)=>{ for(let i=0;i<16;i++){const a=(Math.PI*2/16)*i;_mvSpray(p,1,a,0,p.damage,'#f78fb3',10);} _mvRing(p.x,p.y,'#f78fb3',14,35); SFX.shoot(); } } },
+        // ====== RARE ======
+        'Gangster': {
+            z:{ cd:180, name:'Tommy Gun', color:'#1c1c1c', run:(p,mx,my)=>{ const ang=Math.atan2(my-p.y,mx-p.x); _mvSpray(p,8,ang,0.4,Math.floor(p.damage*0.75),'#1c1c1c',12); SFX.shoot(); } },
+            x:{ cd:600, name:'Drive-By', color:'#1c1c1c', emoji:'🔫', cs:false, run:(p,mx,my)=>{ _mvDash(p,180,'#1c1c1c',mx,my); const ang=Math.atan2(my-p.y,mx-p.x); for(let i=0;i<14;i++){const ba=ang+(i-7)*0.1;_mvSpray(p,1,ba,0,p.damage,'#1c1c1c',12);} addShake(5); SFX.shoot(); } } },
+        'Saber': {
+            z:{ cd:120, name:'Lunge', color:'#c0392b', run:(p,mx,my)=>{ _mvDash(p,90,'#c0392b',mx,my); p.meleeSwing=18; _mvDmgRadius(p,55,Math.floor(p.damage*1.8)); SFX.shoot(); } },
+            x:{ cd:600, name:'Whirlwind', color:'#c0392b', emoji:'⚔️', cs:false, run:(p,mx,my)=>{ p.meleeSwing=40; _mvDmgRadius(p,90,Math.floor(p.damage*2.8)); _mvRing(p.x,p.y,'#c0392b',20,70); addShake(6); SFX.shoot(); } } },
+        'Scientist': {
+            z:{ cd:180, name:'Acid Cloud', color:'#00ff88', run:(p,mx,my)=>{ for(let i=0;i<8;i++) poisonTiles.push({x:mx+(Math.random()-0.5)*60,y:my+(Math.random()-0.5)*60,life:300}); _mvRing(mx,my,'#00ff88',12,30); SFX.shoot(); } },
+            x:{ cd:720, name:'MUTATE', color:'#ecf0f1', emoji:'🧪', cs:false, run:(p,mx,my)=>{ p.hp=p.maxHp; p.invincible=Math.max(p.invincible,90); p.chiliBoost=Math.max(p.chiliBoost,420); _mvRing(p.x,p.y,'#00ff88',20,50); SFX.revive(); } } },
+        '67 Kid': {
+            z:{ cd:180, name:'Hype Up', color:'#9b59b6', run:(p,mx,my)=>{ p.chiliBoost=Math.max(p.chiliBoost,300); p.invincible=Math.max(p.invincible,30); _mvRing(p.x,p.y,'#9b59b6',12,40); SFX.shout67(); } },
+            x:{ cd:780, name:'67 SUPER SLAM', color:'#9b59b6', emoji:'6️⃣', cs:false, run:(p,mx,my)=>{ _mvDmgRadius(p,260,Math.floor(p.damage*4)); _mvRing(p.x,p.y,'#9b59b6',28,80); addShake(16); SFX.shout67(); } } },
+        // ====== LEGENDARY-marked (Epic-tier) ======
+        'Medic': {
+            z:{ cd:240, name:'Heal Pulse', color:'#e74c3c', run:(p,mx,my)=>{ _mvHealTeam(p,220,30); _mvRing(p.x,p.y,'#e74c3c',14,50); SFX.revive(); } },
+            x:{ cd:900, name:'REVIVE AURA', color:'#e74c3c', emoji:'💉', cs:false, run:(p,mx,my)=>{ for(const pl of [player,...remotePlayers]) if(pl){pl.hp=pl.maxHp; pl.invincible=Math.max(pl.invincible,120); pl.reviveUsed=false;} _mvRing(p.x,p.y,'#e74c3c',24,80); SFX.revive(); } } },
+        'Speed Runner': {
+            z:{ cd:120, name:'Sprint Burst', color:'#00d2d3', run:(p,mx,my)=>{ p.chiliBoost=Math.max(p.chiliBoost,300); _mvDash(p,160,'#00d2d3',mx,my); SFX.teleport(); } },
+            x:{ cd:780, name:'TIME SLOW', color:'#00d2d3', emoji:'💨', cs:false, run:(p,mx,my)=>{ for(const m of monsters) m.slow=Math.max(m.slow||0,360); _mvRing(p.x,p.y,'#00d2d3',24,60); SFX.teleport(); } } },
+        'The Iron': {
+            z:{ cd:240, name:'Iron Wall', color:'#7f8c8d', run:(p,mx,my)=>{ for(let i=0;i<6;i++){const a=(Math.PI*2/6)*i;const wx=p.x+Math.cos(a)*55,wy=p.y+Math.sin(a)*55; if(!ptInBld(wx,wy,15))walls.push({x:wx,y:wy,hp:3});} _mvRing(p.x,p.y,'#7f8c8d',12,40); SFX.build(); } },
+            x:{ cd:900, name:'IRON TANK', color:'#7f8c8d', emoji:'🏗️', cs:false, run:(p,mx,my)=>{ p.invincible=Math.max(p.invincible,360); p.hp=p.maxHp; _mvRing(p.x,p.y,'#7f8c8d',20,50); SFX.shield(); } } },
+        'The Nerd': {
+            z:{ cd:180, name:'Bookworm', color:'#16a085', run:(p,mx,my)=>{ p.invincible=Math.max(p.invincible,180); p.hp=Math.min(p.maxHp,p.hp+20); _mvRing(p.x,p.y,'#16a085',10,30); SFX.shield(); } },
+            x:{ cd:900, name:'BIG BRAIN', color:'#16a085', emoji:'🤓', cs:false, run:(p,mx,my)=>{ p.invincible=Math.max(p.invincible,180); _mvDmgRadius(p,200,Math.floor(p.damage*3)); _mvRing(p.x,p.y,'#16a085',20,50); SFX.shout67(); } } },
+        // ====== LEGENDARY ======
+        'Monster Copier': {
+            z:{ cd:180, name:'Mimic', color:'#ffeaa7', run:(p,mx,my)=>{ p.copiedPower=true; p.copyTimer=Math.max(p.copyTimer,300); p.copySpeedBonus=Math.max(p.copySpeedBonus,1.5); _mvRing(p.x,p.y,'#ffeaa7',12,30); } },
+            x:{ cd:780, name:'FINAL FORM', color:'#ffeaa7', emoji:'🎭', cs:false, run:(p,mx,my)=>{ p.copiedPower=true; p.copyTimer=Math.max(p.copyTimer,600); p.copySpeedBonus=Math.max(p.copySpeedBonus,3.0); p.chiliBoost=Math.max(p.chiliBoost,600); _mvRing(p.x,p.y,'#ffeaa7',22,55); SFX.revive(); } } },
+        'Vampire': {
+            z:{ cd:180, name:'Bloodlust', color:'#6c5ce7', run:(p,mx,my)=>{ p.hp=Math.min(p.maxHp,p.hp+30); p.invincible=Math.max(p.invincible,40); _mvRing(p.x,p.y,'#6c5ce7',12,30); SFX.revive(); } },
+            x:{ cd:900, name:'BAT SWARM', color:'#6c5ce7', emoji:'🦇', cs:true, run:(p,mx,my)=>{ for(let i=0;i<8;i++){const a=(Math.PI*2/8)*i; allies.push({x:p.x+Math.cos(a)*35,y:p.y+Math.sin(a)*35,r:9,speed:3.5,damage:6,color:'#6c5ce7',hp:8,maxHp:8,life:720,atkCd:0});} _mvRing(p.x,p.y,'#6c5ce7',18,45); SFX.revive(); } } },
+        // ====== MYTHICAL ======
+        'Gangster Captain': {
+            z:{ cd:180, name:'Captain Order', color:'#2c3e50', run:(p,mx,my)=>{ const ang=Math.atan2(my-p.y,mx-p.x); _mvSpray(p,5,ang,0.5,p.damage,'#2c3e50',11); SFX.shoot(); } },
+            x:{ cd:900, name:'MOB BOSS', color:'#2c3e50', emoji:'🎩', cs:true, run:(p,mx,my)=>{ for(let r=0;r<24;r++){const a=(Math.PI*2/24)*r; _mvSpray(p,1,a,0,p.damage,'#2c3e50',12);} addShake(10); _mvRing(p.x,p.y,'#2c3e50',16,40); SFX.shoot(); } } },
+        'Glitch': {
+            z:{ cd:90, name:'Glitch Dash', color:'#ff3838', run:(p,mx,my)=>{ for(let i=0;i<3;i++){p.x=Math.max(p.r,Math.min(W-p.r,p.x+(Math.random()-0.5)*200));p.y=Math.max(p.r,Math.min(H-p.r,p.y+(Math.random()-0.5)*200));for(let j=0;j<5;j++)particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:15,maxLife:15,color:'#ff3838',r:3});} p.invincible=Math.max(p.invincible,30); SFX.teleport(); } },
+            x:{ cd:900, name:'REALITY BREAK', color:'#ff3838', emoji:'👾', cs:true, run:(p,mx,my)=>{ for(let i=monsters.length-1;i>=0;i--){const m=monsters[i]; if(Math.hypot(m.x-p.x,m.y-p.y)<220 && !m.isBoss){explodeMonster(m); score+=m.score; monsters.splice(i,1);}} _mvDmgRadius(p,220,Math.floor(p.damage*5)); addShake(20); _mvRing(p.x,p.y,'#ff3838',32,80); SFX.teleport(); } } },
+        'Ghost': {
+            z:{ cd:240, name:'Phase Walk', color:'#dfe6e9', run:(p,mx,my)=>{ p.invisible=true; p.invisTimer=Math.max(p.invisTimer,180); _mvRing(p.x,p.y,'#dfe6e9',10,30); SFX.teleport(); } },
+            x:{ cd:900, name:'SOUL DRAIN', color:'#dfe6e9', emoji:'👻', cs:true, run:(p,mx,my)=>{ let drained=0; for(let i=monsters.length-1;i>=0;i--){const m=monsters[i]; if(Math.hypot(m.x-p.x,m.y-p.y)<300){hitMonster(m,i,12); drained+=8;}} p.hp=Math.min(p.maxHp,p.hp+drained); _mvRing(p.x,p.y,'#dfe6e9',24,80); SFX.revive(); } } },
+        'Machine': {
+            z:{ cd:240, name:'Mini Turret', color:'#95a5a6', run:(p,mx,my)=>{ const ang=Math.atan2(my-p.y,mx-p.x); const tx=p.x+Math.cos(ang)*40,ty=p.y+Math.sin(ang)*40; if(!ptInBld(tx,ty,12)) { turrets.push({x:tx,y:ty,r:10,hp:20,maxHp:20,cooldown:0,angle:0,ammo:18}); _mvRing(tx,ty,'#95a5a6',10,25); SFX.build(); } } },
+            x:{ cd:900, name:'MECH MODE', color:'#95a5a6', emoji:'🤖', cs:true, run:(p,mx,my)=>{ p.invincible=Math.max(p.invincible,120); p.hp=p.maxHp; for(let i=0;i<4;i++){const a=(Math.PI*2/4)*i; turrets.push({x:p.x+Math.cos(a)*50,y:p.y+Math.sin(a)*50,r:12,hp:30,maxHp:30,cooldown:0,angle:0,ammo:30});} _mvRing(p.x,p.y,'#95a5a6',20,50); SFX.build(); } } },
+        'Sikuna': {
+            z:{ cd:180, name:'Demon Slash', color:'#e84118', run:(p,mx,my)=>{ const ang=Math.atan2(my-p.y,mx-p.x); for(let i=0;i<3;i++){const a=ang+(i-1)*0.45; _mvSpray(p,1,a,0,Math.floor(p.damage*2),'#e84118',14);} SFX.shoot(); } },
+            x:{ cd:900, name:"HELL'S WRATH", color:'#e84118', emoji:'👹', cs:true, run:(p,mx,my)=>{ for(let i=0;i<14;i++){const fx=p.x+(Math.random()-0.5)*400, fy=p.y+(Math.random()-0.5)*400; fireTiles.push({x:fx,y:fy,life:300,fromPlayer:true});} _mvDmgRadius(p,260,Math.floor(p.damage*3)); addShake(15); _mvRing(p.x,p.y,'#e84118',24,70); SFX.shoot(); } } },
+        // ====== SECRET ======
+        'Builder': {
+            z:{ cd:180, name:'Wall Ring', color:'#00ffe0', run:(p,mx,my)=>{ for(let i=0;i<8;i++){const a=(Math.PI*2/8)*i;const wx=p.x+Math.cos(a)*55,wy=p.y+Math.sin(a)*55; if(!ptInBld(wx,wy,15))walls.push({x:wx,y:wy,hp:3});} SFX.build(); } },
+            x:{ cd:900, name:'FORTRESS', color:'#00ffe0', emoji:'🔨', cs:true, run:(p,mx,my)=>{ for(let ring=40; ring<=90; ring+=25){ const n=Math.max(8,Math.floor(ring/7)); for(let i=0;i<n;i++){const a=(Math.PI*2/n)*i;const wx=p.x+Math.cos(a)*ring,wy=p.y+Math.sin(a)*ring; if(!ptInBld(wx,wy,15))walls.push({x:wx,y:wy,hp:5});} } SFX.build(); } } },
+        'Necromancer': {
+            z:{ cd:240, name:'Raise Dead', color:'#00ffe0', run:(p,mx,my)=>{ for(let i=0;i<2;i++) allies.push({x:p.x+(Math.random()-0.5)*40,y:p.y+(Math.random()-0.5)*40,r:10,speed:3.0,damage:8,color:'#26de81',hp:15,maxHp:15,life:600,atkCd:0}); _mvRing(p.x,p.y,'#00ffe0',12,40); SFX.revive(); } },
+            x:{ cd:900, name:'SKULL KING', color:'#00ffe0', emoji:'💀', cs:true, run:(p,mx,my)=>{ for(let i=0;i<6;i++){const a=(Math.PI*2/6)*i; allies.push({x:p.x+Math.cos(a)*55,y:p.y+Math.sin(a)*55,r:12,speed:3.5,damage:12,color:'#00ffe0',hp:25,maxHp:25,life:1200,atkCd:0});} _mvRing(p.x,p.y,'#00ffe0',24,60); SFX.revive(); } } },
+        'Mind Swapper': {
+            z:{ cd:180, name:'Confuse', color:'#5f27cd', run:(p,mx,my)=>{ for(const m of monsters) if(Math.hypot(m.x-p.x,m.y-p.y)<160) m.stunned=Math.max(m.stunned||0,180); _mvRing(p.x,p.y,'#5f27cd',12,50); SFX.shout67(); } },
+            x:{ cd:900, name:'MIND CONTROL', color:'#00ffe0', emoji:'🧠', cs:true, run:(p,mx,my)=>{ for(let i=monsters.length-1;i>=0;i--){const m=monsters[i]; if(Math.hypot(m.x-p.x,m.y-p.y)<220 && !m.isBoss){ allies.push({x:m.x,y:m.y,r:m.r,speed:m.speed||2,damage:8,color:'#5f27cd',hp:m.maxHp,maxHp:m.maxHp,life:720,atkCd:0}); monsters.splice(i,1);}} _mvRing(p.x,p.y,'#5f27cd',24,60); SFX.revive(); } } },
+        'Calm Kid': {
+            z:{ cd:180, name:'Inner Peace', color:'#74b9ff', run:(p,mx,my)=>{ p.hp=Math.min(p.maxHp,p.hp+50); p.invincible=Math.max(p.invincible,60); _mvRing(p.x,p.y,'#74b9ff',12,40); SFX.revive(); } },
+            x:{ cd:900, name:'ZEN MASTER', color:'#00ffe0', emoji:'😌', cs:true, run:(p,mx,my)=>{ for(const m of monsters) m.frozen=Math.max(m.frozen||0,600); for(const pl of [player,...remotePlayers]) if(pl){ pl.hp=pl.maxHp; pl.invincible=Math.max(pl.invincible,120);} _mvRing(p.x,p.y,'#00ffe0',24,80); SFX.revive(); } } },
+        'Supporter': {
+            z:{ cd:180, name:'Quick Heal', color:'#26de81', run:(p,mx,my)=>{ _mvHealTeam(p,260,40); _mvRing(p.x,p.y,'#26de81',14,40); SFX.revive(); } },
+            x:{ cd:900, name:'TOTAL SUPPORT', color:'#00ffe0', emoji:'💖', cs:true, run:(p,mx,my)=>{ for(const pl of [player,...remotePlayers]) if(pl){ pl.hp=pl.maxHp; pl.invincible=Math.max(pl.invincible,120); pl.chiliBoost=Math.max(pl.chiliBoost,600);} _mvRing(p.x,p.y,'#00ffe0',28,80); SFX.revive(); } } },
+    };
+
+    function useMoveQ(targetPlayer, mx, my) {
+        const p = targetPlayer || player;
+        if (!p || p.frozen > 0 || p.stunned > 0) return;
+        if ((p.charLevel || 1) < 2 && !p.moveZUnlocked) { if (p === player) showStatus('Z LOCKED — Lv.2', '#888'); return; }
+        if (p.moveQCooldown > 0) return;
+        const aimX = (mx !== undefined) ? mx : mouse.x;
+        const aimY = (my !== undefined) ? my : mouse.y;
+        const m = (MOVES[p.cls.name] && MOVES[p.cls.name].z) || { cd:180, name:'Dash', color:'#0abde3', run:(p,mx,my)=>{ _mvDash(p,120,'#0abde3',mx,my); SFX.teleport(); } };
+        p.moveQCooldown = m.cd;
+        if (p === player) showStatus(m.name.toUpperCase()+'!', m.color);
+        // Ability-level damage multiplier (Lv.2 = 1.25x, Lv.3 = 1.5x)
+        const zLvl = (p.abilityLvls && p.abilityLvls.z) || 1;
+        const mult = 1 + (zLvl - 1) * 0.25;
+        const origDmg = p.damage;
+        if (mult !== 1) p.damage = Math.floor(origDmg * mult);
+        m.run(p, aimX, aimY);
+        p.damage = origDmg;
+        if (p === player) { const lvlUp = addAbilityUse(p.cls.name, 'z'); if (lvlUp) { _abilityLevelUpToast(p, 'z', lvlUp); p.abilityLvls.z = lvlUp; } }
+    }
+
+    function useMoveF(targetPlayer, mx, my) {
+        const p = targetPlayer || player;
+        if (!p || p.frozen > 0 || p.stunned > 0) return;
+        if ((p.charLevel || 1) < 3 && !p.moveXUnlocked) { if (p === player) showStatus('X LOCKED — Lv.3', '#888'); return; }
+        if (p.moveFCooldown > 0) return;
+        const aimX = (mx !== undefined) ? mx : mouse.x;
+        const aimY = (my !== undefined) ? my : mouse.y;
+        const m = (MOVES[p.cls.name] && MOVES[p.cls.name].x) || { cd:720, name:'Power Burst', color:'#feca57', emoji:'💥', cs:false, run:(p,mx,my)=>{ _mvDmgRadius(p,150,Math.max(20,Math.floor(p.damage*2))); _mvRing(p.x,p.y,'#feca57',16,40); } };
+        p.moveFCooldown = m.cd;
+        if (m.cs && p === player) _moveCutscene(p, m.name, m.color, m.emoji);
+        else if (p === player) { showStatus(m.name+'!', m.color); addShake(6); }
+        const xLvl = (p.abilityLvls && p.abilityLvls.x) || 1;
+        const mult = 1 + (xLvl - 1) * 0.25;
+        const origDmg = p.damage;
+        if (mult !== 1) p.damage = Math.floor(origDmg * mult);
+        m.run(p, aimX, aimY);
+        p.damage = origDmg;
+        if (p === player) { const lvlUp = addAbilityUse(p.cls.name, 'x'); if (lvlUp) { _abilityLevelUpToast(p, 'x', lvlUp); p.abilityLvls.x = lvlUp; } }
+    }
+
+    function useAbility(targetPlayer, mx, my) {
+        const p = targetPlayer || player;
+        const aimX = (mx !== undefined) ? mx : mouse.x;
+        const aimY = (my !== undefined) ? my : mouse.y;
+        if (p.frozen > 0 || p.stunned > 0) return;
+        // Apply E ability damage multiplier (effect applied throughout via p.damage reads)
+        const eLvl = (p.abilityLvls && p.abilityLvls.e) || 1;
+        const eMult = 1 + (eLvl - 1) * 0.25;
+        const _origEDmg = p.damage;
+        if (eMult !== 1) p.damage = Math.floor(_origEDmg * eMult);
+        try { _useAbilityCore(p, aimX, aimY); }
+        finally { p.damage = _origEDmg; }
+        if (p === player) { const lvlUp = addAbilityUse(p.cls.name, 'e'); if (lvlUp) { _abilityLevelUpToast(p, 'e', lvlUp); p.abilityLvls.e = lvlUp; } }
+    }
+    function _useAbilityCore(p, aimX, aimY) {
         if (p.frozen > 0 || p.stunned > 0) return;
 
-        // Supporter: open buff panel (toggles)
+        // Supporter: open buff panel (local UI — only for the local player)
         if (p.cls.isSupporter) {
-            toggleSupporterPanel();
+            if (p === player) toggleSupporterPanel();
             return;
         }
 
         // Glitch teleport
         if (p.cls.canTeleport && p.teleporting <= 0) {
-            if (!ptInBld(mouse.x, mouse.y, p.r) && !ptInWall(mouse.x, mouse.y, p.r)) {
+            if (!ptInBld(aimX, aimY, p.r) && !ptInWall(aimX, aimY, p.r)) {
                 p.teleporting = 20;
                 SFX.teleport();
                 for (let i=0;i<8;i++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:15,maxLife:15,color:'#ff2d55',r:3});
-                p.x = mouse.x; p.y = mouse.y;
+                p.x = aimX; p.y = aimY;
                 for (let i=0;i<8;i++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:15,maxLife:15,color:'#ff2d55',r:3});
             }
         }
@@ -3435,12 +3747,13 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             } else {
                 // 1) Multiplayer teammate swap (highest priority)
                 let teammate = null, td = 200*200;
-                if (typeof remotePlayers !== 'undefined' && remotePlayers.length > 0) {
-                    for (const rp of remotePlayers) {
-                        if (!rp || rp.hp <= 0) continue;
-                        const dd = (rp.x-p.x)*(rp.x-p.x) + (rp.y-p.y)*(rp.y-p.y);
-                        if (dd < td) { td = dd; teammate = rp; }
-                    }
+                const allOthers = [];
+                if (typeof player !== 'undefined' && player && player !== p) allOthers.push(player);
+                if (typeof remotePlayers !== 'undefined') for (const rp of remotePlayers) if (rp && rp !== p) allOthers.push(rp);
+                for (const tm of allOthers) {
+                    if (!tm || tm.hp <= 0) continue;
+                    const dd = (tm.x-p.x)*(tm.x-p.x) + (tm.y-p.y)*(tm.y-p.y);
+                    if (dd < td) { td = dd; teammate = tm; }
                 }
                 if (teammate) {
                     const tx = teammate.x, ty = teammate.y;
@@ -3575,6 +3888,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (rp.invincible>0) rp.invincible--;
         if (rp.flashTimer>0) rp.flashTimer--;
         if (rp.meleeSwing>0) rp.meleeSwing--;
+        if (rp.moveQCooldown>0) rp.moveQCooldown--;
+        if (rp.moveFCooldown>0) rp.moveFCooldown--;
         if (rp.reloading) { rp.reloadTimer--; if (rp.reloadTimer<=0) { rp.reloading=false; rp.ammo=rp.maxAmmo; } }
         if (rp.chiliBoost>0) rp.chiliBoost--;
         if (rp.cls.hasPlayerShield && !rp.shieldUp) { rp.shieldRecharge++; if (rp.shieldRecharge>=600) { rp.shieldUp=true; rp.shieldRecharge=0; } }
@@ -3614,6 +3929,65 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             }
         }
         if (inp.reload && !rp.reloading && rp.ammo<rp.maxAmmo && rp.cls.type!=='melee') { rp.reloading=true; rp.reloadTimer=60; }
+        // Ability (E key) — trigger host-side ability execution using the remote's aim
+        if (inp.ability && !rp._abilityHandled) {
+            rp._abilityHandled = true;
+            useAbility(rp, inp.mx, inp.my);
+        } else if (!inp.ability) {
+            rp._abilityHandled = false;
+        }
+        // Move Q (Lv.2)
+        if (inp.moveQ && !rp._moveQHandled) {
+            rp._moveQHandled = true;
+            useMoveQ(rp, inp.mx, inp.my);
+        } else if (!inp.moveQ) {
+            rp._moveQHandled = false;
+        }
+        // Move F (Lv.3)
+        if (inp.moveF && !rp._moveFHandled) {
+            rp._moveFHandled = true;
+            useMoveF(rp, inp.mx, inp.my);
+        } else if (!inp.moveF) {
+            rp._moveFHandled = false;
+        }
+        // Class passives for remote players
+        // Flame: fire trail
+        if (rp.cls.flamingPower) {
+            rp.fireTrailTimer = (rp.fireTrailTimer||0) - 1;
+            if (rp.fireTrailTimer <= 0) { rp.fireTrailTimer = 8; fireTiles.push({ x: rp.x, y: rp.y, life: 180, fromPlayer: true }); }
+        }
+        // Vampire: sun burn
+        if (rp.cls.sunBurn && !isInShade(rp.x, rp.y)) {
+            rp.sunBurnTimer = (rp.sunBurnTimer||0) + 1;
+            if (rp.sunBurnTimer % 30 === 0) { rp.hp--; if (rp.hp <= 0) { rp.hp = rp.maxHp; rp.invincible = 120; rp.x = 100+Math.random()*(W-200); rp.y = 100+Math.random()*(H-200); rp.sunBurnTimer = 0; } }
+        } else { rp.sunBurnTimer = 0; }
+        // Machine: auto turret every 60s
+        if (rp.cls.canSpawnTurret) {
+            rp.turretSpawnTimer = (rp.turretSpawnTimer ?? 3600) - 1;
+            if (rp.turretSpawnTimer <= 0) {
+                rp.turretSpawnTimer = 3600;
+                for (let tries=0; tries<20; tries++) {
+                    const a = Math.random()*Math.PI*2;
+                    const tx = rp.x + Math.cos(a)*40, ty = rp.y + Math.sin(a)*40;
+                    if (tx>20 && tx<W-20 && ty>20 && ty<H-20 && !ptInBld(tx,ty,12) && !ptInWall(tx,ty,12)) {
+                        turrets.push({ x: tx, y: ty, r: 12, hp: 30, maxHp: 30, cooldown: 0, angle: 0, ammo: 25 });
+                        break;
+                    }
+                }
+            }
+        }
+        // Speed Runner: periodic chili spawns
+        if (rp.cls.speedModes) {
+            rp.chiliSpawnTimer = (rp.chiliSpawnTimer ?? 600) - 1;
+            if (rp.chiliSpawnTimer <= 0) {
+                rp.chiliSpawnTimer = 600;
+                for (let tries=0; tries<20; tries++) {
+                    const cx = 40 + Math.random()*(W-80);
+                    const cy = 40 + Math.random()*(H-80);
+                    if (!ptInBld(cx,cy,10) && !ptInWall(cx,cy,10)) { pickups.push({ x: cx, y: cy, type:'chili', life: 600 }); break; }
+                }
+            }
+        }
     }
 
     function update() {
@@ -3640,6 +4014,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (p.shootCooldown > 0) p.shootCooldown--;
         if (p.invincible > 0) p.invincible--;
         if (p.flashTimer > 0) p.flashTimer--;
+        if (p.moveQCooldown > 0) p.moveQCooldown--;
+        if (p.moveFCooldown > 0) p.moveFCooldown--;
         if (p.chiliBoost > 0) { p.chiliBoost--; if (p.chiliBoost===0) showStatus('CHILI WORE OFF', '#e17055'); }
         if (p.sikunaBuff > 0) { p.sikunaBuff--; if (p.sikunaBuff===0) showStatus('SIKUNA BUFF WORE OFF', '#ff2d55'); }
         // Poison pebble damage-over-time
@@ -6133,7 +6509,16 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         else if (p.cls.canSpawnTurret) ab=`🤖 Turret ${Math.ceil(p.turretSpawnTimer/60)}s`;
         else if (p.cls.sikunaPower) ab=`👹 Fingers ${p.sikunaFingersUsed||0}/30 ${p.sikunaBuff>0?'(BUFFED!)':''}`;
         else if (p.cls.isSupporter) ab='💖 [E] Buff Panel';
-        document.getElementById('ability-display').textContent = ab;
+        // Append unlockable move set status (Z at Lv.2, X at Lv.3) — names from MOVES table
+        const lvl = p.charLevel || 1;
+        const moveSet = MOVES[p.cls.name] || {};
+        const zName = (moveSet.z && moveSet.z.name) || 'Dash';
+        const xName = (moveSet.x && moveSet.x.name) || 'Burst';
+        const zUnlocked = lvl >= 2 || p.moveZUnlocked;
+        const xUnlocked = lvl >= 3 || p.moveXUnlocked;
+        const qPart = zUnlocked ? (p.moveQCooldown>0?` | [Z] ${zName} ${Math.ceil(p.moveQCooldown/60)}s`:` | [Z] ${zName}`) : ' | 🔒Z Lv.2';
+        const fPart = xUnlocked ? (p.moveFCooldown>0?` | [X] ${xName} ${Math.ceil(p.moveFCooldown/60)}s`:` | [X] ${xName}`) : ' | 🔒X Lv.3';
+        document.getElementById('ability-display').textContent = ab + qPart + fPart;
     }
 
     function gameLoop() { if (!gameRunning) return; if (!gamePaused) { update(); draw(); } animFrame = requestAnimationFrame(gameLoop); }
@@ -6321,10 +6706,12 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
     function togglePause() {
         if (!gameRunning) return;
+        if (NET.mode === 'client') return; // only the host controls pause in multiplayer
         gamePaused = !gamePaused;
         document.getElementById('pause-screen').style.display = gamePaused ? 'flex' : 'none';
         shooting = false; // stop shooting while paused
         keys = {}; // clear held keys
+        if (NET.mode === 'host') mpBroadcast({ t:'event', type:'pause', paused: gamePaused });
     }
 
     // ======================== SAVE / LOAD ========================
@@ -6511,6 +6898,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         '001060': { reward: 'panel', msg: 'Admin Panel unlocked!' },
         'RESET': { reward: 'resetcodes', msg: 'All codes reset!' },
         '6767': { reward: 'mythical', amount: 100, msg: 'MYTHICAL + 100 Points!' },
+        'MOVES': { reward: 'move', msg: 'Pick a class, then pick Z or X to unlock!' },
     };
 
     let guaranteedClass = null; // set by code, used on next roll
@@ -6556,7 +6944,150 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         } else if (reward.reward === 'resetcodes') {
             localStorage.removeItem(USED_CODES_KEY);
             msgEl.style.color = '#26de81'; msgEl.textContent = reward.msg;
+        } else if (reward.reward === 'move') {
+            msgEl.style.color = '#feca57'; msgEl.textContent = reward.msg;
+            openMoveUnlockPicker();
         }
+    }
+
+    // ===== Ability leveling (auto-levels by use, max Lv.3) =====
+    // Each (className, slot in {e,z,x}) tracks uses; thresholds: 8 (→Lv.2), 20 (→Lv.3).
+    const ABILITY_LEVELS_KEY = 'monster_city_ability_levels';
+    const ABILITY_LEVEL_THRESHOLDS = [0, 8, 20]; // uses needed to be AT that level
+    const MAX_ABILITY_LEVEL = 3;
+    function loadAbilityLevels() { try { return JSON.parse(localStorage.getItem(ABILITY_LEVELS_KEY)) || {}; } catch(e) { return {}; } }
+    function saveAbilityLevels(d) { localStorage.setItem(ABILITY_LEVELS_KEY, JSON.stringify(d)); }
+    function getAbilityData(name, slot) {
+        const d = loadAbilityLevels();
+        return (d[name] && d[name][slot]) || { lvl:1, uses:0 };
+    }
+    function getAbilityLevel(name, slot) { return getAbilityData(name, slot).lvl; }
+    function getAbilityMult(name, slot) { return 1 + (getAbilityLevel(name,slot) - 1) * 0.25; }
+    function addAbilityUse(name, slot) {
+        const d = loadAbilityLevels();
+        if (!d[name]) d[name] = {};
+        if (!d[name][slot]) d[name][slot] = { lvl:1, uses:0 };
+        const a = d[name][slot];
+        if (a.lvl >= MAX_ABILITY_LEVEL) { saveAbilityLevels(d); return null; }
+        a.uses++;
+        let leveledTo = null;
+        if (a.lvl < MAX_ABILITY_LEVEL && a.uses >= ABILITY_LEVEL_THRESHOLDS[a.lvl]) {
+            a.lvl++;
+            leveledTo = a.lvl;
+        }
+        saveAbilityLevels(d);
+        return leveledTo;
+    }
+    function abilityProgress(name, slot) {
+        const a = getAbilityData(name, slot);
+        if (a.lvl >= MAX_ABILITY_LEVEL) return { uses:a.uses, need:0, ratio:1, max:true };
+        const need = ABILITY_LEVEL_THRESHOLDS[a.lvl];
+        const prev = ABILITY_LEVEL_THRESHOLDS[a.lvl-1] || 0;
+        return { uses:a.uses, need, ratio: Math.min(1, (a.uses-prev)/(need-prev)), max:false };
+    }
+    function _abilityLevelUpToast(p, slot, newLvl) {
+        if (p !== player) return;
+        const slotName = slot==='e'?'E (Ability)':slot==='z'?'Z (2nd)':'X (3rd)';
+        showStatus(`⭐ ${slotName} → Lv.${newLvl}!`, '#feca57');
+        SFX.rollResult('legendary');
+        for (let i=0;i<14;i++) { const a=(Math.PI*2/14)*i; particles.push({x:p.x+Math.cos(a)*30,y:p.y+Math.sin(a)*30,vx:Math.cos(a)*4,vy:Math.sin(a)*4,life:25,maxLife:25,color:'#feca57',r:4}); }
+    }
+
+    // ===== Move unlocks (granted by the MOVES redemption code) =====
+    const MOVE_UNLOCKS_KEY = 'monster_city_move_unlocks';
+    function loadMoveUnlocks() { try { return JSON.parse(localStorage.getItem(MOVE_UNLOCKS_KEY)) || {}; } catch(e) { return {}; } }
+    function saveMoveUnlocks(u) { localStorage.setItem(MOVE_UNLOCKS_KEY, JSON.stringify(u)); }
+    function hasMoveUnlocked(className, slot) { const u = loadMoveUnlocks(); return !!(u[className] && u[className][slot]); }
+    function grantMoveUnlock(className, slot) { const u = loadMoveUnlocks(); if (!u[className]) u[className] = {}; u[className][slot] = true; saveMoveUnlocks(u); }
+
+    function openMoveUnlockPicker() {
+        // Step 1 — pick a class
+        const overlay = document.createElement('div');
+        overlay.id = 'move-picker';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:95;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(0,0,0,0.88);padding:30px 20px;overflow-y:auto;';
+        const title = document.createElement('div');
+        title.style.cssText = "font-family:'Fredoka One',cursive;font-size:2em;color:#feca57;letter-spacing:4px;text-shadow:0 0 20px #feca57;margin-bottom:6px;text-align:center;";
+        title.textContent = '⭐ PICK A CLASS ⭐';
+        overlay.appendChild(title);
+        const sub = document.createElement('div');
+        sub.style.cssText = "font-family:'Fredoka One',cursive;font-size:0.95em;color:#fff;margin-bottom:16px;text-align:center;";
+        sub.textContent = 'Next: choose which move (Z or X) to unlock.';
+        overlay.appendChild(sub);
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;gap:10px;max-width:780px;';
+        CLASSES.forEach(c => {
+            const zHave = hasMoveUnlocked(c.name, 'z') || getCharLevel(c.name) >= 2;
+            const xHave = hasMoveUnlocked(c.name, 'x') || getCharLevel(c.name) >= 3;
+            const card = document.createElement('button');
+            card.style.cssText = `font-family:'Fredoka One',cursive;background:linear-gradient(135deg, ${c.armorColor||'#444'}, #222);color:#fff;border:3px solid ${c.rarityColor};border-radius:14px;padding:10px 12px;width:165px;cursor:pointer;transition:transform 0.15s;text-align:center;`;
+            const mv = MOVES[c.name] || {};
+            card.innerHTML = `
+                <div style="font-size:1.8em;">${c.emoji}</div>
+                <div style="font-size:0.85em;letter-spacing:1px;">${c.name}</div>
+                <div style="font-size:0.7em;color:${c.rarityColor};letter-spacing:2px;margin-top:2px;">${c.rarity.toUpperCase()}</div>
+                <div style="font-size:0.7em;color:#ccc;margin-top:4px;">${zHave?'✅':'🔒'} Z: ${mv.z?.name||'Dash'}</div>
+                <div style="font-size:0.7em;color:#ccc;">${xHave?'✅':'🔒'} X: ${mv.x?.name||'Burst'}</div>`;
+            card.onmouseenter = () => card.style.transform = 'translateY(-3px) scale(1.05)';
+            card.onmouseleave = () => card.style.transform = '';
+            card.onclick = () => {
+                document.body.removeChild(overlay);
+                openMoveSlotPicker(c);
+            };
+            grid.appendChild(card);
+        });
+        overlay.appendChild(grid);
+        const cancel = document.createElement('button');
+        cancel.style.cssText = "font-family:'Fredoka One',cursive;background:#636e72;color:#fff;border:none;padding:8px 24px;font-size:0.85em;border-radius:30px;cursor:pointer;margin-top:18px;letter-spacing:2px;";
+        cancel.textContent = 'CANCEL (forfeit reward)';
+        cancel.onclick = () => document.body.removeChild(overlay);
+        overlay.appendChild(cancel);
+        document.body.appendChild(overlay);
+    }
+
+    function openMoveSlotPicker(cls) {
+        // Step 2 — pick Z or X for the chosen class
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:95;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(0,0,0,0.88);padding:30px 20px;';
+        const title = document.createElement('div');
+        title.style.cssText = `font-family:'Fredoka One',cursive;font-size:1.8em;color:${cls.rarityColor};letter-spacing:4px;text-shadow:0 0 20px ${cls.rarityColor};margin-bottom:6px;text-align:center;`;
+        title.textContent = `${cls.emoji} ${cls.name.toUpperCase()} — PICK A MOVE`;
+        overlay.appendChild(title);
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;gap:20px;max-width:720px;margin-top:14px;';
+        const mv = MOVES[cls.name] || { z:{name:'Dash',color:'#0abde3'}, x:{name:'Power Burst',color:'#feca57'} };
+        const slots = [
+            { slot:'z', label:'Z', m:mv.z, lock:'Lv.2' },
+            { slot:'x', label:'X', m:mv.x, lock:'Lv.3' },
+        ];
+        slots.forEach(({slot, label, m, lock}) => {
+            const have = hasMoveUnlocked(cls.name, slot) || getCharLevel(cls.name) >= (slot==='z'?2:3);
+            const btn = document.createElement('button');
+            btn.style.cssText = `font-family:'Fredoka One',cursive;background:linear-gradient(180deg, ${m.color}, #222);color:#fff;border:4px solid ${m.color};border-radius:18px;padding:18px 24px;width:280px;cursor:${have?'not-allowed':'pointer'};opacity:${have?0.4:1};transition:transform 0.15s;text-align:center;`;
+            btn.innerHTML = `
+                <div style="font-size:2.2em;">${m.emoji||(slot==='z'?'💨':'💥')}</div>
+                <div style="font-size:1.4em;letter-spacing:3px;margin-top:4px;">[${label}] ${m.name}</div>
+                <div style="font-size:0.75em;color:#feca57;margin-top:6px;">Requires ${lock} — code bypasses it</div>
+                <div style="font-size:0.7em;color:#ccc;margin-top:2px;">${have?'ALREADY UNLOCKED':'CLICK TO UNLOCK'}</div>`;
+            if (!have) {
+                btn.onmouseenter = () => btn.style.transform = 'translateY(-3px) scale(1.04)';
+                btn.onmouseleave = () => btn.style.transform = '';
+                btn.onclick = () => {
+                    grantMoveUnlock(cls.name, slot);
+                    SFX.rollResult('legendary');
+                    document.body.removeChild(overlay);
+                    const msgEl = document.getElementById('code-msg');
+                    if (msgEl) { msgEl.style.color='#26de81'; msgEl.textContent = `${cls.emoji} ${cls.name} → [${label}] ${m.name} unlocked!`; }
+                };
+            }
+            row.appendChild(btn);
+        });
+        overlay.appendChild(row);
+        const cancel = document.createElement('button');
+        cancel.style.cssText = "font-family:'Fredoka One',cursive;background:#636e72;color:#fff;border:none;padding:8px 24px;font-size:0.85em;border-radius:30px;cursor:pointer;margin-top:24px;letter-spacing:2px;";
+        cancel.textContent = 'CANCEL (forfeit reward)';
+        cancel.onclick = () => document.body.removeChild(overlay);
+        overlay.appendChild(cancel);
+        document.body.appendChild(overlay);
     }
 
     // ======================== ADMIN PANEL ========================
@@ -7192,9 +7723,13 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (NET.mode==='client') {
             if (k==='r') NET._reloadFlag = true;
             if (k==='e') NET._abilityFlag = true;
+            if (k==='z') NET._moveQFlag = true;
+            if (k==='x') NET._moveFFlag = true;
         } else {
             if (k==='r') reload();
             if (k==='e') useAbility();
+            if (k==='z') useMoveQ();
+            if (k==='x') useMoveF();
         }
         if (player) { if(k==='1'&&player.cls.speedModes)player.speedMode=1; if(k==='2'&&player.cls.speedModes)player.speedMode=2; if(k==='3'&&player.cls.speedModes)player.speedMode=3; }
     });
@@ -7277,6 +7812,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const shootBtn = document.getElementById('touch-shoot');
         if (reloadBtn) reloadBtn.addEventListener('click', e => { e.preventDefault(); if (NET.mode==='client') NET._reloadFlag = true; else reload(); });
         if (abilityBtn) abilityBtn.addEventListener('click', e => { e.preventDefault(); if (NET.mode==='client') NET._abilityFlag = true; else useAbility(); });
+        const moveZBtn = document.getElementById('touch-movez');
+        const moveXBtn = document.getElementById('touch-movex');
+        if (moveZBtn) moveZBtn.addEventListener('click', e => { e.preventDefault(); if (NET.mode==='client') NET._moveQFlag = true; else useMoveQ(); });
+        if (moveXBtn) moveXBtn.addEventListener('click', e => { e.preventDefault(); if (NET.mode==='client') NET._moveFFlag = true; else useMoveF(); });
         if (pauseBtn) pauseBtn.addEventListener('click', e => { e.preventDefault(); if (gameRunning) togglePause(); });
         if (shootBtn) {
             shootBtn.addEventListener('touchstart', e => { e.preventDefault(); shooting = true; }, { passive: false });
