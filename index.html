@@ -39,6 +39,14 @@
             #touch-knob { width: 40px; height: 40px; left: 27px; top: 27px; }
             #touch-actions { right: 10px; bottom: 10px; gap: 6px; }
         }
+        /* Tablet / iPad — more screen, so bigger controls and let canvas use full width */
+        @media (pointer: coarse) and (min-width: 768px) {
+            .touch-btn { width: 72px; height: 72px; font-size: 28px; border-width: 4px; }
+            #touch-stick { width: 150px; height: 150px; left: 28px; bottom: 28px; }
+            #touch-knob { width: 60px; height: 60px; left: 41px; top: 41px; }
+            #touch-actions { right: 22px; bottom: 22px; gap: 12px; }
+            canvas#game { width: 100vw !important; height: auto !important; max-height: 100vh; }
+        }
         #hud { display: flex; justify-content: space-between; max-width: 900px; margin: 10px auto 0; font-size: 0.85em; flex-wrap: wrap; background: #fff; border-radius: 12px; padding: 6px 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         #hud span { padding: 3px 8px; font-weight: 700; }
         .hp { color: #ff6b6b; } .score { color: #ff9f43; } .wave-hud { color: #ee5a24; }
@@ -7743,6 +7751,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     const __isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     if (__isTouch) {
         document.getElementById('touch-ui').classList.add('show');
+        // iOS Safari: block pinch-zoom and rubber-band scroll
+        document.addEventListener('gesturestart', e => e.preventDefault());
+        document.addEventListener('gesturechange', e => e.preventDefault());
+        document.addEventListener('gestureend', e => e.preventDefault());
+        document.addEventListener('touchmove', e => { if (e.target === document.body || e.target === document.documentElement) e.preventDefault(); }, { passive: false });
     }
     // Virtual joystick — drives keys (w/a/s/d)
     (function setupJoystick() {
@@ -7770,26 +7783,40 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             knob.style.top = '30px';
             keys['w']=false; keys['s']=false; keys['a']=false; keys['d']=false;
         };
+        let stickTouchId = null;
         stick.addEventListener('touchstart', e => {
             e.preventDefault();
-            const t = e.touches[0]; const r = stick.getBoundingClientRect();
+            if (stickTouchId !== null) return; // already tracking a finger
+            const t = e.changedTouches[0];
+            stickTouchId = t.identifier;
+            const r = stick.getBoundingClientRect();
             startX = r.left + r.width/2; startY = r.top + r.height/2;
             active = true;
             setKnob(t.clientX - startX, t.clientY - startY);
         }, { passive: false });
         stick.addEventListener('touchmove', e => {
-            if (!active) return;
+            if (!active || stickTouchId === null) return;
             e.preventDefault();
-            const t = e.touches[0];
-            setKnob(t.clientX - startX, t.clientY - startY);
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.identifier === stickTouchId) { setKnob(t.clientX - startX, t.clientY - startY); break; }
+            }
         }, { passive: false });
-        stick.addEventListener('touchend', e => { e.preventDefault(); release(); }, { passive: false });
-        stick.addEventListener('touchcancel', e => { e.preventDefault(); release(); }, { passive: false });
+        const endStickIfMatch = e => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === stickTouchId) { stickTouchId = null; release(); e.preventDefault(); break; }
+            }
+        };
+        stick.addEventListener('touchend', endStickIfMatch, { passive: false });
+        stick.addEventListener('touchcancel', endStickIfMatch, { passive: false });
     })();
-    // Touch aim+shoot on canvas (right side or anywhere not on stick/buttons)
+    // Touch aim+shoot on canvas — track a single aiming-finger by identifier
+    let aimTouchId = null;
     canvas.addEventListener('touchstart', e => {
         e.preventDefault();
+        if (aimTouchId !== null) return;
         const t = e.changedTouches[0];
+        aimTouchId = t.identifier;
         const r = canvas.getBoundingClientRect();
         mouse.x = (t.clientX - r.left) * (W / r.width);
         mouse.y = (t.clientY - r.top) * (H / r.height);
@@ -7797,13 +7824,23 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }, { passive: false });
     canvas.addEventListener('touchmove', e => {
         e.preventDefault();
-        const t = e.changedTouches[0];
-        const r = canvas.getBoundingClientRect();
-        mouse.x = (t.clientX - r.left) * (W / r.width);
-        mouse.y = (t.clientY - r.top) * (H / r.height);
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            if (t.identifier === aimTouchId) {
+                const r = canvas.getBoundingClientRect();
+                mouse.x = (t.clientX - r.left) * (W / r.width);
+                mouse.y = (t.clientY - r.top) * (H / r.height);
+                break;
+            }
+        }
     }, { passive: false });
-    canvas.addEventListener('touchend', e => { e.preventDefault(); shooting = false; }, { passive: false });
-    canvas.addEventListener('touchcancel', e => { e.preventDefault(); shooting = false; }, { passive: false });
+    const endAimIfMatch = e => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === aimTouchId) { aimTouchId = null; shooting = false; e.preventDefault(); break; }
+        }
+    };
+    canvas.addEventListener('touchend', endAimIfMatch, { passive: false });
+    canvas.addEventListener('touchcancel', endAimIfMatch, { passive: false });
     // Action buttons
     (function bindTouchActions() {
         const reloadBtn = document.getElementById('touch-reload');
