@@ -16,7 +16,7 @@
         #game-wrapper { text-align: center; filter: drop-shadow(0 4px 15px rgba(0,0,0,0.15)); }
         h1 { font-family: 'Fredoka One', cursive; font-size: 2.2em; color: #ff6b6b; text-transform: uppercase; letter-spacing: 3px; text-shadow: 3px 3px 0 #feca57, -1px -1px 0 #fff; margin-bottom: 5px; }
         .subtitle { color: #7c6fa0; letter-spacing: 3px; font-size: 0.85em; margin-bottom: 10px; font-weight: 700; }
-        canvas { border: 4px solid #fff; border-radius: 16px; display: block; margin: 0 auto; background: #7ec8e3; cursor: crosshair; box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+        canvas { border: 4px solid #fff; border-radius: 16px; display: block; margin: 0 auto; background: #7ec8e3; cursor: none; box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
         canvas#game { max-width: 100vw; max-height: 100vh; width: auto; height: auto; touch-action: none; }
         /* Mobile / touch controls */
         #touch-ui { display: none; position: fixed; left: 0; right: 0; bottom: 0; top: 0; z-index: 8; pointer-events: none; }
@@ -239,7 +239,15 @@
         <div class="subtitle">Roll & Fight!</div>
         <div style="position:relative; display:inline-block; line-height:0;">
             <canvas id="game" width="900" height="550"></canvas>
-            <canvas id="game3d" width="900" height="550" style="position:absolute;top:0;left:0;display:none;border:4px solid #fff;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,0.15);"></canvas>
+            <canvas id="game3d" width="900" height="550" style="position:absolute;top:0;left:0;display:none;border:4px solid #fff;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,0.15);pointer-events:none;"></canvas>
+            <div id="vignette" style="position:absolute;top:4px;left:4px;width:calc(100% - 8px);height:calc(100% - 8px);pointer-events:none;border-radius:14px;box-shadow:inset 0 0 40px 6px rgba(0,0,0,0.08);"></div>
+            <div id="crosshair" style="position:absolute;left:0;top:0;width:32px;height:32px;pointer-events:none;display:none;will-change:transform;">
+                <div style="position:absolute;left:50%;top:0;width:2px;height:11px;background:#ff2d55;box-shadow:0 0 4px rgba(0,0,0,0.7);transform:translateX(-50%);"></div>
+                <div style="position:absolute;left:50%;bottom:0;width:2px;height:11px;background:#ff2d55;box-shadow:0 0 4px rgba(0,0,0,0.7);transform:translateX(-50%);"></div>
+                <div style="position:absolute;top:50%;left:0;height:2px;width:11px;background:#ff2d55;box-shadow:0 0 4px rgba(0,0,0,0.7);transform:translateY(-50%);"></div>
+                <div style="position:absolute;top:50%;right:0;height:2px;width:11px;background:#ff2d55;box-shadow:0 0 4px rgba(0,0,0,0.7);transform:translateY(-50%);"></div>
+                <div style="position:absolute;left:50%;top:50%;width:4px;height:4px;background:#ff2d55;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 6px rgba(255,45,85,0.8);"></div>
+            </div>
         </div>
         <div id="status-overlay"></div>
         <div id="hud">
@@ -251,6 +259,7 @@
             <span class="coins" id="coins-display">🍖 200</span>
             <span class="score" id="score-display">⭐ 0</span>
             <span style="color:#6c5ce7;font-weight:700;" id="points-display">🏆 0</span>
+            <span style="color:#feca57;font-weight:700;" id="tod-display">🕒 ---</span>
         </div>
     </div>
 
@@ -286,7 +295,7 @@
         <div class="tut-section">
             <h3>3. Controls</h3>
             <p>
-                <span class="tut-key">WASD</span> or <span class="tut-key">Arrows</span> — Move<br>
+                <span class="tut-key">WASD</span> — Move &nbsp; · &nbsp; <span class="tut-key">Arrows</span> — Look around<br>
                 <span class="tut-key">Mouse</span> — Aim<br>
                 <span class="tut-key">Click</span> — Shoot / Attack<br>
                 <span class="tut-key">R</span> — Reload<br>
@@ -705,7 +714,7 @@
             <button class="btn btn-fight" id="fight-btn" onclick="startGame()" disabled>Fight!</button>
         </div>
         <div class="controls">
-            <b style="color:#d4710e;">WASD</b>/<b style="color:#d4710e;">Arrows</b> — Move |
+            <b style="color:#d4710e;">WASD</b> — Move | <b style="color:#d4710e;">Arrows</b> — Look |
             <b style="color:#d4710e;">Click</b> — Attack |
             <b style="color:#d4710e;">R</b> — Reload |
             <b style="color:#d4710e;">E</b> — Ability |
@@ -1221,6 +1230,16 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
+    // World is 10x bigger than the viewport — camera follows the player
+    const WORLD_W = 9000, WORLD_H = 5500;
+    let camera = { x: 0, y: 0 };
+    function updateCamera() {
+        if (!player) return;
+        camera.x = Math.max(0, Math.min(WORLD_W - W, player.x - W/2));
+        camera.y = Math.max(0, Math.min(WORLD_H - H, player.y - H/2));
+    }
+    function mouseWorldX() { return mouse.x + camera.x; }
+    function mouseWorldY() { return mouse.y + camera.y; }
 
     // ======================== 20 CLASSES ========================
     const CLASSES = [
@@ -1514,7 +1533,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
     function mpClientSendInput() {
         if (NET.mode!=='client' || !NET.hostConn || !NET.hostConn.open) return;
-        NET.hostConn.send({ t:'input', keys: {...keys}, mx: mouse.x, my: mouse.y, shooting, speedMode: player?player.speedMode:1, ability: NET._abilityFlag, reload: NET._reloadFlag, moveQ: NET._moveQFlag, moveF: NET._moveFFlag });
+        NET.hostConn.send({ t:'input', keys: {...keys}, mx: mouseWorldX(), my: mouseWorldY(), shooting, speedMode: player?player.speedMode:1, ability: NET._abilityFlag, reload: NET._reloadFlag, moveQ: NET._moveQFlag, moveF: NET._moveFFlag });
         NET._abilityFlag=false; NET._reloadFlag=false; NET._moveQFlag=false; NET._moveFFlag=false;
     }
 
@@ -1537,7 +1556,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             const mine = s.players[NET.myIdx];
             player.x=mine.x; player.y=mine.y; player.hp=mine.hp; player.maxHp=mine.maxHp;
             // Local angle from mouse for instant aim — host still computes hitreg
-            player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+            player.angle = Math.atan2(mouseWorldY() - player.y, mouseWorldX() - player.x);
             player.ammo=mine.ammo; player.maxAmmo=mine.maxAmmo; player.reloading=mine.reloading;
             player.invincible=mine.invincible; player.frozen=mine.frozen; player.stunned=mine.stunned; player.slow=mine.slow;
             player.teleporting=mine.teleporting; player.invisible=mine.invisible;
@@ -1573,7 +1592,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Host player (idx 0)
         chosenClass = CLASSES.find(c=>c.name===NET.lobby[0].clsName) || CLASSES[0];
         player = createPlayer();
-        let att=0; do { player.x=100+Math.random()*(W-200); player.y=100+Math.random()*(H-200); att++; } while ((ptInBld(player.x,player.y,player.r)) && att<100);
+        let att=0; do { player.x=WORLD_W/2-W/2+100+Math.random()*(W-200); player.y=WORLD_H/2-H/2+100+Math.random()*(H-200); att++; } while ((ptInBld(player.x,player.y,player.r)) && att<100);
         // Remote players
         for (let i=1; i<NET.lobby.length; i++) {
             const cls = CLASSES.find(c=>c.name===NET.lobby[i].clsName) || CLASSES[0];
@@ -1645,10 +1664,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // ======================== GOD SURVIVOR ========================
     const GS_KEY = 'monster_city_god_survivor';
     const GS_STAT_NAMES = ['HP','ATK','SPD','DEF','CRIT'];
+    const GS_STAT_MAX = { HP:200, ATK:200, SPD:50, DEF:200, CRIT:200 };
     const GS_STAT_EMOJIS = ['❤️','💥','⚡','🛡️','🎯'];
     let gsData = { sp: 0, stats: {HP:0,ATK:0,SPD:0,DEF:0,CRIT:0}, questsDone: {}, totalKills: 0, totalWaves: 0, totalGames: 0, dailyKills: 0, dailyWaves: 0, dailyGames: 0, lastQuestDay: '', unlocked: false };
 
-    function loadGS() { try { const d = JSON.parse(localStorage.getItem(GS_KEY)); if (d) gsData = {...gsData, ...d}; } catch(e) {} }
+    function loadGS() { try { const d = JSON.parse(localStorage.getItem(GS_KEY)); if (d) gsData = {...gsData, ...d}; } catch(e) {} ; GS_STAT_NAMES.forEach(s => { const mx = GS_STAT_MAX[s] || 200; if ((gsData.stats[s]||0) > mx) gsData.stats[s] = mx; }); }
     const MAX_SP = 10000000000;
     function saveGS() { if (gsData.sp > MAX_SP) gsData.sp = MAX_SP; localStorage.setItem(GS_KEY, JSON.stringify(gsData)); }
 
@@ -1702,7 +1722,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
     function allocGSStat(stat) {
         if (gsData.sp <= 0) return;
-        if (gsData.stats[stat] >= 200) return;
+        const max = GS_STAT_MAX[stat] || 200;
+        if (gsData.stats[stat] >= max) return;
         gsData.sp--;
         gsData.stats[stat]++;
         saveGS();
@@ -1780,7 +1801,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         adminMsg(`Added ${v} Stat Points!`);
     }
     function adminMaxStats() {
-        GS_STAT_NAMES.forEach(s => { gsData.stats[s] = 200; });
+        GS_STAT_NAMES.forEach(s => { gsData.stats[s] = GS_STAT_MAX[s] || 200; });
         saveGS();
         adminMsg('All God Survivor stats maxed to 200!');
     }
@@ -3155,33 +3176,45 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // ======================== BUILDINGS ========================
     const BLDG_COLORS = ['#ff6b6b','#feca57','#48dbfb','#ff9ff3','#54a0ff','#5f27cd','#01a3a4','#f368e0','#ff9f43','#26de81'];
     function generateBuildings() {
-        buildings = [
-            { x:80, y:60, w:100, h:80 }, { x:650, y:50, w:120, h:70 },
-            { x:370, y:370, w:90, h:100 }, { x:50, y:320, w:80, h:90 },
-            { x:700, y:340, w:110, h:80 }, { x:260, y:120, w:60, h:60 },
-            { x:530, y:210, w:70, h:70 },
-        ];
+        rollTimeOfDay();
+        buildings = [];
+        // Procedurally scatter ~70 buildings across the 9000×5500 world
+        const TARGET_BUILDINGS = 70;
+        for (let i = 0; i < TARGET_BUILDINGS; i++) {
+            const w = 60 + Math.random()*80, h = 60 + Math.random()*80;
+            let x, y, attempts = 0, overlap;
+            do {
+                x = 60 + Math.random() * (WORLD_W - 120 - w);
+                y = 60 + Math.random() * (WORLD_H - 120 - h);
+                overlap = false;
+                for (const b of buildings) {
+                    if (x + w + 60 > b.x && x < b.x + b.w + 60 && y + h + 60 > b.y && y < b.y + b.h + 60) { overlap = true; break; }
+                }
+                attempts++;
+            } while (overlap && attempts < 30);
+            if (attempts < 30) buildings.push({ x, y, w, h });
+        }
         const cols = currentWorld.bldgColors || BLDG_COLORS;
         buildings.forEach((b,i) => { b.color = cols[i % cols.length]; });
         shadeZones = buildings.map(b => ({ x: b.x, y: b.y, w: b.w + 30, h: b.h + 20 }));
-        // Generate traps based on world — supports new `trapTypes` array and legacy single `traps` def
+        // Traps — scale count up for the larger world
         traps = [];
         const trapPool = currentWorld.trapTypes
             || (currentWorld.traps ? [currentWorld.traps] : []);
         if (trapPool.length > 0) {
-            const TRAPS_PER_MAP = 8;
+            const TRAPS_PER_MAP = 60;
             for (let i = 0; i < TRAPS_PER_MAP; i++) {
                 let tx, ty, attempts = 0;
-                do { tx = 40 + Math.random() * (W - 80); ty = 40 + Math.random() * (H - 80); attempts++; }
+                do { tx = 40 + Math.random() * (WORLD_W - 80); ty = 40 + Math.random() * (WORLD_H - 80); attempts++; }
                 while (ptInBld(tx, ty, 15) && attempts < 50);
                 const t = trapPool[Math.floor(Math.random() * trapPool.length)];
                 traps.push({ x: tx, y: ty, r: 18, type: t.type, emoji: t.emoji, color: t.color, dmg: t.dmg, effect: t.effect, duration: t.duration, label: t.label, art: t.art || 'default', cooldown: 0, seed: Math.random()*1000 });
             }
         }
-        // Always sprinkle poison pebbles (4 per map) — they poison for 10s on touch
-        for (let i = 0; i < 4; i++) {
+        // Poison pebbles scattered through the world
+        for (let i = 0; i < 30; i++) {
             let tx, ty, attempts = 0;
-            do { tx = 40 + Math.random() * (W - 80); ty = 40 + Math.random() * (H - 80); attempts++; }
+            do { tx = 40 + Math.random() * (WORLD_W - 80); ty = 40 + Math.random() * (WORLD_H - 80); attempts++; }
             while (ptInBld(tx, ty, 15) && attempts < 50);
             traps.push({ x: tx, y: ty, r: 28, type:'pebble', emoji:'🪨', color:'#26de81', dmg: 0, effect:'poison', duration: 600, label:'POISONED 10s!', cooldown: 0 });
         }
@@ -3343,7 +3376,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const spd = c.speed * bonus.speedMult + (gsData.stats.SPD || 0) * 0.3;
         const ammo = c.ammo === 999 ? 999 : c.ammo + bonus.ammoBonus;
         const p = {
-            x: W/2, y: H/2, r: 14,
+            x: WORLD_W/2, y: WORLD_H/2, r: 14,
             speed: spd, hp: hp, maxHp: hp,
             ammo: ammo, maxAmmo: ammo,
             damage: dmg, fireRate: c.fireRate,
@@ -3411,7 +3444,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (p.cls.type === 'melee') { meleeAttack(); return; }
         if (p.ammo <= 0 || p.reloading || p.shootCooldown > 0) return;
 
-        let angle = Math.atan2(mouse.y - p.y, mouse.x - p.x);
+        let angle = p.angle;
         // Aimbot: auto-aim at nearest monster
         if (cheats.aimBot && monsters.length > 0) {
             let closest = null, closestDist = Infinity;
@@ -3427,7 +3460,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             bullets.push({
                 x: p.x+Math.cos(angle)*18, y: p.y+Math.sin(angle)*18,
                 vx: Math.cos(angle+spread)*10, vy: Math.sin(angle+spread)*10,
-                life: 50, damage: p.sikunaBuff>0 ? Math.floor(p.damage*1.5) : p.damage,
+                life: 220, damage: p.sikunaBuff>0 ? Math.floor(p.damage*1.5) : p.damage,
                 slow: p.cls.slowBullet || false,
                 slowDur: p.cls.slowDuration || 60,
                 freeze: p.cls.freezeShot || false,
@@ -3548,7 +3581,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function _mvSpray(p, count, ang, spread, dmg, color, speed) {
         for (let i=0;i<count;i++) {
             const ba = count>1 ? ang + (i/(count-1)-0.5)*spread : ang;
-            bullets.push({ x:p.x+Math.cos(ba)*18, y:p.y+Math.sin(ba)*18, vx:Math.cos(ba)*speed, vy:Math.sin(ba)*speed, life:60, damage:dmg, color });
+            bullets.push({ x:p.x+Math.cos(ba)*18, y:p.y+Math.sin(ba)*18, vx:Math.cos(ba)*speed, vy:Math.sin(ba)*speed, life:220, damage:dmg, color });
         }
     }
     function _mvDash(p, dist, color, mx, my) {
@@ -3684,6 +3717,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
     function useAbility(targetPlayer, mx, my) {
         const p = targetPlayer || player;
+        if (!p) return;
         const aimX = (mx !== undefined) ? mx : mouse.x;
         const aimY = (my !== undefined) ? my : mouse.y;
         if (p.frozen > 0 || p.stunned > 0) return;
@@ -3838,10 +3872,18 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function spawnMonster() {
         if (!currentMonsterClass) return;
         const mc = currentMonsterClass;
+        // Spawn just off-screen relative to the player's camera so monsters reach them
         let x, y;
+        const px = player ? player.x : WORLD_W/2;
+        const py = player ? player.y : WORLD_H/2;
         const side = Math.floor(Math.random()*4);
-        if (side===0){x=-20;y=Math.random()*H;}else if(side===1){x=W+20;y=Math.random()*H;}
-        else if(side===2){x=Math.random()*W;y=-20;}else{x=Math.random()*W;y=H+20;}
+        const margin = 40;
+        if (side===0){ x = px - W/2 - margin; y = py - H/2 + Math.random()*H; }
+        else if(side===1){ x = px + W/2 + margin; y = py - H/2 + Math.random()*H; }
+        else if(side===2){ x = px - W/2 + Math.random()*W; y = py - H/2 - margin; }
+        else { x = px - W/2 + Math.random()*W; y = py + H/2 + margin; }
+        x = Math.max(-50, Math.min(WORLD_W+50, x));
+        y = Math.max(-50, Math.min(WORLD_H+50, y));
 
         const boss = isBossWave();
         const hpMult = (1 + (wave-1)*0.2) * (boss ? 12 + wave*0.5 : 1);
@@ -3936,28 +3978,31 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (rp.cls.hasPlayerShield && !rp.shieldUp) { rp.shieldRecharge++; if (rp.shieldRecharge>=600) { rp.shieldUp=true; rp.shieldRecharge=0; } }
         // Angle
         rp.angle = Math.atan2(inp.my - rp.y, inp.mx - rp.x);
-        // Movement
+        // Movement (player-relative: W forward, S back, A strafe-left, D strafe-right)
         const canMove = rp.frozen<=0 && rp.stunned<=0;
         if (canMove) {
-            let dx=0, dy=0;
-            if (inp.keys['w']||inp.keys['arrowup']) dy--;
-            if (inp.keys['s']||inp.keys['arrowdown']) dy++;
-            if (inp.keys['a']||inp.keys['arrowleft']) dx--;
-            if (inp.keys['d']||inp.keys['arrowright']) dx++;
-            if (dx&&dy) { dx*=0.707; dy*=0.707; }
+            let fwd=0, side=0;
+            if (inp.keys['w']) fwd++;
+            if (inp.keys['s']) fwd--;
+            if (inp.keys['d']) side++;
+            if (inp.keys['a']) side--;
+            if (fwd && side) { fwd*=0.707; side*=0.707; }
+            const ca = Math.cos(rp.angle), sa = Math.sin(rp.angle);
+            const dx = ca*fwd - sa*side;
+            const dy = sa*fwd + ca*side;
             let spd = rp.speed;
             if (rp.cls.speedModes) { if (inp.speedMode===2) spd=5.5; else if (inp.speedMode===3) spd=7.0; }
             if (rp.chiliBoost>0) spd *= 1.4;
             if (rp.slow>0) spd *= 0.4;
             const nx = rp.x + dx*spd, ny = rp.y + dy*spd;
-            if (!ptInBld(nx,rp.y,rp.r) && !ptInWall(nx,rp.y,rp.r) && nx-rp.r>0 && nx+rp.r<W) rp.x = nx;
-            if (!ptInBld(rp.x,ny,rp.r) && !ptInWall(rp.x,ny,rp.r) && ny-rp.r>0 && ny+rp.r<H) rp.y = ny;
+            if (!ptInBld(nx,rp.y,rp.r) && !ptInWall(nx,rp.y,rp.r) && nx-rp.r>0 && nx+rp.r<WORLD_W) rp.x = nx;
+            if (!ptInBld(rp.x,ny,rp.r) && !ptInWall(rp.x,ny,rp.r) && ny-rp.r>0 && ny+rp.r<WORLD_H) rp.y = ny;
         }
         // Shooting (ranged only for remote — simplified)
         if (inp.shooting && rp.cls.type!=='melee' && rp.shootCooldown<=0 && !rp.reloading && rp.ammo>0) {
             rp.shootCooldown = rp.fireRate;
             rp.ammo--;
-            bullets.push({ x:rp.x+Math.cos(rp.angle)*18, y:rp.y+Math.sin(rp.angle)*18, vx:Math.cos(rp.angle)*10, vy:Math.sin(rp.angle)*10, life:50, damage:rp.damage, color:'#ffcc00' });
+            bullets.push({ x:rp.x+Math.cos(rp.angle)*18, y:rp.y+Math.sin(rp.angle)*18, vx:Math.cos(rp.angle)*10, vy:Math.sin(rp.angle)*10, life:220, damage:rp.damage, color:'#ffcc00' });
             if (rp.ammo<=0) { rp.reloading=true; rp.reloadTimer=60; }
         }
         if (inp.shooting && rp.cls.type==='melee' && rp.shootCooldown<=0) {
@@ -4146,14 +4191,22 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
         const canMove = p.frozen <= 0 && p.stunned <= 0;
 
-        // Movement
+        // Arrow keys rotate the view (player.angle) — separate from WASD movement
+        const ROT_SPEED = 0.05;
+        if (keys['arrowleft']) p.angle -= ROT_SPEED;
+        if (keys['arrowright']) p.angle += ROT_SPEED;
+
+        // Movement — W forward, S back, A strafe-left, D strafe-right (relative to player.angle)
         if (canMove) {
-            let dx=0, dy=0;
-            if (keys['w']||keys['arrowup']) dy--;
-            if (keys['s']||keys['arrowdown']) dy++;
-            if (keys['a']||keys['arrowleft']) dx--;
-            if (keys['d']||keys['arrowright']) dx++;
-            if (dx&&dy) { dx*=0.707; dy*=0.707; }
+            let fwd = 0, side = 0;
+            if (keys['w']) fwd++;
+            if (keys['s']) fwd--;
+            if (keys['d']) side++;
+            if (keys['a']) side--;
+            if (fwd && side) { fwd *= 0.707; side *= 0.707; }
+            const ca = Math.cos(p.angle), sa = Math.sin(p.angle);
+            const dx = ca * fwd - sa * side;
+            const dy = sa * fwd + ca * side;
 
             let spd = p.speed + (p.copiedPower ? p.copySpeedBonus : 0);
             if (p.cls.speedModes) { if (p.speedMode===2) spd=5.5; else if (p.speedMode===3) spd=7.0; }
@@ -4170,8 +4223,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                 for (let st = 0; st < totalSteps; st++) {
                     const nx = p.x + dx*stepSpd, ny = p.y + dy*stepSpd;
                     let moved = false;
-                    if (!ptInBld(nx,p.y,p.r) && !ptInWall(nx,p.y,p.r) && nx-p.r>0 && nx+p.r<W) { p.x = nx; moved = true; }
-                    if (!ptInBld(p.x,ny,p.r) && !ptInWall(p.x,ny,p.r) && ny-p.r>0 && ny+p.r<H) { p.y = ny; moved = true; }
+                    if (!ptInBld(nx,p.y,p.r) && !ptInWall(nx,p.y,p.r) && nx-p.r>0 && nx+p.r<WORLD_W) { p.x = nx; moved = true; }
+                    if (!ptInBld(p.x,ny,p.r) && !ptInWall(p.x,ny,p.r) && ny-p.r>0 && ny+p.r<WORLD_H) { p.y = ny; moved = true; }
                     if (!moved) break;
                     // Stop on trap so the trap-trigger loop below catches us
                     let onTrap = false;
@@ -4183,7 +4236,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             }
         }
 
-        if (cameraMode === 'topdown') p.angle = Math.atan2(mouse.y - p.y, mouse.x - p.x);
+        if (cameraMode === 'topdown' && !keys['arrowleft'] && !keys['arrowright']) p.angle = Math.atan2(mouseWorldY() - p.y, mouseWorldX() - p.x);
 
         // Flame class: fire trail
         if (p.cls.flamingPower && canMove) {
@@ -4214,7 +4267,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             if (ptInBld(b.x,b.y,2)) { bullets.splice(i,1); continue; }
             const hw = ptInWall(b.x,b.y,2);
             if (hw) { hw.hp--; if(hw.hp<=0) walls.splice(walls.indexOf(hw),1); bullets.splice(i,1); continue; }
-            if (b.life<=0||b.x<-10||b.x>W+10||b.y<-10||b.y>H+10) { bullets.splice(i,1); continue; }
+            if (b.life<=0||b.x<-10||b.x>WORLD_W+10||b.y<-10||b.y>WORLD_H+10) { bullets.splice(i,1); continue; }
 
             // Player bullets hit monsters
             if (b.owner !== 'monster') {
@@ -4558,6 +4611,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Wave complete — roll new monster class + auto save
         if (monstersSpawned >= monstersToSpawn && monsters.length === 0) {
             wave++; monstersSpawned = 0; spawnTimer = 90;
+            setTimeOfDayForWave(wave);
             currentMonsterClass = rollMonsterClass();
             monstersToSpawn = (wave % 10 === 0) ? 1 : (5 + (wave-1)*3);
             waveIntroTimer = 120;
@@ -4789,8 +4843,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (trap.effect === 'knockback') {
             const ka = Math.atan2(pl.y - trap.y, pl.x - trap.x);
             pl.x += Math.cos(ka) * 60; pl.y += Math.sin(ka) * 60;
-            if (pl.x < pl.r) pl.x = pl.r; if (pl.x > W-pl.r) pl.x = W-pl.r;
-            if (pl.y < pl.r) pl.y = pl.r; if (pl.y > H-pl.r) pl.y = H-pl.r;
+            if (pl.x < pl.r) pl.x = pl.r; if (pl.x > WORLD_W-pl.r) pl.x = WORLD_W-pl.r;
+            if (pl.y < pl.r) pl.y = pl.r; if (pl.y > WORLD_H-pl.r) pl.y = WORLD_H-pl.r;
         }
         // Visual + audio feedback (only show status text + flash for local player)
         if (pl === player) {
@@ -6402,11 +6456,13 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Sky + floor
         const skyGrad = ctx.createLinearGradient(0, 0, 0, H/2);
         const horizonCol = currentWorld.ground || '#7ec8e3';
-        skyGrad.addColorStop(0, '#1a1a2e'); skyGrad.addColorStop(1, horizonCol + 'aa');
+        skyGrad.addColorStop(0, '#' + _timeOfDay.skyTop.toString(16).padStart(6,'0'));
+        skyGrad.addColorStop(1, '#' + _timeOfDay.skyBot.toString(16).padStart(6,'0'));
         ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, W, H/2);
         const floorGrad = ctx.createLinearGradient(0, H/2, 0, H);
-        floorGrad.addColorStop(0, currentWorld.groundAlt || '#6bb8d6');
-        floorGrad.addColorStop(1, '#1a1a1a');
+        // Per-time-of-day floor: top is a brighter version of the earth, bottom is a dim version
+        floorGrad.addColorStop(0, _shadeColor(_timeOfDay.groundHex, 1.25));
+        floorGrad.addColorStop(1, _shadeColor(_timeOfDay.groundHex, 0.5));
         ctx.fillStyle = floorGrad; ctx.fillRect(0, H/2, W, H/2);
 
         // Cast rays — build a depth buffer per column so sprites can occlude properly
@@ -6475,14 +6531,59 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             if (s.name) { ctx.font='bold 12px sans-serif'; ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(s.name, screenX, sy - sz*0.7); }
         }
 
-        // Weapon overlay — bottom-center hand/gun depending on class
+        // Viewmodel — arm + class-appropriate weapon (sword for melee, gun for ranged)
         const handCol = player.cls?.armorColor || '#444';
+        const swayX = Math.cos(Date.now()/240) * 6;
+        const swayY = Math.abs(Math.sin(Date.now()/240)) * 4;
+        const swingT = (player.meleeSwing||0) > 0 ? player.meleeSwing : 0;
+        const isMelee = player.cls?.type === 'melee';
+        // Arm
+        ctx.save();
+        ctx.translate(W/2 + 40 + swayX, H - 30 + swayY);
+        ctx.rotate(-0.25 + (isMelee ? -(swingT/8) : 0)); // melee swings upward when attacking
         ctx.fillStyle = handCol;
-        ctx.fillRect(W/2 - 50, H - 80, 100, 80);
-        ctx.fillStyle = '#2d3436';
-        ctx.fillRect(W/2 - 12, H - 130, 24, 50);
-        ctx.font = '40px serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
-        ctx.fillText(player.cls?.emoji || '🔫', W/2, H - 30);
+        ctx.beginPath(); ctx.roundRect?.(- 26, - 90, 52, 110, 14); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.fillStyle = '#222';
+        ctx.beginPath(); ctx.roundRect?.(- 28, - 95, 56, 14, 6); ctx.fill();
+        if (isMelee) {
+            // Sword: hilt + crossguard + blade
+            ctx.fillStyle = '#3a2410';
+            ctx.beginPath(); ctx.roundRect?.(- 6, - 110, 12, 22, 3); ctx.fill();
+            ctx.fillStyle = '#feca57';
+            ctx.beginPath(); ctx.roundRect?.(- 18, - 116, 36, 8, 2); ctx.fill();
+            // Blade
+            const bladeLen = 110;
+            const grad = ctx.createLinearGradient(0, -116, 0, -116-bladeLen);
+            grad.addColorStop(0, '#e8e8e8'); grad.addColorStop(0.5, '#fff'); grad.addColorStop(1, '#bbb');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(-7, -116);
+            ctx.lineTo(7, -116);
+            ctx.lineTo(4, -116-bladeLen+8);
+            ctx.lineTo(0, -116-bladeLen);
+            ctx.lineTo(-4, -116-bladeLen+8);
+            ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1.5; ctx.stroke();
+            // Edge highlight
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(-2, -120); ctx.lineTo(-1, -116-bladeLen+6); ctx.stroke();
+        } else {
+            // Gun: barrel + sight
+            ctx.fillStyle = '#2d3436';
+            ctx.beginPath(); ctx.roundRect?.(- 8, - 150, 16, 75, 4); ctx.fill();
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath(); ctx.roundRect?.(- 10, - 90, 20, 18, 3); ctx.fill();
+            ctx.fillStyle = '#444';
+            ctx.beginPath(); ctx.arc(0, - 155, 7, 0, Math.PI*2); ctx.fill();
+            // Front sight
+            ctx.fillStyle = '#feca57';
+            ctx.fillRect(-2, -162, 4, 6);
+        }
+        ctx.restore();
+        // Class emoji floating near grip
+        ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+        ctx.fillText(player.cls?.emoji || (isMelee?'⚔️':'🔫'), W/2 + 40 + swayX, H - 50 + swayY);
 
         // Crosshair
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
@@ -6491,6 +6592,56 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // ===== Three.js 3D first-person renderer =====
     // Maps the existing 2D game state to a real 3D scene rendered onto canvas#game3d.
     let _three = null;
+    let _three_sky = null;
+
+    // ===== Time of day — rolled at game start, drives sky + ground + lighting =====
+    const TIME_OF_DAY = [
+        { name:'Early Morning', skyTop:0x7891b8, skyBot:0xffc89a, groundHex:'#7a6248', sunCol:0xffd8a0, sunInt:0.95, hemiTop:0xffe2c0, hemiBot:0x8a7a55, hemiInt:0.85, exposure:1.25, bgFallback:0xffc89a },
+        { name:'Morning',       skyTop:0x4a98e0, skyBot:0xc8e4f8, groundHex:'#9c7a52', sunCol:0xfffaee, sunInt:1.4,  hemiTop:0xfff7d6, hemiBot:0xb4a578, hemiInt:1.1,  exposure:1.45, bgFallback:0xc8e4f8 },
+        { name:'Afternoon',     skyTop:0x2a7fc4, skyBot:0x9cd2f0, groundHex:'#a6815a', sunCol:0xffffff, sunInt:1.7,  hemiTop:0xffffff, hemiBot:0xa89568, hemiInt:1.3,  exposure:1.6,  bgFallback:0x9cd2f0 },
+        { name:'Evening',       skyTop:0x4a3a78, skyBot:0xff7a4a, groundHex:'#6e4a30', sunCol:0xffaa6a, sunInt:1.0,  hemiTop:0xffa86a, hemiBot:0x5a3a28, hemiInt:0.85, exposure:1.3,  bgFallback:0xff7a4a },
+    ];
+    let _timeOfDay = TIME_OF_DAY[Math.floor(Math.random()*TIME_OF_DAY.length)];
+    // Cycle the time of day in real-world order based on the wave number.
+    // Wave 1 = Early Morning, Wave 2 = Morning, Wave 3 = Afternoon, Wave 4 = Evening, then loops.
+    function setTimeOfDayForWave(w) {
+        const idx = ((w - 1) % TIME_OF_DAY.length + TIME_OF_DAY.length) % TIME_OF_DAY.length;
+        _timeOfDay = TIME_OF_DAY[idx];
+        if (typeof showStatus === 'function') showStatus(`🕒 ${_timeOfDay.name}`, '#feca57');
+        applyTimeOfDayToScene();
+    }
+    // Backwards-compatible name (still called from generateBuildings on first map)
+    function rollTimeOfDay() {
+        setTimeOfDayForWave(typeof wave !== 'undefined' && wave > 0 ? wave : 1);
+    }
+    function applyTimeOfDayToScene() {
+        if (!_three) return; // 3D not initialized yet — init3D will pick up _timeOfDay
+        const tod = _timeOfDay;
+        // Sky shader uniforms
+        if (_three_sky && _three_sky.material && _three_sky.material.uniforms) {
+            _three_sky.material.uniforms.topColor.value.setHex(tod.skyTop);
+            _three_sky.material.uniforms.bottomColor.value.setHex(tod.skyBot);
+        }
+        // Scene fallback background
+        if (_three.scene && _three.scene.background) _three.scene.background.setHex(tod.bgFallback);
+        // Sun & hemisphere light
+        _three.scene.traverse(o => {
+            if (o.isDirectionalLight && o === _three._sun) { o.color.setHex(tod.sunCol); o.intensity = tod.sunInt; }
+            if (o.isHemisphereLight) { o.color.setHex(tod.hemiTop); o.groundColor.setHex(tod.hemiBot); o.intensity = tod.hemiInt; }
+        });
+        // Tonemapping exposure
+        if (_three.renderer) _three.renderer.toneMappingExposure = tod.exposure;
+        // Ground material color
+        if (_three.ground && _three.ground.material) {
+            _three.ground.material.color.setHex(_hex(tod.groundHex));
+            // Replace ground texture so the tile pattern matches the new earth tone
+            const newTex = makeGroundTexture(tod.groundHex);
+            const old = _three.ground.material.map;
+            _three.ground.material.map = newTex;
+            _three.ground.material.needsUpdate = true;
+            if (old && old.dispose) old.dispose();
+        }
+    }
     function _hex(c) { if (typeof c !== 'string' || c[0] !== '#') return 0xff8800; return parseInt(c.slice(1).padStart(6,'0').slice(0,6), 16); }
 
     // ----- Procedural canvas textures (cached per color so we don't recreate them per frame) -----
@@ -6544,7 +6695,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             x.fillRect(Math.random()*256, Math.random()*256, 2, 2);
         }
         // Grid lines (subtle)
-        x.strokeStyle = 'rgba(0,0,0,0.18)'; x.lineWidth = 1;
+        x.strokeStyle = 'rgba(255,255,255,0.12)'; x.lineWidth = 1;
         for (let i = 0; i <= 256; i += 32) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 256); x.moveTo(0, i); x.lineTo(256, i); x.stroke(); }
         const tex = new THREE.CanvasTexture(c);
         tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -6710,6 +6861,71 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         group.userData.baseR = r;
         return group;
     }
+    function makePickupMesh(pk) {
+        const g = new THREE.Group();
+        const colHex = pk.type==='health'?'#ff3838':pk.type==='ammo'?'#48dbfb':pk.type==='chili'?'#e17055':pk.type==='sikunaFinger'?'#ff2d55':'#feca57';
+        const col = _hex(colHex);
+        // Glowing halo disc on the ground
+        const halo = new THREE.Mesh(new THREE.RingGeometry(8, 14, 28), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+        halo.userData.baseOp = 0.55;
+        halo.rotation.x = -Math.PI/2; halo.position.y = -10;
+        g.add(halo);
+        g.userData.halo = halo;
+        // Point light for an extra glow pop
+        const light = new THREE.PointLight(col, 0.55, 50);
+        light.position.y = 4; g.add(light);
+        if (pk.type === 'health') {
+            // 3D heart — two top spheres + downward cone, all glossy red
+            const mat = new THREE.MeshStandardMaterial({ color: col, metalness: 0.35, roughness: 0.2, envMapIntensity: 1.6, emissive: col, emissiveIntensity: 0.35 });
+            const l = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 12), mat); l.position.set(-2.5, 2, 0); g.add(l);
+            const r = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 12), mat); r.position.set( 2.5, 2, 0); g.add(r);
+            const tip = new THREE.Mesh(new THREE.ConeGeometry(5, 9, 18), mat);
+            tip.rotation.x = Math.PI; tip.position.set(0, -4, 0); g.add(tip);
+            // White shine highlight
+            const shine = new THREE.Mesh(new THREE.SphereGeometry(1.2, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
+            shine.position.set(-3, 4, 2.2); g.add(shine);
+        } else if (pk.type === 'ammo') {
+            // Bullet cartridge — brass body + pointed copper tip
+            const brass = new THREE.MeshStandardMaterial({ color: 0xfeca57, metalness: 0.95, roughness: 0.18, envMapIntensity: 1.8 });
+            const copper = new THREE.MeshStandardMaterial({ color: 0xb8631e, metalness: 0.95, roughness: 0.15, envMapIntensity: 1.8 });
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 8, 18), brass); body.position.y = -2; g.add(body);
+            const rim = new THREE.Mesh(new THREE.TorusGeometry(3, 0.6, 8, 18), brass); rim.rotation.x = Math.PI/2; rim.position.y = -6; g.add(rim);
+            const tip = new THREE.Mesh(new THREE.ConeGeometry(2.6, 5, 18), copper); tip.position.y = 4.5; g.add(tip);
+        } else if (pk.type === 'chili') {
+            // Chili pepper — curved cone + green stem
+            const red = new THREE.MeshStandardMaterial({ color: 0xff3838, metalness: 0.5, roughness: 0.2, envMapIntensity: 1.5, emissive: 0xff3838, emissiveIntensity: 0.3 });
+            const body = new THREE.Mesh(new THREE.ConeGeometry(3, 12, 16), red);
+            body.position.y = -2; body.rotation.z = -0.35; g.add(body);
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 3, 10), new THREE.MeshStandardMaterial({ color: 0x26de81, metalness: 0.3, roughness: 0.5 }));
+            stem.position.set(1.2, 5, 0); stem.rotation.z = -0.35; g.add(stem);
+            const leaf = new THREE.Mesh(new THREE.ConeGeometry(1.2, 2, 6), new THREE.MeshStandardMaterial({ color: 0x26de81, metalness: 0.2, roughness: 0.6 }));
+            leaf.position.set(2.4, 6, 0); leaf.rotation.z = -1.3; g.add(leaf);
+        } else if (pk.type === 'sikunaFinger') {
+            // Severed finger — long capsule + segments + claw tip
+            const flesh = new THREE.MeshStandardMaterial({ color: 0xff8e9d, metalness: 0.05, roughness: 0.55 });
+            const body = new THREE.Mesh(new THREE.CapsuleGeometry(2.8, 9, 6, 16), flesh);
+            body.position.y = 0; body.rotation.z = 0.3; g.add(body);
+            const knuckle = new THREE.Mesh(new THREE.SphereGeometry(3, 14, 10), flesh);
+            knuckle.position.set(-3, -3, 0); g.add(knuckle);
+            // Black claw at the top
+            const claw = new THREE.Mesh(new THREE.ConeGeometry(2.2, 4, 12), new THREE.MeshStandardMaterial({ color: 0x111, metalness: 0.8, roughness: 0.2 }));
+            claw.position.set(3, 6, 0); claw.rotation.z = -0.3; g.add(claw);
+        } else {
+            // Coin — golden disc with rim, slight tilt so spin reads
+            const gold = new THREE.MeshStandardMaterial({ color: 0xfeca57, metalness: 0.98, roughness: 0.12, envMapIntensity: 2.0, emissive: 0xfeca57, emissiveIntensity: 0.15 });
+            const disc = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 1.2, 28), gold);
+            disc.rotation.x = Math.PI/2; g.add(disc);
+            // Edge rim ring
+            const rim = new THREE.Mesh(new THREE.TorusGeometry(4.6, 0.4, 8, 28), gold);
+            rim.position.z = 0; g.add(rim);
+            // Star emblem on the face
+            const star = new THREE.Mesh(new THREE.OctahedronGeometry(2.2, 0), new THREE.MeshStandardMaterial({ color: 0xff9f43, metalness: 0.9, roughness: 0.18, emissive: 0xff9f43, emissiveIntensity: 0.5 }));
+            star.position.z = 0.7; g.add(star);
+        }
+        g.traverse(o => { if (o.castShadow !== undefined && o !== halo) o.castShadow = true; });
+        return g;
+    }
+
     function makeTrapMesh(t) {
         // Build a small group per trap archetype so each looks distinctive in 3D.
         const g = new THREE.Group();
@@ -6946,17 +7162,18 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const c3d = document.getElementById('game3d');
         const scene = new THREE.Scene();
         // Procedural sky gradient (cyan → near-white at horizon)
-        const skyCol = _hex(currentWorld.ground || '#7ec8e3');
-        scene.background = new THREE.Color(skyCol);
-        scene.fog = new THREE.Fog(skyCol, 220, 1300);
-        const camera = new THREE.PerspectiveCamera(72, W / H, 0.1, 3000);
+        const tod = _timeOfDay;
+        const skyCol = tod.bgFallback;
+        scene.background = new THREE.Color(tod.bgFallback);
+        scene.fog = new THREE.Fog(0xeaf6ff, 600, 3500);
+        const camera = new THREE.PerspectiveCamera(72, W / H, 0.1, 12000);
         camera.position.set(W/2, 30, H/2);
         const renderer = new THREE.WebGLRenderer({ canvas: c3d, antialias: true, powerPreference: 'high-performance' });
         renderer.setSize(W, H);
         renderer.setPixelRatio(window.devicePixelRatio);
         // Photorealistic tone mapping + correct color space
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.05;
+        renderer.toneMappingExposure = tod.exposure;
         if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
         else renderer.outputEncoding = THREE.sRGBEncoding;
         // Shadows for grounded realism
@@ -6983,10 +7200,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             scene.environment = envMap;
         } catch (e) { /* PMREM unavailable in some builds */ }
         // Lighting rig — hemisphere fills sky+ground bounce, sun casts shadows
-        const hemi = new THREE.HemisphereLight(0xbfd6ff, 0x4a3a26, 0.6);
+        const hemi = new THREE.HemisphereLight(tod.hemiTop, tod.hemiBot, tod.hemiInt);
         hemi.position.set(0, 500, 0);
         scene.add(hemi);
-        const sun = new THREE.DirectionalLight(0xfff2d6, 1.1);
+        const sun = new THREE.DirectionalLight(tod.sunCol, tod.sunInt);
+        // (saved on _three after creation so applyTimeOfDayToScene can find it)
         sun.position.set(400, 700, 250);
         sun.castShadow = true;
         sun.shadow.mapSize.set(512, 512);
@@ -6999,20 +7217,20 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         fill.position.set(-300, 400, -200);
         scene.add(fill);
         // Skybox dome — vertical gradient from deep blue to horizon
-        const skyGeo = new THREE.SphereGeometry(2000, 32, 16);
+        const skyGeo = new THREE.SphereGeometry(8000, 32, 16);
         const skyMat = new THREE.ShaderMaterial({
             side: THREE.BackSide,
-            uniforms: { topColor: { value: new THREE.Color(0x1e3a5f) }, bottomColor: { value: new THREE.Color(skyCol) }, offset: { value: 200 }, exponent: { value: 0.65 } },
+            uniforms: { topColor: { value: new THREE.Color(tod.skyTop) }, bottomColor: { value: new THREE.Color(tod.skyBot) }, offset: { value: 200 }, exponent: { value: 0.55 } },
             vertexShader: 'varying vec3 vWorldPosition; void main(){ vec4 p = modelMatrix * vec4(position,1.0); vWorldPosition = p.xyz; gl_Position = projectionMatrix * viewMatrix * p; }',
             fragmentShader: 'uniform vec3 topColor; uniform vec3 bottomColor; uniform float offset; uniform float exponent; varying vec3 vWorldPosition; void main(){ float h = normalize(vWorldPosition + vec3(0.0, offset, 0.0)).y; gl_FragColor = vec4( mix(bottomColor, topColor, max(pow(max(h,0.0), exponent), 0.0)), 1.0); }',
         });
-        const sky = new THREE.Mesh(skyGeo, skyMat); scene.add(sky);
-        scene.background = null; // shader sky replaces solid color
+        const sky = new THREE.Mesh(skyGeo, skyMat); _three_sky = sky; scene.add(sky);
+        // Don't clear scene.background — keep the early-morning fallback color so the sky never reads as black
 
         // Big glowing sun sphere up in the sky
-        const sunBall = new THREE.Mesh(new THREE.SphereGeometry(80, 24, 18), new THREE.MeshBasicMaterial({ color: 0xfff2a8 }));
-        sunBall.position.set(900, 950, 500);
-        scene.add(sunBall);
+        // Sun moved far away so it reads as a small bright disc on the horizon rather than a giant ball at spawn
+        // Sun disabled — the user kept seeing this as a "big ball at spawn"
+        // (sky gradient shader is enough to suggest a sun)
         // Cloud puffs — flat planes facing camera, very translucent
         const cloudTex = (function() {
             const c = document.createElement('canvas'); c.width = 256; c.height = 128;
@@ -7033,15 +7251,16 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             cloud.lookAt(W/2, 700, H/2);
             scene.add(cloud);
         }
-        // Ground plane (PBR, slight roughness to break up reflections)
-        const groundGeo = new THREE.PlaneGeometry(W*3, H*3, 1, 1);
-        const groundMat = new THREE.MeshStandardMaterial({ color: _hex(currentWorld.ground || '#7ec8e3'), map: makeGroundTexture(currentWorld.ground || '#7ec8e3'), metalness: 0.15, roughness: 0.85, envMapIntensity: 0.5 });
+        // Ground plane (PBR, slight roughness to break up reflections) — covers full world
+        const groundGeo = new THREE.PlaneGeometry(WORLD_W, WORLD_H, 1, 1);
+        // Earth/ground — uses the time-of-day's earth color
+        const groundMat = new THREE.MeshStandardMaterial({ color: _hex(tod.groundHex), map: makeGroundTexture(tod.groundHex), metalness: 0.05, roughness: 0.95, envMapIntensity: 0.3 });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI/2;
-        ground.position.set(W/2, 0, H/2);
+        ground.position.set(WORLD_W/2, 0, WORLD_H/2);
         ground.receiveShadow = true;
         scene.add(ground);
-        _three = { scene, camera, renderer, ground, envMap, buildingMeshes: [], monsterMeshes: new Map(), bulletMeshes: new Map(), trapMeshes: new Map(), pickupMeshes: new Map(), allyMeshes: new Map(), turretMeshes: new Map(), remoteMeshes: new Map(), wallMeshes: [] };
+        _three = { scene, camera, renderer, ground, envMap, _sun: sun, buildingMeshes: [], monsterMeshes: new Map(), bulletMeshes: new Map(), trapMeshes: new Map(), pickupMeshes: new Map(), allyMeshes: new Map(), turretMeshes: new Map(), remoteMeshes: new Map(), wallMeshes: [] };
     }
     function _disposeMesh(m) {
         m.traverse?.(o => {
@@ -7073,8 +7292,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Update ground/sky color if the world changed (e.g., loaded a save)
         const gCol = _hex(currentWorld.ground || '#7ec8e3');
         if (scene.background && scene.background.set) scene.background.set(gCol);
-        if (scene.fog) scene.fog.color.set(gCol);
-        if (ground.material.color) ground.material.color.set(gCol);
+        // Keep fog bright day-color instead of matching ground; only update if not already bright
+        if (scene.fog && scene.fog.color.getHexString() === '000000') scene.fog.color.set(0xeaf6ff);
+        // Keep the earth dark dirt brown — don't override with the world's sky-blue color
+        // if (ground.material.color) ground.material.color.set(gCol);
         // Buildings — rebuild only if count or refs changed
         // Rebuild only when the actual building list changes — track by JSON of dimensions to avoid mismatch with prop additions
         const bldgSig = buildings.map(b => `${b.x},${b.y},${b.w},${b.h},${b.color||''}`).join('|');
@@ -7165,7 +7386,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                     const cap = new THREE.Mesh(new THREE.SphereGeometry(4.5, 12, 8), new THREE.MeshStandardMaterial({ color: 0x8e2920, metalness: 0.6, roughness: 0.3 }));
                     cap.position.y = 15; hyd.add(cap);
                     hyd.position.set(px, 0, py); scene.add(hyd); buildingMeshes.push(hyd);
-                } else {
+                } else if (r < 0.85) {
                     // Mailbox — small blue box on a post
                     const mb = new THREE.Group();
                     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 18, 6), new THREE.MeshStandardMaterial({ color: 0x444, metalness: 0.8, roughness: 0.3 }));
@@ -7173,6 +7394,23 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                     const box = new THREE.Mesh(new THREE.BoxGeometry(12, 8, 8), new THREE.MeshStandardMaterial({ color: 0x2c3e50, metalness: 0.5, roughness: 0.4 }));
                     box.position.y = 22; box.castShadow = true; mb.add(box);
                     mb.position.set(px, 0, py); scene.add(mb); buildingMeshes.push(mb);
+                } else {
+                    // Tree — brown trunk + leafy sphere cluster
+                    const tree = new THREE.Group();
+                    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(2, 3, 22, 10), new THREE.MeshStandardMaterial({ color: 0x6d4925, metalness: 0.1, roughness: 0.85 }));
+                    trunk.position.y = 11; trunk.castShadow = true; tree.add(trunk);
+                    const leafMat = new THREE.MeshStandardMaterial({ color: 0x26de81, metalness: 0.15, roughness: 0.6, emissive: 0x0a3a1f, emissiveIntensity: 0.1 });
+                    const leaves = [
+                        { x: 0, y: 28, z: 0, r: 12 },
+                        { x: 6, y: 26, z: 4, r: 9 },
+                        { x: -7, y: 25, z: 5, r: 9 },
+                        { x: 2, y: 33, z: -5, r: 8 },
+                    ];
+                    for (const l of leaves) {
+                        const leaf = new THREE.Mesh(new THREE.SphereGeometry(l.r, 14, 10), leafMat);
+                        leaf.position.set(l.x, l.y, l.z); leaf.castShadow = true; tree.add(leaf);
+                    }
+                    tree.position.set(px, 0, py); scene.add(tree); buildingMeshes.push(tree);
                 }
             }
         }
@@ -7190,7 +7428,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         _syncMap(monsterMeshes, monsters,
             m => makeMonsterMesh(m),
             (mesh, m) => {
-                mesh.position.set(m.x, m.r||14, m.y);
+                // Idle bob — alive monsters gently bob up/down
+                const bob = m.hp > 0 ? Math.sin(Date.now()/350 + m.x*0.013) * (m.r||14) * 0.08 : 0;
+                mesh.position.set(m.x, (m.r||14) + bob, m.y);
                 const dx = player.x - m.x, dz = m.y - player.y;
                 mesh.rotation.y = Math.atan2(dx, dz);
                 const baseR = mesh.userData.baseR || 14;
@@ -7216,19 +7456,36 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                     hp.visible = ratio < 1; // hide when at full HP to reduce clutter
                 }
             });
-        // Bullets — small bright spheres
+        // Bullets — bright head sphere + a stretched glowing trail cylinder behind it
         _syncMap(bulletMeshes, bullets,
-            b => new THREE.Mesh(new THREE.SphereGeometry(3, 6, 4), new THREE.MeshBasicMaterial({ color: _hex(b.color || '#ffcc00') })),
-            (mesh, b) => mesh.position.set(b.x, 20, b.y));
+            b => {
+                const grp = new THREE.Group();
+                const col = _hex(b.color || '#ffcc00');
+                const head = new THREE.Mesh(new THREE.SphereGeometry(2.6, 8, 6), new THREE.MeshBasicMaterial({ color: col }));
+                grp.add(head);
+                const trail = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 0.2, 18, 6), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55 }));
+                trail.rotation.z = Math.PI/2;
+                trail.position.x = -9;
+                grp.add(trail);
+                return grp;
+            },
+            (mesh, b) => {
+                mesh.position.set(b.x, 20, b.y);
+                mesh.rotation.y = -Math.atan2(b.vy || 0, b.vx || 1);
+            });
         // Pickups — spinning cubes color-coded
         _syncMap(pickupMeshes, pickups,
-            pk => {
-                const col = pk.type==='health'?'#ff6b6b':pk.type==='ammo'?'#48dbfb':pk.type==='chili'?'#e17055':pk.type==='sikunaFinger'?'#ff2d55':'#feca57';
-                const mat = new THREE.MeshStandardMaterial({ color: _hex(col), metalness: 0.85, roughness: 0.18, envMapIntensity: 1.5, emissive: _hex(col), emissiveIntensity: 0.5 });
-                const me = new THREE.Mesh(new THREE.BoxGeometry(10,10,10), mat);
-                me.castShadow = true; return me;
-            },
-            (mesh, pk) => { mesh.position.set(pk.x, 10 + Math.sin(Date.now()/200 + pk.x)*3, pk.y); mesh.rotation.y += 0.05; });
+            pk => makePickupMesh(pk),
+            (mesh, pk) => {
+                const t = Date.now() / 200;
+                mesh.position.set(pk.x, 12 + Math.sin(t + pk.x*0.01)*4, pk.y);
+                mesh.rotation.y += 0.06;
+                // Halo ring slow counter-spin
+                if (mesh.userData.halo) mesh.userData.halo.rotation.y -= 0.03;
+                // Fade out when life is low
+                const alpha = pk.life < 60 ? pk.life/60 : 1;
+                mesh.traverse(o => { if (o.material && 'opacity' in o.material) { o.material.transparent = true; o.material.opacity = (o.userData?.baseOp ?? 1) * alpha; } });
+            });
         // Traps — flat colored discs
         _syncMap(trapMeshes, traps,
             t => makeTrapMesh(t),
@@ -7251,11 +7508,66 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         _syncMap(remoteMeshes, remotePlayers,
             rp => { const me = new THREE.Mesh(new THREE.CapsuleGeometry(8, 18, 8, 20), new THREE.MeshStandardMaterial({ color: _hex(rp.cls?.armorColor || '#a29bfe'), metalness: 0.55, roughness: 0.3, envMapIntensity: 1.3, emissive: _hex(rp.cls?.rarityColor || '#a29bfe'), emissiveIntensity: 0.12 })); me.castShadow = true; return me; },
             (mesh, rp) => { mesh.position.set(rp.x, 18, rp.y); mesh.visible = rp.hp > 0 && !rp.invisible; });
-        // Camera follows player at eye height, looking forward
-        camera.position.set(player.x, 22, player.y);
+        // Sky dome follows the player so we're always inside it (sphere is rendered from BackSide)
+        if (_three_sky) _three_sky.position.set(player.x, 0, player.y);
+
+        // Camera follows player at eye height with subtle head-bob when moving
+        const moving = !!(keys && (keys['w']||keys['a']||keys['s']||keys['d']));
+        _three._bobPhase = (_three._bobPhase || 0) + (moving ? 0.22 : 0);
+        const bobY = moving ? Math.abs(Math.sin(_three._bobPhase)) * 1.6 : 0;
+        const bobX = moving ? Math.cos(_three._bobPhase) * 0.8 : 0;
+        const camY = 22 + bobY;
+        camera.position.set(player.x + Math.cos(player.angle + Math.PI/2) * bobX, camY, player.y + Math.sin(player.angle + Math.PI/2) * bobX);
         const lookX = player.x + Math.cos(player.angle) * 50;
         const lookZ = player.y + Math.sin(player.angle) * 50;
-        camera.lookAt(lookX, 22, lookZ);
+        camera.lookAt(lookX, camY, lookZ);
+
+        // First-person weapon viewmodel — attached to camera so it follows view
+        if (!_three.weaponGroup) {
+            const wg = new THREE.Group();
+            _three.weaponGroup = wg;
+            _three.scene.add(wg);
+        }
+        const wg = _three.weaponGroup;
+        const wantMelee = player.cls?.type === 'melee';
+        if (_three._weaponMelee !== wantMelee || !_three._weaponBuilt) {
+            // Rebuild viewmodel when class type changes
+            while (wg.children.length) { const c = wg.children[0]; wg.remove(c); _disposeMesh(c); }
+            if (wantMelee) {
+                // Sword: hilt + crossguard + blade
+                const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 4, 12), new THREE.MeshStandardMaterial({ color: 0x3a2410, metalness: 0.3, roughness: 0.7 }));
+                hilt.position.set(0, 0, -1); hilt.rotation.x = Math.PI/2; wg.add(hilt);
+                const cross = new THREE.Mesh(new THREE.BoxGeometry(5, 1, 1.2), new THREE.MeshStandardMaterial({ color: 0xfeca57, metalness: 0.85, roughness: 0.2 }));
+                cross.position.set(0, 0.5, -3); wg.add(cross);
+                const blade = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.25, 18), new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.95, roughness: 0.1, envMapIntensity: 2 }));
+                blade.position.set(0, 0.5, -12.5); wg.add(blade);
+                const tip = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2, 4), new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.95, roughness: 0.1 }));
+                tip.position.set(0, 0.5, -22.5); tip.rotation.x = Math.PI/2; wg.add(tip);
+            } else {
+                // Gun: grip + body + barrel + sight
+                const grip = new THREE.Mesh(new THREE.BoxGeometry(1.2, 3, 1.5), new THREE.MeshStandardMaterial({ color: 0x222, metalness: 0.6, roughness: 0.4 }));
+                grip.position.set(0, -1, -1); wg.add(grip);
+                const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 4.5), new THREE.MeshStandardMaterial({ color: 0x2d3436, metalness: 0.85, roughness: 0.3 }));
+                body.position.set(0, 0.3, -2.5); wg.add(body);
+                const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 5, 12), new THREE.MeshStandardMaterial({ color: 0x111, metalness: 0.95, roughness: 0.2 }));
+                barrel.position.set(0, 0.3, -6); barrel.rotation.x = Math.PI/2; wg.add(barrel);
+                const sight = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.5, 0.4), new THREE.MeshStandardMaterial({ color: 0xfeca57, emissive: 0xfeca57, emissiveIntensity: 0.6 }));
+                sight.position.set(0, 1.1, -4); wg.add(sight);
+            }
+            _three._weaponMelee = wantMelee;
+            _three._weaponBuilt = true;
+        }
+        // Position viewmodel: anchor in front-bottom-right of camera, swing when meleeSwing > 0
+        const swingAmt = (player.meleeSwing || 0) > 0 ? Math.sin((10 - player.meleeSwing) * 0.3) : 0;
+        const camWorld = new THREE.Vector3(); camera.getWorldPosition(camWorld);
+        wg.position.copy(camWorld);
+        wg.quaternion.copy(camera.quaternion);
+        // Offset relative to camera (right, down, forward)
+        const offset = new THREE.Vector3(2.2, -1.6, -1.5 - bobY*0.3);
+        offset.applyQuaternion(camera.quaternion);
+        wg.position.add(offset);
+        // Bob the viewmodel with camera bob + melee swing
+        wg.rotation.x += swingAmt * 0.8;
 
         // Muzzle flash + light — visible while shooting and player has ammo
         if (!_three.muzzle) {
@@ -7287,6 +7599,44 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
     function draw() {
         ctx.clearRect(0, 0, W, H);
+        updateCamera();
+
+        if (cameraMode === 'fp3d' && player) {
+            // Lazy init + canvas visibility so default fp3d works without first toggling
+            if (typeof THREE === 'undefined') {
+                // Three.js didn't load — fall back to top-down render so the screen isn't blank
+                cameraMode = 'topdown';
+                const c3d = document.getElementById('game3d'); if (c3d) c3d.style.display = 'none';
+                showStatus('3D failed to load — top-down','#ff2d55');
+            } else {
+                if (!_three) init3D();
+                const c3d = document.getElementById('game3d');
+                if (c3d && c3d.style.display !== 'block') c3d.style.display = 'block';
+                render3D();
+                updateHUD();
+                return;
+            }
+        }
+
+        if (cameraMode === 'firstperson' && player) {
+            drawFirstPerson();
+            updateHUD();
+            return;
+        }
+
+        // Top-down camera follow (world is 10x bigger than the viewport)
+        if (cameraMode === 'topdown' && player) {
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+        }
+        // Third-person: apply camera transform (zoom + rotate + follow) around the top-down draw
+        if (cameraMode === 'thirdperson' && player) {
+            ctx.save();
+            ctx.translate(W/2, H*0.62);
+            ctx.scale(TP_ZOOM, TP_ZOOM);
+            ctx.rotate(-player.angle - Math.PI/2);
+            ctx.translate(-player.x, -player.y);
+        }
 
         if (cameraMode === 'fp3d' && player) {
             // Lazy init + canvas visibility so default fp3d works without first toggling
@@ -7331,25 +7681,33 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             ctx.translate(_sx, _sy);
         }
 
-        // Ground (world themed)
-        ctx.fillStyle = currentWorld.ground;
-        ctx.fillRect(0, 0, W, H);
+        // Ground (world themed) — fills the full world; camera translate handles viewport clipping
+        const _gw = (typeof WORLD_W !== 'undefined') ? WORLD_W : W;
+        const _gh = (typeof WORLD_H !== 'undefined') ? WORLD_H : H;
+        // Earth color matches the time of day
+        ctx.fillStyle = _timeOfDay.groundHex;
+        ctx.fillRect(0, 0, _gw, _gh);
 
-        // Tile grid for depth
+        // Tile grid for depth — only draw lines within the visible viewport (perf)
+        const _vx0 = camera ? camera.x : 0, _vy0 = camera ? camera.y : 0;
+        const _vx1 = _vx0 + W, _vy1 = _vy0 + H;
         ctx.strokeStyle = 'rgba(0,0,0,0.06)'; ctx.lineWidth = 1;
-        for (let gx=0; gx<W; gx+=40) { ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
-        for (let gy=0; gy<H; gy+=40) { ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
+        const _gx0 = Math.floor(_vx0/40)*40, _gy0 = Math.floor(_vy0/40)*40;
+        for (let gx=_gx0; gx<_vx1; gx+=40) { ctx.beginPath(); ctx.moveTo(gx,_vy0); ctx.lineTo(gx,_vy1); ctx.stroke(); }
+        for (let gy=_gy0; gy<_vy1; gy+=40) { ctx.beginPath(); ctx.moveTo(_vx0,gy); ctx.lineTo(_vx1,gy); ctx.stroke(); }
 
-        // Ground pattern (soft blobs)
-        ctx.fillStyle = currentWorld.groundAlt;
-        for (let i = 0; i < 30; i++) {
-            const gx = (i * 67 + 13) % W, gy = (i * 43 + 7) % H;
+        // Ground pattern (soft blobs) — slightly lighter dirt patches matching the time-of-day earth
+        ctx.fillStyle = _shadeColor(_timeOfDay.groundHex, 1.3);
+        for (let i = 0; i < 800; i++) {
+            const gx = (i * 1973 + 13) % _gw, gy = (i * 1097 + 7) % _gh;
+            if (gx < _vx0-20 || gx > _vx1+20 || gy < _vy0-20 || gy > _vy1+20) continue;
             ctx.beginPath(); ctx.arc(gx, gy, 15 + (i%3)*5, 0, Math.PI*2); ctx.fill();
         }
 
         // Shade zones
         ctx.fillStyle = currentWorld.shade;
         for (const s of shadeZones) {
+            if (s.x + s.w < _vx0 || s.x > _vx1 || s.y + s.h < _vy0 || s.y > _vy1) continue;
             ctx.beginPath();
             ctx.roundRect(s.x, s.y, s.w, s.h, 8);
             ctx.fill();
@@ -7391,8 +7749,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             for (let h=0;h<w.hp;h++){ctx.fillStyle='#26de81';ctx.beginPath();ctx.arc(w.x-8+h*8,w.y+12,3,0,Math.PI*2);ctx.fill();}
         }
 
-        // Traps
+        // Traps — viewport culled
+        const _cvx0 = camera ? camera.x - 40 : -40, _cvy0 = camera ? camera.y - 40 : -40;
+        const _cvx1 = _cvx0 + W + 80, _cvy1 = _cvy0 + H + 80;
         for (const trap of traps) {
+            if (trap.x < _cvx0 || trap.x > _cvx1 || trap.y < _cvy0 || trap.y > _cvy1) continue;
             const active = trap.cooldown <= 0;
             ctx.globalAlpha = active ? 0.85 : 0.3;
             if (trap.type === 'pebble') {
@@ -7452,9 +7813,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             ctx.globalAlpha = 1;
         }
 
-        // Buildings (colorful cartoon buildings)
+        // Buildings (colorful cartoon buildings) — viewport culled
         for (let bi=0; bi<buildings.length; bi++) {
             const b = buildings[bi];
+            if (b.x + b.w < _cvx0 || b.x > _cvx1 || b.y + b.h < _cvy0 || b.y > _cvy1) continue;
             const col = BLDG_COLORS[bi % BLDG_COLORS.length];
             // Shadow
             ctx.fillStyle = 'rgba(0,0,0,0.1)';
@@ -7481,21 +7843,69 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, 8, [10,10,0,0]); ctx.fill();
         }
 
-        // Pickups
+        // Pickups — viewport culled
         ctx.font='16px serif';ctx.textAlign='center';
         for (const pk of pickups) {
-            ctx.globalAlpha=pk.life<60?pk.life/60:1;
-            const bob=Math.sin(Date.now()/200+pk.x)*3;
-            ctx.fillText(pk.type==='health'?'❤️':pk.type==='ammo'?'🔫':pk.type==='chili'?'🌶️':pk.type==='sikunaFinger'?'🖐️':'🍖',pk.x,pk.y+bob);
+            if (pk.x < _cvx0 || pk.x > _cvx1 || pk.y < _cvy0 || pk.y > _cvy1) continue;
+            const tColor = pk.type==='health'?'#ff3838':pk.type==='ammo'?'#48dbfb':pk.type==='chili'?'#e17055':pk.type==='sikunaFinger'?'#ff2d55':'#feca57';
+            const tEmoji = pk.type==='health'?'❤️':pk.type==='ammo'?'🔫':pk.type==='chili'?'🌶️':pk.type==='sikunaFinger'?'🖐️':'🪙';
+            const fade = pk.life < 60 ? pk.life/60 : 1;
+            const t = Date.now()/200;
+            const bob = Math.sin(t + pk.x*0.01) * 4;
+            const pulse = (Math.sin(t*2 + pk.x*0.01) + 1) * 0.5;
+            const yy = pk.y + bob;
+            // Soft ground shadow
+            ctx.globalAlpha = 0.25 * fade;
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.ellipse(pk.x, pk.y + 16, 14, 5, 0, 0, Math.PI*2); ctx.fill();
+            // Outer radial halo
+            ctx.globalAlpha = (0.35 + pulse*0.2) * fade;
+            const halo = ctx.createRadialGradient(pk.x, yy, 0, pk.x, yy, 30);
+            halo.addColorStop(0, tColor); halo.addColorStop(0.4, tColor + '88'); halo.addColorStop(1, tColor + '00');
+            ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(pk.x, yy, 30, 0, Math.PI*2); ctx.fill();
+            // Ring underneath
+            ctx.globalAlpha = (0.6 + pulse*0.3) * fade;
+            ctx.strokeStyle = tColor; ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]); ctx.lineDashOffset = -t * 8;
+            ctx.beginPath(); ctx.ellipse(pk.x, pk.y + 14, 18, 6, 0, 0, Math.PI*2); ctx.stroke();
+            ctx.setLineDash([]);
+            // Rising sparkles (3 small particles tied to position so they're stable per pickup)
+            ctx.globalAlpha = fade;
+            for (let s = 0; s < 3; s++) {
+                const sp = ((t * 0.6 + s * 1.2 + pk.x * 0.01) % 3) / 3;
+                const sx = pk.x + Math.sin(t + s + pk.x*0.01) * 6;
+                const sy = yy + 12 - sp * 28;
+                ctx.fillStyle = tColor;
+                ctx.globalAlpha = (1 - sp) * fade;
+                ctx.beginPath(); ctx.arc(sx, sy, 2, 0, Math.PI*2); ctx.fill();
+            }
+            // Star burst behind emoji
+            ctx.globalAlpha = (0.7 + pulse*0.3) * fade;
+            ctx.fillStyle = '#fff';
+            const rays = 6;
+            for (let r = 0; r < rays; r++) {
+                const a = (r / rays) * Math.PI * 2 + t * 0.3;
+                const len = 14 + pulse * 4;
+                ctx.beginPath();
+                ctx.moveTo(pk.x + Math.cos(a) * 4, yy + Math.sin(a) * 4);
+                ctx.lineTo(pk.x + Math.cos(a) * len, yy + Math.sin(a) * len);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = `rgba(255,255,255,${0.35 + pulse*0.3})`;
+                ctx.stroke();
+            }
+            // Emoji
+            ctx.globalAlpha = fade;
+            ctx.fillText(tEmoji, pk.x, yy);
         }
         ctx.globalAlpha=1;
 
         // Particles
-        for (const pt of particles){ctx.globalAlpha=pt.life/pt.maxLife;ctx.fillStyle=pt.color;ctx.beginPath();ctx.arc(pt.x,pt.y,pt.r*(pt.life/pt.maxLife),0,Math.PI*2);ctx.fill();}
+        for (const pt of particles){ if (pt.x < _cvx0 || pt.x > _cvx1 || pt.y < _cvy0 || pt.y > _cvy1) continue; ctx.globalAlpha=pt.life/pt.maxLife;ctx.fillStyle=pt.color;ctx.beginPath();ctx.arc(pt.x,pt.y,pt.r*(pt.life/pt.maxLife),0,Math.PI*2);ctx.fill();}
         ctx.globalAlpha=1;
 
         // Monsters (cartoon style)
         for (const m of monsters) {
+            if (m.x + m.r < _cvx0 || m.x - m.r > _cvx1 || m.y + m.r < _cvy0 || m.y - m.r > _cvy1) continue;
             if (m.swallowed > 0) {
                 ctx.globalAlpha = 0.4;
                 ctx.fillStyle = '#48dbfb'; ctx.beginPath(); ctx.arc(m.x, m.y, 6, 0, Math.PI*2); ctx.fill();
@@ -7640,8 +8050,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             ctx.fillText(t.ammo+'', t.x, t.y-t.r-12);
         }
 
-        // Bullets (glowing)
+        // Bullets (glowing) — viewport culled
         for (const b of bullets) {
+            if (b.x < _cvx0 || b.x > _cvx1 || b.y < _cvy0 || b.y > _cvy1) continue;
             const bc = b.color||'#feca57';
             // Glow halo
             const g = ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,10);
@@ -7688,8 +8099,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // End screen-shake transform
         if (_sx !== 0 || _sy !== 0) ctx.restore();
 
-        // Restore third-person camera transform before drawing screen-space HUD elements
-        if (cameraMode === 'thirdperson' && player) ctx.restore();
+        // Restore camera transform (topdown OR thirdperson) before drawing screen-space HUD elements
+        if ((cameraMode === 'thirdperson' || cameraMode === 'topdown') && player) ctx.restore();
 
         // Coin bar (top-right)
         const barX = W - 160, barY = 12, barW = 140, barH = 22;
@@ -7726,6 +8137,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         document.getElementById('coins-display').textContent = `🍖 ${coinStr()}`;
         document.getElementById('score-display').textContent = `⭐ ${score}`;
         document.getElementById('points-display').textContent = `🏆 ${points}`;
+        const _todEl = document.getElementById('tod-display');
+        if (_todEl) _todEl.textContent = `🕒 ${_timeOfDay.name}`;
 
         let ab='';
         if (p.cls.canTeleport) ab=p.teleporting>0?'⚡ ...':'⚡ [E] Teleport';
@@ -7823,7 +8236,23 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         return null;
     }
 
-    function gameLoop() { if (!gameRunning) return; if (!gamePaused) { update(); draw(); } animFrame = requestAnimationFrame(gameLoop); }
+    function updateCrosshair() {
+        const ch = document.getElementById('crosshair');
+        if (!ch) return;
+        if (!gameRunning) { ch.style.display = 'none'; return; }
+        ch.style.display = 'block';
+        const canvasEl = document.getElementById('game');
+        const rect = canvasEl.getBoundingClientRect();
+        const scaleX = rect.width / W, scaleY = rect.height / H;
+        let cx, cy;
+        if (cameraMode === 'topdown') {
+            cx = mouse.x * scaleX; cy = mouse.y * scaleY;
+        } else {
+            cx = (W/2) * scaleX; cy = (H/2) * scaleY;
+        }
+        ch.style.transform = `translate(${cx - 16}px, ${cy - 16}px)`;
+    }
+    function gameLoop() { if (!gameRunning) return; if (!gamePaused) { update(); draw(); } updateCrosshair(); animFrame = requestAnimationFrame(gameLoop); }
 
     // ======================== SUPPORTER BUFF PANEL ========================
     let __supporterPaused = false; // remember if we paused the game
@@ -8082,7 +8511,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             // Make sure player isn't inside a building
             if (ptInBld(player.x, player.y, player.r)) {
                 let att=0;
-                do { player.x=100+Math.random()*(W-200); player.y=100+Math.random()*(H-200); att++; }
+                do { player.x=WORLD_W/2-W/2+100+Math.random()*(W-200); player.y=WORLD_H/2-H/2+100+Math.random()*(H-200); att++; }
                 while (ptInBld(player.x,player.y,player.r) && att<100);
             }
             gameRunning = true; gameLoop();
@@ -8107,7 +8536,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // To add a new trap to a world, just append another object to its trapTypes array.
     const WORLDS = [
         { id:'city', name:'City', emoji:'🏙️', unlockWave:0, wavesNeeded:20, ground:'#7ec8e3', groundAlt:'#6bb8d6',
-          bldgColors:['#ff6b6b','#feca57','#48dbfb','#ff9ff3','#54a0ff','#5f27cd','#01a3a4'], shade:'rgba(0,0,0,0.12)',
+          bldgColors:['#ff6b6b','#feca57','#48dbfb','#ff9ff3','#54a0ff','#5f27cd','#01a3a4'], shade:'rgba(0,0,0,0.05)',
           trapTypes:[
               { type:'manhole',     emoji:'🕳️', color:'#2d3436', dmg:5,  effect:'slow',      duration:120, label:'MANHOLE!', art:'pit' },
               { type:'powerline',   emoji:'⚡', color:'#feca57', dmg:8,  effect:'stun',      duration:90,  label:'ZAPPED!', art:'electric' },
@@ -8115,7 +8544,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
               { type:'trafficlight',emoji:'💥', color:'#ee5a24', dmg:6,  effect:'knockback', duration:0,   label:'KNOCKBACK!', art:'boom' },
           ] },
         { id:'desert', name:'Desert', emoji:'🏜️', unlockWave:20, wavesNeeded:20, ground:'#f0d78c', groundAlt:'#e6c876',
-          bldgColors:['#d4a35a','#c49245','#b8860b','#deb887','#cd853f','#a0522d','#d2b48c'], shade:'rgba(0,0,0,0.15)',
+          bldgColors:['#d4a35a','#c49245','#b8860b','#deb887','#cd853f','#a0522d','#d2b48c'], shade:'rgba(0,0,0,0.06)',
           trapTypes:[
               { type:'quicksand', emoji:'🌀', color:'#c49245', dmg:3,  effect:'slow',   duration:180, label:'QUICKSAND!', art:'sand' },
               { type:'cactus',    emoji:'🌵', color:'#26de81', dmg:12, effect:'none',   duration:0,   label:'CACTUS!', art:'spike' },
@@ -8123,7 +8552,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
               { type:'sandstorm', emoji:'🌪️', color:'#b8860b', dmg:2,  effect:'stun',   duration:120, label:'BLINDED!', art:'sand' },
           ] },
         { id:'circus', name:'Circus', emoji:'🎪', unlockWave:40, wavesNeeded:20, ground:'#ffb8b8', groundAlt:'#ffa3a3',
-          bldgColors:['#ff6b6b','#feca57','#26de81','#a55eea','#fd79a8','#00cec9','#e17055'], shade:'rgba(100,0,100,0.1)',
+          bldgColors:['#ff6b6b','#feca57','#26de81','#a55eea','#fd79a8','#00cec9','#e17055'], shade:'rgba(100,0,100,0.05)',
           trapTypes:[
               { type:'cannon',  emoji:'💥', color:'#ff6b6b', dmg:15, effect:'knockback', duration:0,   label:'BOOM!', art:'boom' },
               { type:'balloon', emoji:'🎈', color:'#fd79a8', dmg:5,  effect:'knockback', duration:0,   label:'POP!', art:'balloon' },
@@ -8788,7 +9217,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         Object.keys(labels).forEach(k => { const el = document.getElementById(ids[k]); if (el) el.textContent = `${labels[k]}: ON`; });
 
         // Max God Survivor
-        GS_STAT_NAMES.forEach(s => { gsData.stats[s] = 200; });
+        GS_STAT_NAMES.forEach(s => { gsData.stats[s] = GS_STAT_MAX[s] || 200; });
         gsData.totalKills = 9999; gsData.totalWaves = 9999; gsData.totalGames = 9999;
         getGSQuests().forEach(q => { if (!gsData.questsDone[q.id]) { gsData.questsDone[q.id] = true; gsData.sp += q.reward; } });
         saveGS();
@@ -9145,7 +9574,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         SFX.waveStart();
         generateBuildings();
         let att=0;
-        do { player.x=100+Math.random()*(W-200); player.y=100+Math.random()*(H-200); att++; }
+        do { player.x=WORLD_W/2-W/2+100+Math.random()*(W-200); player.y=WORLD_H/2-H/2+100+Math.random()*(H-200); att++; }
         while ((ptInBld(player.x,player.y,player.r)||(player.cls.sunBurn&&!isInShade(player.x,player.y))) && att<100);
         gsTrackGame();
         gameRunning = true; gameLoop();
