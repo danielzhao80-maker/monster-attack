@@ -3203,7 +3203,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const trapPool = currentWorld.trapTypes
             || (currentWorld.traps ? [currentWorld.traps] : []);
         if (trapPool.length > 0) {
-            const TRAPS_PER_MAP = 60;
+            const TRAPS_PER_MAP = 22;
             for (let i = 0; i < TRAPS_PER_MAP; i++) {
                 let tx, ty, attempts = 0;
                 do { tx = 40 + Math.random() * (WORLD_W - 80); ty = 40 + Math.random() * (WORLD_H - 80); attempts++; }
@@ -3213,7 +3213,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             }
         }
         // Poison pebbles scattered through the world
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < 10; i++) {
             let tx, ty, attempts = 0;
             do { tx = 40 + Math.random() * (WORLD_W - 80); ty = 40 + Math.random() * (WORLD_H - 80); attempts++; }
             while (ptInBld(tx, ty, 15) && attempts < 50);
@@ -3520,7 +3520,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             addSeasonXP(10);
             explodeMonster(m);
             spawnPickup(m.x, m.y);
-            if (player.cls.canCopy) { player.copiedPower = true; player.copyTimer = 600; player.copySpeedBonus = 1.5; }
+            if (player.cls.canCopy) { player.copiedPower = true; player.copyTimer = 600; player.copySpeedBonus = 1.5; player.copiedMonsterName = m.name || ''; if (player === player) showStatus(`COPIED: ${m.name}`, '#ffeaa7'); }
             // Sikuna: every 10 kills spawns a Sikuna finger (up to 30 lifetime)
             if (player.cls.sikunaPower) {
                 player.sikunaKills = (player.sikunaKills||0) + 1;
@@ -3576,6 +3576,162 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             if (Math.hypot(m.x-p.x, m.y-p.y) < rad) hitMonster(m, i, dmg);
         }
     }
+    // ===== In-world ability effects =====
+    // Each effect is positioned in world coordinates and rendered in both the 2D canvas (with camera translate)
+    // and as a Three.js mesh in 3D mode. Effects fade out over time.
+    let gameEffects = [];
+    function spawnGameEffect(type, x, y, color, opts = {}) {
+        gameEffects.push({ type, x, y, color, angle: opts.angle || 0, maxR: opts.maxR || 180, maxT: opts.maxT || 36, t: 0, _mesh: null });
+    }
+    function updateGameEffects() {
+        for (let i = gameEffects.length - 1; i >= 0; i--) {
+            const e = gameEffects[i];
+            e.t++;
+            if (e.t >= e.maxT) {
+                if (e._mesh && _three) { _three.scene.remove(e._mesh); _disposeMesh(e._mesh); }
+                gameEffects.splice(i, 1);
+            }
+        }
+    }
+    function draw2DEffects(_cvx0, _cvy0, _cvx1, _cvy1) {
+        for (const e of gameEffects) {
+            if (e.x + e.maxR < _cvx0 || e.x - e.maxR > _cvx1 || e.y + e.maxR < _cvy0 || e.y - e.maxR > _cvy1) continue;
+            const p = e.t / e.maxT;
+            ctx.globalAlpha = (1 - p);
+            if (e.type === 'ring') {
+                const rad = 20 + p * e.maxR;
+                ctx.strokeStyle = e.color; ctx.lineWidth = Math.max(2, 10 * (1 - p));
+                ctx.beginPath(); ctx.arc(e.x, e.y, rad, 0, Math.PI*2); ctx.stroke();
+                // Inner faint ring
+                ctx.strokeStyle = e.color; ctx.lineWidth = 2; ctx.globalAlpha = (1 - p) * 0.4;
+                ctx.beginPath(); ctx.arc(e.x, e.y, rad * 0.7, 0, Math.PI*2); ctx.stroke();
+                ctx.globalAlpha = 1 - p;
+            } else if (e.type === 'slash') {
+                const a = e.angle, sweep = 1.2, rad = 70 + p * 20;
+                ctx.strokeStyle = e.color; ctx.lineWidth = Math.max(3, 16 * (1 - p)); ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.arc(e.x, e.y, rad, a - sweep/2, a + sweep/2); ctx.stroke();
+                ctx.lineCap = 'butt';
+            } else if (e.type === 'lightning') {
+                ctx.strokeStyle = e.color; ctx.lineWidth = Math.max(1.5, 3 * (1 - p));
+                for (let r = 0; r < 7; r++) {
+                    const a = (r / 7) * Math.PI*2;
+                    let cx = e.x, cy = e.y;
+                    ctx.beginPath(); ctx.moveTo(cx, cy);
+                    for (let j = 0; j < 5; j++) {
+                        const d = (j + 1) * (e.maxR / 5) * (0.6 + p*0.4);
+                        cx = e.x + Math.cos(a) * d + (Math.random()-0.5)*16;
+                        cy = e.y + Math.sin(a) * d + (Math.random()-0.5)*16;
+                        ctx.lineTo(cx, cy);
+                    }
+                    ctx.stroke();
+                }
+            } else if (e.type === 'burst') {
+                const n = 14;
+                for (let i = 0; i < n; i++) {
+                    const a = (i / n) * Math.PI * 2;
+                    const d = p * e.maxR;
+                    const sx = e.x + Math.cos(a) * d;
+                    const sy = e.y + Math.sin(a) * d;
+                    ctx.fillStyle = e.color;
+                    ctx.beginPath(); ctx.arc(sx, sy, 8 * (1 - p), 0, Math.PI*2); ctx.fill();
+                }
+            } else if (e.type === 'pillar') {
+                // Vertical column of light rising over time
+                const h = 60 + p * 80;
+                const grad = ctx.createLinearGradient(e.x, e.y, e.x, e.y - h);
+                grad.addColorStop(0, e.color + '00');
+                grad.addColorStop(0.5, e.color + 'cc');
+                grad.addColorStop(1, e.color + '33');
+                ctx.fillStyle = grad;
+                const w = (1 - p) * 28 + 6;
+                ctx.fillRect(e.x - w/2, e.y - h, w, h);
+                ctx.strokeStyle = e.color; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x, e.y - h); ctx.stroke();
+            }
+        }
+        ctx.globalAlpha = 1;
+    }
+    function update3DEffects() {
+        if (!_three) return;
+        for (const e of gameEffects) {
+            const p = e.t / e.maxT;
+            if (!e._mesh) {
+                let mesh;
+                if (e.type === 'ring') {
+                    mesh = new THREE.Mesh(new THREE.TorusGeometry(20, 4, 8, 32), new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true, opacity: 1, side: THREE.DoubleSide }));
+                    mesh.rotation.x = -Math.PI / 2; mesh.position.set(e.x, 4, e.y);
+                } else if (e.type === 'slash') {
+                    mesh = new THREE.Mesh(new THREE.TorusGeometry(50, 5, 8, 22, 1.4), new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true, opacity: 1, side: THREE.DoubleSide }));
+                    mesh.rotation.x = -Math.PI / 2; mesh.rotation.z = -e.angle; mesh.position.set(e.x, 14, e.y);
+                } else if (e.type === 'lightning') {
+                    mesh = new THREE.Group();
+                    for (let i = 0; i < 6; i++) {
+                        const ai = (i/6) * Math.PI*2;
+                        const arm = new THREE.Mesh(new THREE.BoxGeometry(2, 2, e.maxR), new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true, opacity: 1 }));
+                        arm.position.set(Math.cos(ai)*e.maxR/2, 12, Math.sin(ai)*e.maxR/2);
+                        arm.rotation.y = -ai; mesh.add(arm);
+                    }
+                    mesh.position.set(e.x, 0, e.y);
+                } else if (e.type === 'burst') {
+                    mesh = new THREE.Mesh(new THREE.SphereGeometry(8, 18, 14), new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true, opacity: 1 }));
+                    mesh.position.set(e.x, 16, e.y);
+                } else if (e.type === 'pillar') {
+                    mesh = new THREE.Mesh(new THREE.CylinderGeometry(8, 14, 100, 16, 1, true), new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true, opacity: 1, side: THREE.DoubleSide }));
+                    mesh.position.set(e.x, 50, e.y);
+                }
+                if (mesh) { _three.scene.add(mesh); e._mesh = mesh; }
+            }
+            if (!e._mesh) continue;
+            const scale = 1 + p * (e.maxR / 30);
+            if (e.type === 'ring' || e.type === 'slash') e._mesh.scale.set(scale, scale, 1);
+            else if (e.type === 'burst') e._mesh.scale.setScalar(scale);
+            else if (e.type === 'pillar') { e._mesh.scale.y = 1 + p*0.5; e._mesh.scale.x = e._mesh.scale.z = 1 - p*0.6; }
+            // Lightning is fixed in size; just fade
+            e._mesh.traverse(o => { if (o.material) { o.material.transparent = true; o.material.opacity = 1 - p; } });
+        }
+    }
+    // Map a move name to the most fitting animation archetype
+    function _abilityArchetype(name, slot) {
+        const n = (name||'').toLowerCase();
+        if (n.includes('slash') || n.includes('whirlwind') || n.includes('lunge') || n.includes('strike') || n.includes('demon') || n.includes('flurry')) return 'slash';
+        if (n.includes('tommy') || n.includes('drive') || n.includes('gun') || n.includes('volley') || n.includes('captain') || n.includes('mob') || n.includes('reality') || n.includes('storm') || n.includes('break')) return 'lightning';
+        if (n.includes('slam') || n.includes('burst') || n.includes('soul') || n.includes('mind control') || n.includes('skull') || n.includes('bat') || n.includes('rain') || n.includes("hell")) return 'burst';
+        if (n.includes('mutate') || n.includes('mech') || n.includes('iron tank') || n.includes('final form') || n.includes('big brain') || n.includes('hype') || n.includes('bloodlust') || n.includes('phase') || n.includes('zen')) return 'pillar';
+        return 'ring';
+    }
+    // For E abilities, archetype by class flag
+    function _eAbilityArchetype(cls) {
+        if (!cls) return 'ring';
+        if (cls.canShout || cls.canScream || cls.canSwallow) return 'burst';
+        if (cls.canBuild) return 'ring';
+        if (cls.flamingPower || cls.canTeleport) return 'lightning';
+        if (cls.hasPlayerShield || cls.fireImmune) return 'pillar';
+        if (cls.mindSwap || cls.ghostMode || cls.necromancer || cls.canSpawnTurret || cls.sikunaPower) return 'burst';
+        return 'ring';
+    }
+
+    // Pick a sensible emoji for the E ability based on class flags
+    function _eEmoji(cls) {
+        if (!cls) return '⚡';
+        if (cls.canTeleport) return '⚡';
+        if (cls.canShout)    return '📢';
+        if (cls.canBuild)    return '🧱';
+        if (cls.canScream)   return '😡';
+        if (cls.canSwallow)  return '🎤';
+        if (cls.speedModes)  return '🏃';
+        if (cls.canRevive)   return '💉';
+        if (cls.mindSwap)    return '🧠';
+        if (cls.ghostMode)   return '👻';
+        if (cls.necromancer) return '💀';
+        if (cls.canSpawnTurret) return '🤖';
+        if (cls.sikunaPower) return '👹';
+        if (cls.isSupporter) return '💖';
+        if (cls.canCopy)     return '🎭';
+        if (cls.hasPlayerShield) return '🛡️';
+        if (cls.flamingPower) return '🔥';
+        return cls.emoji || '⚡';
+    }
+
     function _mvRing(cx, cy, color, count, radius) {
         for (let i=0;i<count;i++) { const a=(Math.PI*2/count)*i; particles.push({x:cx+Math.cos(a)*radius,y:cy+Math.sin(a)*radius,vx:Math.cos(a)*4,vy:Math.sin(a)*4,life:22,maxLife:22,color,r:4}); }
     }
@@ -3585,17 +3741,65 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             bullets.push({ x:p.x+Math.cos(ba)*18, y:p.y+Math.sin(ba)*18, vx:Math.cos(ba)*speed, vy:Math.sin(ba)*speed, life:220, damage:dmg, color });
         }
     }
+    // Dash helper — kept as a visual burst + brief i-frames but does NOT move the player anymore
+    // (user requested abilities stop teleporting them)
     function _mvDash(p, dist, color, mx, my) {
-        const ang = Math.atan2(my - p.y, mx - p.x);
-        const tx = Math.max(p.r, Math.min(W-p.r, p.x + Math.cos(ang)*dist));
-        const ty = Math.max(p.r, Math.min(H-p.r, p.y + Math.sin(ang)*dist));
-        if (ptInBld(tx,ty,p.r) || ptInWall(tx,ty,p.r)) return false;
-        for (let i=0;i<8;i++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:15,maxLife:15,color,r:3});
-        p.x = tx; p.y = ty;
-        for (let i=0;i<8;i++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:15,maxLife:15,color,r:3});
-        p.invincible = Math.max(p.invincible, 15);
+        for (let i=0;i<16;i++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:18,maxLife:18,color,r:3});
+        p.invincible = Math.max(p.invincible, 25);
         return true;
     }
+    // Mimic — apply the killed monster's signature ability to the player.
+    // `boosted` doubles ranges/durations/damage for the X (Final Form) version.
+    function _applyMimicAbility(p, monsterName, boosted) {
+        if (!monsterName) {
+            if (p === player) showStatus('No monster copied yet', '#888');
+            return;
+        }
+        const k = boosted ? 2 : 1;
+        const mn = monsterName.toLowerCase();
+        if (mn.includes('frost')) {
+            for (const m of monsters) if (Math.hypot(m.x-p.x, m.y-p.y) < 220 * k) m.frozen = Math.max(m.frozen||0, 180 * k);
+            if (p === player) showStatus(`MIMIC ❄️ FROST: freeze!`, '#5bc0de');
+            SFX.freeze();
+        } else if (mn.includes('flame')) {
+            for (let i = 0; i < 8 * k; i++) fireTiles.push({ x: p.x + (Math.random()-0.5)*80*k, y: p.y + (Math.random()-0.5)*80*k, life: 240 * k, fromPlayer: true });
+            if (p === player) showStatus(`MIMIC 🔥 FLAME: fire trail!`, '#e25822');
+        } else if (mn.includes('shield')) {
+            p.shieldUp = true; p.invincible = Math.max(p.invincible, 60 * k);
+            if (p === player) showStatus(`MIMIC 🛡️ SHIELD: blocked!`, '#7f8c8d');
+            SFX.shield();
+        } else if (mn.includes('mad mom')) {
+            for (let i = monsters.length-1; i >= 0; i--) {
+                const m = monsters[i];
+                if (Math.hypot(m.x-p.x, m.y-p.y) < 170 * k) { m.stunned = Math.max(m.stunned||0, 120 * k); hitMonster(m, i, Math.floor(p.damage * 1.5 * k)); }
+            }
+            if (p === player) showStatus(`MIMIC 😡 SCREAM!`, '#c0392b');
+            SFX.scream();
+        } else if (mn.includes('miku')) {
+            // Swallow the nearest monster(s)
+            const monstersByDist = [...monsters].sort((a,b) => Math.hypot(a.x-p.x,a.y-p.y) - Math.hypot(b.x-p.x,b.y-p.y));
+            for (let i = 0; i < (boosted ? 3 : 1); i++) {
+                const closest = monstersByDist[i];
+                if (closest && Math.hypot(closest.x-p.x, closest.y-p.y) < 200 * k) closest.swallowed = Math.max(closest.swallowed||0, 600);
+            }
+            if (p === player) showStatus(`MIMIC 🎤 SWALLOW!`, '#39c5bb');
+            SFX.ability();
+        } else if (mn.includes('dragon')) {
+            // Fire breath cone
+            const ang = p.angle;
+            const shots = 7 * k;
+            for (let i = 0; i < shots; i++) {
+                const ba = ang + (i - shots/2) * 0.12;
+                bullets.push({ x:p.x+Math.cos(ba)*18, y:p.y+Math.sin(ba)*18, vx:Math.cos(ba)*9, vy:Math.sin(ba)*9, life:160, damage:Math.floor(p.damage * 1.6 * k), color:'#ff6b6b' });
+            }
+            if (p === player) showStatus(`MIMIC 🐲 DRAGON BREATH!`, '#27ae60');
+            SFX.shoot();
+        } else {
+            // Generic fallback if the monster name doesn't match a known class
+            if (p === player) showStatus(`MIMIC: ${monsterName}!`, '#ffeaa7');
+        }
+    }
+
     function _mvHealTeam(p, radius, amt) {
         const all = [player, ...remotePlayers];
         for (const pl of all) if (pl && pl.hp>0 && Math.hypot(pl.x-p.x,pl.y-p.y)<radius) pl.hp = Math.min(pl.maxHp, pl.hp + amt);
@@ -3637,8 +3841,16 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             x:{ cd:900, name:'BIG BRAIN', color:'#16a085', emoji:'🤓', cs:false, run:(p,mx,my)=>{ p.invincible=Math.max(p.invincible,180); _mvDmgRadius(p,200,Math.floor(p.damage*3)); _mvRing(p.x,p.y,'#16a085',20,50); SFX.shout67(); } } },
         // ====== LEGENDARY ======
         'Monster Copier': {
-            z:{ cd:180, name:'Mimic', color:'#ffeaa7', run:(p,mx,my)=>{ p.copiedPower=true; p.copyTimer=Math.max(p.copyTimer,300); p.copySpeedBonus=Math.max(p.copySpeedBonus,1.5); _mvRing(p.x,p.y,'#ffeaa7',12,30); } },
-            x:{ cd:780, name:'FINAL FORM', color:'#ffeaa7', emoji:'🎭', cs:false, run:(p,mx,my)=>{ p.copiedPower=true; p.copyTimer=Math.max(p.copyTimer,600); p.copySpeedBonus=Math.max(p.copySpeedBonus,3.0); p.chiliBoost=Math.max(p.chiliBoost,600); _mvRing(p.x,p.y,'#ffeaa7',22,55); SFX.revive(); } } },
+            z:{ cd:180, name:'Mimic', color:'#ffeaa7', run:(p,mx,my)=>{
+                p.copiedPower=true; p.copyTimer=Math.max(p.copyTimer,300); p.copySpeedBonus=Math.max(p.copySpeedBonus,1.5);
+                _applyMimicAbility(p, p.copiedMonsterName, false);
+                _mvRing(p.x,p.y,'#ffeaa7',12,30);
+            } },
+            x:{ cd:780, name:'FINAL FORM', color:'#ffeaa7', emoji:'🎭', cs:false, run:(p,mx,my)=>{
+                p.copiedPower=true; p.copyTimer=Math.max(p.copyTimer,600); p.copySpeedBonus=Math.max(p.copySpeedBonus,3.0); p.chiliBoost=Math.max(p.chiliBoost,600);
+                _applyMimicAbility(p, p.copiedMonsterName, true);
+                _mvRing(p.x,p.y,'#ffeaa7',22,55); SFX.revive();
+            } } },
         'Vampire': {
             z:{ cd:180, name:'Bloodlust', color:'#6c5ce7', run:(p,mx,my)=>{ p.hp=Math.min(p.maxHp,p.hp+30); p.invincible=Math.max(p.invincible,40); _mvRing(p.x,p.y,'#6c5ce7',12,30); SFX.revive(); } },
             x:{ cd:900, name:'BAT SWARM', color:'#6c5ce7', emoji:'🦇', cs:true, run:(p,mx,my)=>{ for(let i=0;i<8;i++){const a=(Math.PI*2/8)*i; allies.push({x:p.x+Math.cos(a)*35,y:p.y+Math.sin(a)*35,r:9,speed:3.5,damage:6,color:'#6c5ce7',hp:8,maxHp:8,life:720,atkCd:0});} _mvRing(p.x,p.y,'#6c5ce7',18,45); SFX.revive(); } } },
@@ -3647,7 +3859,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             z:{ cd:180, name:'Captain Order', color:'#2c3e50', run:(p,mx,my)=>{ const ang=Math.atan2(my-p.y,mx-p.x); _mvSpray(p,5,ang,0.5,p.damage,'#2c3e50',11); SFX.shoot(); } },
             x:{ cd:900, name:'MOB BOSS', color:'#2c3e50', emoji:'🎩', cs:true, run:(p,mx,my)=>{ for(let r=0;r<24;r++){const a=(Math.PI*2/24)*r; _mvSpray(p,1,a,0,p.damage,'#2c3e50',12);} addShake(10); _mvRing(p.x,p.y,'#2c3e50',16,40); SFX.shoot(); } } },
         'Glitch': {
-            z:{ cd:90, name:'Glitch Dash', color:'#ff3838', run:(p,mx,my)=>{ for(let i=0;i<3;i++){p.x=Math.max(p.r,Math.min(W-p.r,p.x+(Math.random()-0.5)*200));p.y=Math.max(p.r,Math.min(H-p.r,p.y+(Math.random()-0.5)*200));for(let j=0;j<5;j++)particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:15,maxLife:15,color:'#ff3838',r:3});} p.invincible=Math.max(p.invincible,30); SFX.teleport(); } },
+            z:{ cd:90, name:'Glitch Dash', color:'#ff3838', run:(p,mx,my)=>{ for(let i=0;i<3;i++){ p.x=Math.max(p.r,Math.min(WORLD_W-p.r,p.x+(Math.random()-0.5)*240)); p.y=Math.max(p.r,Math.min(WORLD_H-p.r,p.y+(Math.random()-0.5)*240)); for(let j=0;j<6;j++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:18,maxLife:18,color:'#ff3838',r:3}); } p.invincible=Math.max(p.invincible,30); SFX.teleport(); } },
             x:{ cd:900, name:'REALITY BREAK', color:'#ff3838', emoji:'👾', cs:true, run:(p,mx,my)=>{ for(let i=monsters.length-1;i>=0;i--){const m=monsters[i]; if(Math.hypot(m.x-p.x,m.y-p.y)<220 && !m.isBoss){explodeMonster(m); score+=m.score; monsters.splice(i,1);}} _mvDmgRadius(p,220,Math.floor(p.damage*5)); addShake(20); _mvRing(p.x,p.y,'#ff3838',32,80); SFX.teleport(); } } },
         'Ghost': {
             z:{ cd:240, name:'Phase Walk', color:'#dfe6e9', run:(p,mx,my)=>{ p.invisible=true; p.invisTimer=Math.max(p.invisTimer,180); _mvRing(p.x,p.y,'#dfe6e9',10,30); SFX.teleport(); } },
@@ -3676,16 +3888,26 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             x:{ cd:900, name:'TOTAL SUPPORT', color:'#00ffe0', emoji:'💖', cs:true, run:(p,mx,my)=>{ for(const pl of [player,...remotePlayers]) if(pl){ pl.hp=pl.maxHp; pl.invincible=Math.max(pl.invincible,120); pl.chiliBoost=Math.max(pl.chiliBoost,600);} _mvRing(p.x,p.y,'#00ffe0',28,80); SFX.revive(); } } },
     };
 
+    // Compute the aim point for an ability — use mouse in top-down, otherwise project a point in front of the player along player.angle
+    function _abilityAim(p, mx, my) {
+        if (mx !== undefined && my !== undefined) return { x: mx, y: my };
+        if (cameraMode === 'topdown') return { x: mouseWorldX(), y: mouseWorldY() };
+        const dist = 250; // how far "forward" the aim is
+        return { x: p.x + Math.cos(p.angle) * dist, y: p.y + Math.sin(p.angle) * dist };
+    }
+
     function useMoveQ(targetPlayer, mx, my) {
         const p = targetPlayer || player;
         if (!p || p.frozen > 0 || p.stunned > 0) return;
         if ((p.charLevel || 1) < 2 && !p.moveZUnlocked) { if (p === player) showStatus('Z LOCKED — Lv.2', '#888'); return; }
         if (p.moveQCooldown > 0) return;
-        const aimX = (mx !== undefined) ? mx : mouse.x;
-        const aimY = (my !== undefined) ? my : mouse.y;
+        const _aimPt = _abilityAim(p, mx, my); const aimX = _aimPt.x, aimY = _aimPt.y;
         const m = (MOVES[p.cls.name] && MOVES[p.cls.name].z) || { cd:180, name:'Dash', color:'#0abde3', run:(p,mx,my)=>{ _mvDash(p,120,'#0abde3',mx,my); SFX.teleport(); } };
         p.moveQCooldown = m.cd;
-        if (p === player) showStatus(m.name.toUpperCase()+'!', m.color);
+        if (p === player) {
+            showStatus(m.name.toUpperCase()+'!', m.color);
+            spawnGameEffect(_abilityArchetype(m.name, 'z'), p.x, p.y, m.color || '#0abde3', { angle: p.angle, maxR: 140 });
+        }
         // Ability-level damage multiplier (Lv.2 = 1.25x, Lv.3 = 1.5x)
         const zLvl = (p.abilityLvls && p.abilityLvls.z) || 1;
         const mult = 1 + (zLvl - 1) * 0.25;
@@ -3701,12 +3923,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (!p || p.frozen > 0 || p.stunned > 0) return;
         if ((p.charLevel || 1) < 3 && !p.moveXUnlocked) { if (p === player) showStatus('X LOCKED — Lv.3', '#888'); return; }
         if (p.moveFCooldown > 0) return;
-        const aimX = (mx !== undefined) ? mx : mouse.x;
-        const aimY = (my !== undefined) ? my : mouse.y;
+        const _aimPt = _abilityAim(p, mx, my); const aimX = _aimPt.x, aimY = _aimPt.y;
         const m = (MOVES[p.cls.name] && MOVES[p.cls.name].x) || { cd:720, name:'Power Burst', color:'#feca57', emoji:'💥', cs:false, run:(p,mx,my)=>{ _mvDmgRadius(p,150,Math.max(20,Math.floor(p.damage*2))); _mvRing(p.x,p.y,'#feca57',16,40); } };
         p.moveFCooldown = m.cd;
         if (m.cs && p === player) _moveCutscene(p, m.name, m.color, m.emoji);
-        else if (p === player) { showStatus(m.name+'!', m.color); addShake(6); }
+        else if (p === player) { showStatus(m.name+'!', m.color); addShake(6); spawnGameEffect(_abilityArchetype(m.name, 'x'), p.x, p.y, m.color || '#feca57', { angle: p.angle, maxR: 220, maxT: 42 }); }
         const xLvl = (p.abilityLvls && p.abilityLvls.x) || 1;
         const mult = 1 + (xLvl - 1) * 0.25;
         const origDmg = p.damage;
@@ -3719,8 +3940,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function useAbility(targetPlayer, mx, my) {
         const p = targetPlayer || player;
         if (!p) return;
-        const aimX = (mx !== undefined) ? mx : mouse.x;
-        const aimY = (my !== undefined) ? my : mouse.y;
+        const _aimPt = _abilityAim(p, mx, my); const aimX = _aimPt.x, aimY = _aimPt.y;
         if (p.frozen > 0 || p.stunned > 0) return;
         // Apply E ability damage multiplier (effect applied throughout via p.damage reads)
         const eLvl = (p.abilityLvls && p.abilityLvls.e) || 1;
@@ -3729,6 +3949,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (eMult !== 1) p.damage = Math.floor(_origEDmg * eMult);
         try { _useAbilityCore(p, aimX, aimY); }
         finally { p.damage = _origEDmg; }
+        if (p === player) spawnGameEffect(_eAbilityArchetype(p.cls), p.x, p.y, p.cls?.rarityColor || '#feca57', { angle: p.angle, maxR: 150 });
         if (p === player) { const lvlUp = addAbilityUse(p.cls.name, 'e'); if (lvlUp) { _abilityLevelUpToast(p, 'e', lvlUp); p.abilityLvls.e = lvlUp; } }
     }
     function _useAbilityCore(p, aimX, aimY) {
@@ -3740,13 +3961,16 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             return;
         }
 
-        // Glitch teleport
+        // Glitch teleport — teleports you to aim point with invincibility window (Glitch's signature)
         if (p.cls.canTeleport && p.teleporting <= 0) {
-            if (!ptInBld(aimX, aimY, p.r) && !ptInWall(aimX, aimY, p.r)) {
+            const tx = Math.max(p.r, Math.min(WORLD_W - p.r, aimX));
+            const ty = Math.max(p.r, Math.min(WORLD_H - p.r, aimY));
+            if (!ptInBld(tx, ty, p.r) && !ptInWall(tx, ty, p.r)) {
                 p.teleporting = 20;
+                p.invincible = Math.max(p.invincible, 60);
                 SFX.teleport();
                 for (let i=0;i<8;i++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:15,maxLife:15,color:'#ff2d55',r:3});
-                p.x = aimX; p.y = aimY;
+                p.x = tx; p.y = ty;
                 for (let i=0;i<8;i++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:15,maxLife:15,color:'#ff2d55',r:3});
             }
         }
@@ -3865,7 +4089,104 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                 }
             }
         }
+
+        // ===== Active E abilities for classes that were previously passive-only =====
+        // Physico — Frenzy: 3 quick wide melee strikes around the player
+        if (p.cls.name === 'Physico' && (p._eCd||0) <= 0) {
+            p._eCd = 90; p.meleeSwing = 30;
+            _mvDmgRadius(p, 80, Math.floor(p.damage * 1.6));
+            _mvRing(p.x, p.y, '#34495e', 12, 40);
+            if (p === player) showStatus('FRENZY!', '#34495e');
+            SFX.shoot();
+        }
+        // Scaredy Cat — Hide: 4s invisibility
+        if (p.cls.name === 'Scaredy Cat' && (p._eCd||0) <= 0) {
+            p._eCd = 240; p.invisible = true; p.invisTimer = Math.max(p.invisTimer, 240);
+            _mvRing(p.x, p.y, '#f78fb3', 10, 30);
+            if (p === player) showStatus('HIDDEN!', '#f78fb3');
+            SFX.teleport();
+        }
+        // Gangster — Slow Rounds: slow all monsters in 200px for 3s
+        if (p.cls.name === 'Gangster' && (p._eCd||0) <= 0) {
+            p._eCd = 180;
+            for (const m of monsters) if (Math.hypot(m.x-p.x, m.y-p.y) < 200) m.slow = Math.max(m.slow||0, 180);
+            _mvRing(p.x, p.y, '#1c1c1c', 14, 60);
+            if (p === player) showStatus('SLOW ROUNDS!', '#1c1c1c');
+            SFX.shoot();
+        }
+        // Saber — Spear Throw: hard-hitting ranged forward stab projectile
+        if (p.cls.name === 'Saber' && (p._eCd||0) <= 0) {
+            p._eCd = 120;
+            const ang = p.angle;
+            bullets.push({ x:p.x+Math.cos(ang)*18, y:p.y+Math.sin(ang)*18, vx:Math.cos(ang)*14, vy:Math.sin(ang)*14, life:220, damage:Math.floor(p.damage*2.5), color:'#c0392b' });
+            if (p === player) showStatus('SPEAR THROW!', '#c0392b');
+            SFX.shoot();
+        }
+        // Scientist — Toxic Bomb: poison cloud at aim point
+        if (p.cls.name === 'Scientist' && (p._eCd||0) <= 0) {
+            p._eCd = 180;
+            for (let i = 0; i < 8; i++) poisonTiles.push({ x: aimX + (Math.random()-0.5)*60, y: aimY + (Math.random()-0.5)*60, life: 300 });
+            _mvRing(aimX, aimY, '#00ff88', 12, 30);
+            if (p === player) showStatus('TOXIC BOMB!', '#00ff88');
+            SFX.shoot();
+        }
+        // Medic — Self Heal: instant +50 HP and brief invuln
+        if (p.cls.canRevive && (p._eCd||0) <= 0 && p.cls.name === 'Medic') {
+            p._eCd = 300;
+            p.hp = Math.min(p.maxHp, p.hp + 50);
+            p.invincible = Math.max(p.invincible, 60);
+            _mvRing(p.x, p.y, '#e74c3c', 12, 40);
+            if (p === player) showStatus('SELF HEAL!', '#e74c3c');
+            SFX.revive();
+        }
+        // The Iron — Iron Skin: 4s invuln + heal
+        if (p.cls.fireImmune && p.cls.name === 'The Iron' && (p._eCd||0) <= 0) {
+            p._eCd = 480;
+            p.invincible = Math.max(p.invincible, 240);
+            p.hp = Math.min(p.maxHp, p.hp + 30);
+            _mvRing(p.x, p.y, '#7f8c8d', 12, 40);
+            if (p === player) showStatus('IRON SKIN!', '#7f8c8d');
+            SFX.shield();
+        }
+        // The Nerd — Counter Spell: reflect all enemy bullets back, 3s
+        if (p.cls.reflectEvery && p.cls.name === 'The Nerd' && (p._eCd||0) <= 0) {
+            p._eCd = 360;
+            for (const b of bullets) if (b.owner === 'monster') { b.vx *= -1; b.vy *= -1; b.color = '#feca57'; b.owner = 'player'; b.damage = Math.max(b.damage, 12); }
+            _mvRing(p.x, p.y, '#16a085', 16, 50);
+            if (p === player) showStatus('COUNTER SPELL!', '#16a085');
+            SFX.shield();
+        }
+        // Monster Copier — Force Mimic: trigger the copy/speed buff manually
+        if (p.cls.canCopy && (p._eCd||0) <= 0) {
+            p._eCd = 240;
+            p.copiedPower = true; p.copyTimer = Math.max(p.copyTimer, 300); p.copySpeedBonus = Math.max(p.copySpeedBonus, 1.5);
+            _mvRing(p.x, p.y, '#ffeaa7', 12, 40);
+            if (p === player) showStatus('FORCE MIMIC!', '#ffeaa7');
+            SFX.shoot();
+        }
+        // Vampire — Blood Frenzy: heal + boost damage briefly
+        if (p.cls.lifeSteal && p.cls.name === 'Vampire' && (p._eCd||0) <= 0) {
+            p._eCd = 360;
+            p.hp = Math.min(p.maxHp, p.hp + 60);
+            p.chiliBoost = Math.max(p.chiliBoost, 300);
+            _mvRing(p.x, p.y, '#6c5ce7', 12, 40);
+            if (p === player) showStatus('BLOOD FRENZY!', '#6c5ce7');
+            SFX.revive();
+        }
+        // Calm Kid — Zen Burst: full heal + 3s invuln + chili
+        if (p.cls.name === 'Calm Kid' && (p._eCd||0) <= 0) {
+            p._eCd = 480;
+            p.hp = p.maxHp;
+            p.invincible = Math.max(p.invincible, 180);
+            p.chiliBoost = Math.max(p.chiliBoost, 300);
+            _mvRing(p.x, p.y, '#74b9ff', 14, 50);
+            if (p === player) showStatus('ZEN BURST!', '#74b9ff');
+            SFX.revive();
+        }
     }
+
+    // E ability cooldown decrement (called from update loop)
+    function _decEAbilityCd(pl) { if (pl && pl._eCd > 0) pl._eCd--; }
 
     // ======================== MONSTER SPAWNING ========================
     function isBossWave() { return wave > 0 && wave % 10 === 0; }
@@ -3873,18 +4194,14 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function spawnMonster() {
         if (!currentMonsterClass) return;
         const mc = currentMonsterClass;
-        // Spawn just off-screen relative to the player's camera so monsters reach them
+        // Spawn at one of the four world borders (random side, random point along that edge)
         let x, y;
-        const px = player ? player.x : WORLD_W/2;
-        const py = player ? player.y : WORLD_H/2;
+        const margin = 30;
         const side = Math.floor(Math.random()*4);
-        const margin = 40;
-        if (side===0){ x = px - W/2 - margin; y = py - H/2 + Math.random()*H; }
-        else if(side===1){ x = px + W/2 + margin; y = py - H/2 + Math.random()*H; }
-        else if(side===2){ x = px - W/2 + Math.random()*W; y = py - H/2 - margin; }
-        else { x = px - W/2 + Math.random()*W; y = py + H/2 + margin; }
-        x = Math.max(-50, Math.min(WORLD_W+50, x));
-        y = Math.max(-50, Math.min(WORLD_H+50, y));
+        if (side === 0)      { x = -margin;          y = Math.random()*WORLD_H; } // left edge
+        else if (side === 1) { x = WORLD_W + margin; y = Math.random()*WORLD_H; } // right edge
+        else if (side === 2) { x = Math.random()*WORLD_W; y = -margin; }          // top edge
+        else                 { x = Math.random()*WORLD_W; y = WORLD_H + margin; } // bottom edge
 
         const boss = isBossWave();
         const hpMult = (1 + (wave-1)*0.2) * (boss ? 12 + wave*0.5 : 1);
@@ -4099,6 +4416,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (p.copyTimer > 0) { p.copyTimer--; if (p.copyTimer<=0) { p.copiedPower=false; p.copySpeedBonus=0; } }
         if (statusTimer > 0) { statusTimer--; if (statusTimer<=0) document.getElementById('status-overlay').style.display='none'; }
         if (p.shootCooldown > 0) p.shootCooldown--;
+        if (p._eCd > 0) p._eCd--;
         if (p.invincible > 0) p.invincible--;
         if (p.flashTimer > 0) p.flashTimer--;
         if (p.moveQCooldown > 0) p.moveQCooldown--;
@@ -4608,6 +4926,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
         // Particles
         for (let i = particles.length-1; i >= 0; i--) { const pt=particles[i]; pt.x+=pt.vx;pt.y+=pt.vy;pt.vx*=0.95;pt.vy*=0.95;pt.life--; if(pt.life<=0)particles.splice(i,1); }
+        updateGameEffects();
 
         // Wave complete — roll new monster class + auto save
         if (monstersSpawned >= monstersToSpawn && monsters.length === 0) {
@@ -6710,152 +7029,318 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const group = new THREE.Group();
         const baseCol = _hex(m.color || '#ff3838');
         const name = m.name || '';
-        // Body — shared base, slightly different material per class
-        const bodyMat = new THREE.MeshStandardMaterial({ color: baseCol, metalness: 0.5, roughness: 0.4, envMapIntensity: 1.2, emissive: baseCol, emissiveIntensity: 0.08 });
-        const body = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 20), bodyMat);
-        body.castShadow = true;
-        body.scale.set(1, 1.1, 1);
-        group.add(body);
-        // Eyes (white sclera + black pupil + small white glint)
-        const eyeWhite = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.2, roughness: 0.4 });
-        const eyeBlack = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.1, roughness: 0.4 });
-        const glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        // Realistic zombie skin — sickly grey-green blend of the class color
+        const zomBase = new THREE.Color(baseCol).lerp(new THREE.Color(0x6a7a55), 0.7);
+        const skinMat = new THREE.MeshStandardMaterial({ color: zomBase, metalness: 0.05, roughness: 0.95, envMapIntensity: 0.4 });
+        const bloodMat = new THREE.MeshStandardMaterial({ color: 0x6a0d0d, roughness: 0.6, emissive: 0x2a0303, emissiveIntensity: 0.3 });
+        const clothMat = new THREE.MeshStandardMaterial({ color: 0x322a1c, roughness: 0.95, side: THREE.DoubleSide, transparent: true, opacity: 0.94 });
+        const boneMat = new THREE.MeshStandardMaterial({ color: 0xe0d4b0, roughness: 0.8 });
+        // bodyMat alias kept so existing class-extras (Dragon snout etc) still compile
+        const bodyMat = skinMat;
+        // ===== HUMANOID FIGURE — feet at local y=0, head ~3.5r up =====
+        // Feet (placed at y=0)
         for (const sx of [-1, 1]) {
-            const eye = new THREE.Mesh(new THREE.SphereGeometry(r*0.3, 12, 10), eyeWhite);
-            eye.position.set(sx * r * 0.36, r * 0.25, r * 0.78);
-            group.add(eye);
-            const pupil = new THREE.Mesh(new THREE.SphereGeometry(r*0.14, 10, 8), eyeBlack);
-            pupil.position.set(sx * r * 0.36, r * 0.25, r * 0.95);
-            group.add(pupil);
-            const glint = new THREE.Mesh(new THREE.SphereGeometry(r*0.05, 6, 4), glintMat);
-            glint.position.set(sx * r * 0.36 - r*0.05, r * 0.30, r * 1.01);
-            group.add(glint);
+            const foot = new THREE.Mesh(new THREE.BoxGeometry(r*0.34, r*0.16, r*0.55), skinMat);
+            foot.position.set(sx*r*0.28, r*0.08, r*0.08);
+            foot.castShadow = true; group.add(foot);
+            // Lower leg (shin)
+            const shin = new THREE.Mesh(new THREE.CylinderGeometry(r*0.16, r*0.13, r*0.85, 12), skinMat);
+            shin.position.set(sx*r*0.28, r*0.6, 0);
+            shin.castShadow = true; group.add(shin);
+            // Upper leg (thigh)
+            const thigh = new THREE.Mesh(new THREE.CylinderGeometry(r*0.21, r*0.17, r*0.9, 12), skinMat);
+            thigh.position.set(sx*r*0.27, r*1.5, 0);
+            thigh.castShadow = true; group.add(thigh);
+            // Tattered pants — translucent ragged cylinder around thigh
+            const pant = new THREE.Mesh(new THREE.CylinderGeometry(r*0.26, r*0.2, r*1.1, 10, 1, true), clothMat);
+            pant.position.set(sx*r*0.27, r*1.4, 0); group.add(pant);
+            // Knee patch — small bloody scrape
+            const knee = new THREE.Mesh(new THREE.SphereGeometry(r*0.1, 8, 6), bloodMat);
+            knee.position.set(sx*r*0.27, r*1.0, r*0.16); knee.scale.set(1, 0.6, 0.4); group.add(knee);
         }
-        // Mouth with teeth
-        const mouth = new THREE.Mesh(new THREE.SphereGeometry(r*0.32, 14, 10, 0, Math.PI*2, 0, Math.PI/2), new THREE.MeshStandardMaterial({ color: 0x2c1010, metalness: 0.1, roughness: 0.7 }));
-        mouth.rotation.x = Math.PI/2; mouth.position.set(0, -r*0.18, r*0.78);
-        group.add(mouth);
-        // Teeth (small white cubes inside the mouth opening)
+        // Pelvis / hip
+        const hip = new THREE.Mesh(new THREE.BoxGeometry(r*0.78, r*0.4, r*0.46), skinMat);
+        hip.position.y = r*2.0; hip.castShadow = true; group.add(hip);
+        // Torso (chest)
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(r*0.5, r*0.55, r*1.05, 14), skinMat);
+        torso.position.y = r*2.75; torso.castShadow = true; group.add(torso);
+        // Tattered shirt — semi-transparent dark cloth over torso
+        const shirt = new THREE.Mesh(new THREE.CylinderGeometry(r*0.58, r*0.62, r*0.95, 16, 1, true), clothMat);
+        shirt.position.y = r*2.7; group.add(shirt);
+        // Exposed ribs (3 lines on front)
+        for (let i = 0; i < 3; i++) {
+            const rib = new THREE.Mesh(new THREE.BoxGeometry(r*0.7, r*0.06, r*0.04), boneMat);
+            rib.position.set(0, r*(2.95 - i*0.22), r*0.5); group.add(rib);
+        }
+        // Bloody patches scattered on torso
         for (let i = 0; i < 4; i++) {
-            const tooth = new THREE.Mesh(new THREE.ConeGeometry(r*0.04, r*0.18, 4), new THREE.MeshStandardMaterial({ color: 0xffffff }));
-            tooth.position.set((i-1.5)*r*0.08, -r*0.18 + r*0.07, r*0.92);
-            tooth.rotation.x = Math.PI; group.add(tooth);
+            const a = (i/4)*Math.PI*2 + Math.random()*0.6;
+            const patch = new THREE.Mesh(new THREE.SphereGeometry(r*0.16, 8, 6), bloodMat);
+            patch.position.set(Math.cos(a)*r*0.55, r*(2.4 + Math.random()*0.8), Math.sin(a)*r*0.55);
+            patch.scale.set(1, 0.5, 0.3); group.add(patch);
         }
+        // Shoulders / arms (hunched zombie pose — both arms reaching forward)
+        for (const sx of [-1, 1]) {
+            // Shoulder
+            const shoulder = new THREE.Mesh(new THREE.SphereGeometry(r*0.22, 12, 10), skinMat);
+            shoulder.position.set(sx*r*0.55, r*3.2, 0); group.add(shoulder);
+            // Upper arm — angled forward
+            const upArm = new THREE.Mesh(new THREE.CylinderGeometry(r*0.16, r*0.13, r*0.85, 12), skinMat);
+            upArm.position.set(sx*r*0.55, r*2.85, r*0.25);
+            upArm.rotation.x = -0.55; upArm.castShadow = true; group.add(upArm);
+            // Lower arm — bent forward
+            const loArm = new THREE.Mesh(new THREE.CylinderGeometry(r*0.14, r*0.11, r*0.85, 12), skinMat);
+            loArm.position.set(sx*r*0.55, r*2.5, r*0.85);
+            loArm.rotation.x = -1.25; loArm.castShadow = true; group.add(loArm);
+            // Hand
+            const hand = new THREE.Mesh(new THREE.SphereGeometry(r*0.16, 10, 8), skinMat);
+            hand.position.set(sx*r*0.55, r*2.1, r*1.3); group.add(hand);
+            // Claws (4 short black cones)
+            for (let f = 0; f < 4; f++) {
+                const claw = new THREE.Mesh(new THREE.ConeGeometry(r*0.03, r*0.14, 4), new THREE.MeshStandardMaterial({ color: 0x111, metalness: 0.5, roughness: 0.5 }));
+                claw.position.set(sx*r*0.55 + (f-1.5)*r*0.07, r*1.95, r*1.4);
+                claw.rotation.x = -1.5; group.add(claw);
+            }
+        }
+        // Neck
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(r*0.18, r*0.22, r*0.25, 10), skinMat);
+        neck.position.y = r*3.4; group.add(neck);
+        // ===== HEAD =====
+        const head = new THREE.Mesh(new THREE.SphereGeometry(r*0.55, 18, 14), skinMat);
+        head.position.y = r*3.85;
+        head.scale.set(1, 1.05, 0.95);
+        head.castShadow = true;
+        group.add(head);
+        group.userData.head = head;
+        // Sunken eye sockets
+        const socketMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.7 });
+        const irisMat = new THREE.MeshStandardMaterial({ color: 0xfff200, emissive: 0xfff200, emissiveIntensity: 0.9 });
+        for (const sx of [-1, 1]) {
+            const socket = new THREE.Mesh(new THREE.SphereGeometry(r*0.17, 12, 10), socketMat);
+            socket.position.set(sx*r*0.22, r*3.9, r*0.45);
+            socket.scale.set(1, 0.85, 0.5);
+            group.add(socket);
+            // Deep glowing iris inside socket
+            const iris = new THREE.Mesh(new THREE.SphereGeometry(r*0.07, 8, 6), irisMat);
+            iris.position.set(sx*r*0.22, r*3.9, r*0.55); group.add(iris);
+        }
+        // Mouth — bloody gash
+        const mouth = new THREE.Mesh(new THREE.BoxGeometry(r*0.38, r*0.11, r*0.08), new THREE.MeshStandardMaterial({ color: 0x1a0508, roughness: 0.6 }));
+        mouth.position.set(0, r*3.62, r*0.5); group.add(mouth);
+        // Crooked uneven teeth
+        for (let i = 0; i < 5; i++) {
+            if (i === Math.floor(Math.random()*5)) continue; // missing tooth
+            const tlen = r * (0.1 + Math.random()*0.08);
+            const tooth = new THREE.Mesh(new THREE.ConeGeometry(r*0.04, tlen, 4), new THREE.MeshStandardMaterial({ color: 0xd8c884, roughness: 0.7 }));
+            tooth.position.set((i-2)*r*0.07, r*3.63 - tlen*0.4, r*0.54);
+            tooth.rotation.x = Math.PI + (Math.random()-0.5)*0.2;
+            group.add(tooth);
+        }
+        // Blood dribbling down the chin
+        const chinBlood = new THREE.Mesh(new THREE.CylinderGeometry(r*0.04, r*0.07, r*0.3, 8), bloodMat);
+        chinBlood.position.set(-r*0.08, r*3.42, r*0.51); group.add(chinBlood);
+        const chinDrop = new THREE.Mesh(new THREE.SphereGeometry(r*0.08, 10, 8), bloodMat);
+        chinDrop.position.set(-r*0.08, r*3.28, r*0.51); chinDrop.scale.set(1, 1.5, 1); group.add(chinDrop);
+        // Scraggly hair patches on top of head
+        for (let i = 0; i < 7; i++) {
+            const a = (i/7)*Math.PI*2;
+            const hair = new THREE.Mesh(new THREE.ConeGeometry(r*0.04, r*0.18 + Math.random()*r*0.12, 4), new THREE.MeshStandardMaterial({ color: 0x261810, roughness: 0.95 }));
+            hair.position.set(Math.cos(a)*r*0.3, r*4.3, Math.sin(a)*r*0.3);
+            hair.rotation.x = -Math.cos(a)*0.5; hair.rotation.z = Math.sin(a)*0.5; group.add(hair);
+        }
+        // Stitched wound across cheek
+        const cheekGash = new THREE.Mesh(new THREE.BoxGeometry(r*0.4, r*0.06, r*0.04), bloodMat);
+        cheekGash.position.set(-r*0.32, r*3.75, r*0.45); cheekGash.rotation.z = 0.3; group.add(cheekGash);
+        for (let s = 0; s < 3; s++) {
+            const stitch = new THREE.Mesh(new THREE.BoxGeometry(r*0.025, r*0.14, r*0.02), new THREE.MeshStandardMaterial({ color: 0x111, metalness: 0.4 }));
+            stitch.position.set(-r*0.32 + (s-1)*r*0.13, r*3.75, r*0.46); stitch.rotation.z = 0.3; group.add(stitch);
+        }
+        // Pulsing dark green emissive — subtle infection glow on the chest
+        const infection = new THREE.Mesh(new THREE.SphereGeometry(r*0.25, 10, 8), new THREE.MeshStandardMaterial({ color: 0x2a4015, emissive: 0x95d040, emissiveIntensity: 0.6, roughness: 0.5 }));
+        infection.position.set(r*0.2, r*2.7, r*0.5); infection.scale.set(1, 0.8, 0.4); group.add(infection);
+        // Reference for backward compatibility
+        const body = head;
+        const HEAD_Y = r * 3.85;
+        const CHEST_Y = r * 2.75;
+        // Per-class mutations — grow OUT of the zombie body, not as a separate crown
         // Class-specific extras
+        // ===== ABILITY MUTATIONS — each monster type's ability twists its body =====
         if (name.includes('Frost')) {
-            // 6 white ice spikes growing out of the body
-            const iceMat = new THREE.MeshStandardMaterial({ color: 0xdff7ff, metalness: 0.6, roughness: 0.18, transparent: true, opacity: 0.95, emissive: 0x74b9ff, emissiveIntensity: 0.35 });
-            for (let i = 0; i < 6; i++) {
-                const a = (i/6) * Math.PI * 2;
-                const spike = new THREE.Mesh(new THREE.ConeGeometry(r*0.16, r*0.85, 5), iceMat);
-                spike.position.set(Math.cos(a)*r*0.85, r*0.6, Math.sin(a)*r*0.85);
-                spike.rotation.x = -Math.cos(a)*0.45; spike.rotation.z = Math.sin(a)*0.45;
+            // Ice has fused into the corpse — spikes pierce out of shoulders/chest/head, frost rimes the skin
+            const iceMat = new THREE.MeshStandardMaterial({ color: 0xdff7ff, metalness: 0.6, roughness: 0.18, transparent: true, opacity: 0.95, emissive: 0x74b9ff, emissiveIntensity: 0.5 });
+            // Spikes erupting from shoulders + back
+            const spikeSpots = [
+                { x: r*0.55, y: r*3.2, z: -r*0.15, ang: 0.3 },  // right shoulder
+                { x: -r*0.55, y: r*3.2, z: -r*0.15, ang: -0.3 },// left shoulder
+                { x: 0, y: r*3.0, z: -r*0.4, ang: 0 },          // upper back
+                { x: r*0.3, y: r*2.5, z: -r*0.45, ang: 0.2 },   // mid back
+                { x: -r*0.3, y: r*2.5, z: -r*0.45, ang: -0.2 }, // mid back
+                { x: 0, y: r*4.3, z: -r*0.1, ang: 0 },          // head/skull
+            ];
+            for (const s of spikeSpots) {
+                const spike = new THREE.Mesh(new THREE.ConeGeometry(r*0.13, r*0.7, 5), iceMat);
+                spike.position.set(s.x, s.y, s.z);
+                spike.rotation.z = s.ang;
+                spike.rotation.x = -0.4;
                 group.add(spike);
             }
-            // Frosty crown
-            const crown = new THREE.Mesh(new THREE.ConeGeometry(r*0.45, r*0.65, 6), iceMat);
-            crown.position.y = r*1.0; group.add(crown);
+            // Frozen skin patches on torso/arms — light blue rime spheres
+            for (let i = 0; i < 5; i++) {
+                const a = (i/5)*Math.PI*2;
+                const rime = new THREE.Mesh(new THREE.SphereGeometry(r*0.18, 8, 6), iceMat);
+                rime.position.set(Math.cos(a)*r*0.5, r*(2.5 + Math.random()*0.7), Math.sin(a)*r*0.5);
+                rime.scale.set(1, 0.5, 0.3); group.add(rime);
+            }
+            // Icicle drool from mouth instead of blood
+            const icicle = new THREE.Mesh(new THREE.ConeGeometry(r*0.07, r*0.35, 6), iceMat);
+            icicle.position.set(-r*0.08, r*3.42, r*0.55); icicle.rotation.x = Math.PI; group.add(icicle);
+            // Cold aura point light
+            const cold = new THREE.PointLight(0x74b9ff, 0.5, 60); cold.position.y = r*3.5; group.add(cold);
         } else if (name.includes('Flame')) {
-            // Fire crown — multiple cones in red/orange/yellow
+            // The corpse is on fire — burnt skin, embers glow through cracks, flame jets from wounds
             const flameCols = [0xff6b6b, 0xee5a24, 0xffa502, 0xfeca57];
-            for (let i = 0; i < 7; i++) {
-                const a = (i/7) * Math.PI * 2;
-                const flame = new THREE.Mesh(new THREE.ConeGeometry(r*0.15 + Math.random()*r*0.1, r*0.55 + Math.random()*r*0.5, 6), new THREE.MeshStandardMaterial({ color: flameCols[i%flameCols.length], emissive: flameCols[i%flameCols.length], emissiveIntensity: 1.0, metalness: 0.2, roughness: 0.3, transparent: true, opacity: 0.92 }));
-                flame.position.set(Math.cos(a)*r*0.55, r*0.85 + Math.random()*r*0.2, Math.sin(a)*r*0.55);
-                group.add(flame);
+            // Charred patches over arms/torso (very dark + slight emissive crackle)
+            const charMat = new THREE.MeshStandardMaterial({ color: 0x1a0a05, roughness: 0.95, emissive: 0xff3a00, emissiveIntensity: 0.6 });
+            for (let i = 0; i < 6; i++) {
+                const a = (i/6)*Math.PI*2;
+                const char = new THREE.Mesh(new THREE.SphereGeometry(r*0.2, 8, 6), charMat);
+                char.position.set(Math.cos(a)*r*0.5, r*(2.4 + Math.random()*0.9), Math.sin(a)*r*0.5);
+                char.scale.set(1, 0.7, 0.35); group.add(char);
             }
-            // Hot glow inside
-            const glow = new THREE.PointLight(0xee5a24, 0.8, 60); glow.position.y = r; group.add(glow);
+            // Flames erupting from wounds — shoulders, chest, head
+            const flameSpots = [
+                { x: 0, y: r*3.4, z: r*0.1 },           // through the chest
+                { x: r*0.55, y: r*3.3, z: 0 },          // right shoulder
+                { x: -r*0.55, y: r*3.3, z: 0 },         // left shoulder
+                { x: 0, y: r*4.4, z: 0 },               // top of head
+                { x: r*0.3, y: r*2.6, z: r*0.3 },       // torso side
+            ];
+            for (let i = 0; i < flameSpots.length; i++) {
+                const s = flameSpots[i];
+                const flame = new THREE.Mesh(new THREE.ConeGeometry(r*0.18, r*0.6 + Math.random()*r*0.3, 6), new THREE.MeshStandardMaterial({ color: flameCols[i%flameCols.length], emissive: flameCols[i%flameCols.length], emissiveIntensity: 1.2, metalness: 0.1, roughness: 0.3, transparent: true, opacity: 0.92 }));
+                flame.position.set(s.x, s.y, s.z); group.add(flame);
+            }
+            // Hot inner glow
+            const glow = new THREE.PointLight(0xee5a24, 1.0, 80); glow.position.y = r*3.0; group.add(glow);
         } else if (name.includes('Shield')) {
-            // Armored plate on the front of the body
+            // The corpse's bones broke through skin and fused as armor plating
             const armorMat = new THREE.MeshStandardMaterial({ color: 0x636e72, metalness: 0.95, roughness: 0.18, envMapIntensity: 1.6 });
-            const plate = new THREE.Mesh(new THREE.SphereGeometry(r*1.05, 24, 18, 0, Math.PI, 0, Math.PI), armorMat);
-            plate.position.set(0, 0, r*0.05); plate.rotation.y = Math.PI; group.add(plate);
-            // Rivets around the edge
-            for (let i = 0; i < 8; i++) {
-                const a = (i/8) * Math.PI * 2;
-                const rivet = new THREE.Mesh(new THREE.SphereGeometry(r*0.07, 8, 6), armorMat);
-                rivet.position.set(Math.cos(a)*r*0.9, Math.sin(a)*r*0.9, r*0.6); group.add(rivet);
+            const boneSpikeMat = new THREE.MeshStandardMaterial({ color: 0xc8b890, roughness: 0.6 });
+            // Chest plate over torso
+            const plate = new THREE.Mesh(new THREE.SphereGeometry(r*0.65, 18, 12, 0, Math.PI, 0, Math.PI), armorMat);
+            plate.position.set(0, r*2.85, r*0.35); plate.rotation.y = Math.PI; group.add(plate);
+            // Bone spikes from shoulders/back
+            for (let i = 0; i < 5; i++) {
+                const a = i * Math.PI / 4 - Math.PI/2;
+                const spike = new THREE.Mesh(new THREE.ConeGeometry(r*0.12, r*0.55, 4), boneSpikeMat);
+                spike.position.set(Math.cos(a)*r*0.5, r*3.25, Math.sin(a)*r*0.5 - r*0.1);
+                spike.rotation.z = Math.cos(a)*0.4;
+                spike.rotation.x = -Math.sin(a)*0.4 - 0.2;
+                group.add(spike);
             }
-            // Helmet visor strip
-            const visor = new THREE.Mesh(new THREE.BoxGeometry(r*1.4, r*0.18, r*0.1), new THREE.MeshStandardMaterial({ color: 0xff2d55, emissive: 0xff2d55, emissiveIntensity: 0.8 }));
-            visor.position.set(0, r*0.3, r*1.05); group.add(visor);
+            // Skull-like bone helmet over head
+            const helmet = new THREE.Mesh(new THREE.SphereGeometry(r*0.58, 16, 12, 0, Math.PI*2, 0, Math.PI/2), boneSpikeMat);
+            helmet.position.y = r*3.95; group.add(helmet);
+            // Glowing red visor strip
+            const visor = new THREE.Mesh(new THREE.BoxGeometry(r*0.9, r*0.1, r*0.06), new THREE.MeshStandardMaterial({ color: 0xff2d55, emissive: 0xff2d55, emissiveIntensity: 1.2 }));
+            visor.position.set(0, r*3.9, r*0.5); group.add(visor);
         } else if (name.includes('Mad Mom')) {
-            // Wild hair (cluster of spikes) + angry eyebrows
-            const hairMat = new THREE.MeshStandardMaterial({ color: 0x8b3a1f, metalness: 0.1, roughness: 0.7 });
-            for (let i = 0; i < 10; i++) {
-                const a = (i/10)*Math.PI*2;
-                const hair = new THREE.Mesh(new THREE.ConeGeometry(r*0.18, r*0.7 + Math.random()*r*0.3, 5), hairMat);
-                hair.position.set(Math.cos(a)*r*0.65, r*0.85, Math.sin(a)*r*0.65);
-                hair.rotation.x = -Math.cos(a)*0.4; hair.rotation.z = Math.sin(a)*0.4;
+            // Rage caused muscles to bulge grotesquely, veins glow red, jaw unhinges
+            const muscleMat = new THREE.MeshStandardMaterial({ color: zomBase.clone().multiplyScalar(0.7), roughness: 0.85, emissive: 0x8b0000, emissiveIntensity: 0.3 });
+            // Bulging tumor muscles on arms and torso
+            for (let i = 0; i < 7; i++) {
+                const a = Math.random()*Math.PI*2;
+                const muscle = new THREE.Mesh(new THREE.SphereGeometry(r*(0.18 + Math.random()*0.15), 10, 8), muscleMat);
+                muscle.position.set(Math.cos(a)*r*0.58, r*(2.4 + Math.random()*0.9), Math.sin(a)*r*0.58);
+                group.add(muscle);
+            }
+            // Bigger fists — clenched
+            for (const sx of [-1, 1]) {
+                const fist = new THREE.Mesh(new THREE.SphereGeometry(r*0.24, 12, 10), muscleMat);
+                fist.position.set(sx*r*0.55, r*2.05, r*1.35); group.add(fist);
+            }
+            // Wild bloody red hair, longer than normal
+            const hairMat = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.7 });
+            for (let i = 0; i < 12; i++) {
+                const a = (i/12)*Math.PI*2;
+                const hair = new THREE.Mesh(new THREE.ConeGeometry(r*0.1, r*0.5 + Math.random()*r*0.3, 4), hairMat);
+                hair.position.set(Math.cos(a)*r*0.35, r*(4.35 + Math.random()*0.15), Math.sin(a)*r*0.35);
+                hair.rotation.x = -Math.cos(a)*0.6; hair.rotation.z = Math.sin(a)*0.6;
                 group.add(hair);
             }
-            // Angry eyebrows (slanted boxes)
-            const browMat = new THREE.MeshStandardMaterial({ color: 0x2c1810 });
-            for (const sx of [-1, 1]) {
-                const brow = new THREE.Mesh(new THREE.BoxGeometry(r*0.35, r*0.08, r*0.06), browMat);
-                brow.position.set(sx*r*0.36, r*0.5, r*0.95);
-                brow.rotation.z = sx * Math.PI/6; group.add(brow);
-            }
-            // Handbag (signature item)
-            const bag = new THREE.Mesh(new THREE.BoxGeometry(r*0.5, r*0.4, r*0.25), new THREE.MeshStandardMaterial({ color: 0xa52a2a, metalness: 0.3, roughness: 0.45 }));
-            bag.position.set(r*0.85, -r*0.2, 0); group.add(bag);
-            const handle = new THREE.Mesh(new THREE.TorusGeometry(r*0.18, r*0.04, 6, 14), new THREE.MeshStandardMaterial({ color: 0x654321 }));
-            handle.position.set(r*0.85, r*0.05, 0); handle.rotation.x = Math.PI/2; group.add(handle);
+            // Unhinged jaw — extends below the mouth
+            const jaw = new THREE.Mesh(new THREE.BoxGeometry(r*0.45, r*0.25, r*0.25), new THREE.MeshStandardMaterial({ color: 0x1a0508, roughness: 0.6 }));
+            jaw.position.set(0, r*3.35, r*0.5); group.add(jaw);
         } else if (name.includes('Miku')) {
-            // Twin hair tails + microphone
-            const hairCol = 0x00cec9;
-            const hairMat = new THREE.MeshStandardMaterial({ color: hairCol, metalness: 0.3, roughness: 0.35, emissive: hairCol, emissiveIntensity: 0.18 });
+            // Sound-based mutation — speakers grow from chest, glowing teal tendrils replace arms, mic-cone tongue
+            const sonicCol = 0x00cec9;
+            const sonicMat = new THREE.MeshStandardMaterial({ color: sonicCol, metalness: 0.4, roughness: 0.25, emissive: sonicCol, emissiveIntensity: 0.55 });
+            // Speaker cones growing from chest
             for (const sx of [-1, 1]) {
-                const tail = new THREE.Mesh(new THREE.CylinderGeometry(r*0.18, r*0.05, r*1.4, 12), hairMat);
-                tail.position.set(sx*r*0.95, r*0.2, -r*0.3); tail.rotation.z = sx*0.3; group.add(tail);
+                const speaker = new THREE.Mesh(new THREE.CylinderGeometry(r*0.22, r*0.32, r*0.25, 16), sonicMat);
+                speaker.position.set(sx*r*0.3, r*2.85, r*0.5); speaker.rotation.x = Math.PI/2; group.add(speaker);
+                const cone = new THREE.Mesh(new THREE.ConeGeometry(r*0.22, r*0.25, 16, 1, true), new THREE.MeshStandardMaterial({ color: 0x111, side: THREE.DoubleSide, emissive: sonicCol, emissiveIntensity: 0.4 }));
+                cone.position.set(sx*r*0.3, r*2.85, r*0.65); cone.rotation.x = Math.PI/2; group.add(cone);
             }
-            // Hair top
-            const top = new THREE.Mesh(new THREE.SphereGeometry(r*0.6, 16, 12, 0, Math.PI*2, 0, Math.PI/2), hairMat);
-            top.position.y = r*0.55; group.add(top);
-            // Microphone (stick + ball)
-            const stick = new THREE.Mesh(new THREE.CylinderGeometry(r*0.05, r*0.05, r*0.6, 8), new THREE.MeshStandardMaterial({ color: 0x444, metalness: 0.85, roughness: 0.25 }));
-            stick.position.set(-r*0.7, -r*0.1, r*0.5); stick.rotation.z = Math.PI/4; group.add(stick);
-            const micBall = new THREE.Mesh(new THREE.SphereGeometry(r*0.18, 14, 10), new THREE.MeshStandardMaterial({ color: 0xfff, metalness: 0.4, roughness: 0.3 }));
-            micBall.position.set(-r*0.9, r*0.05, r*0.7); group.add(micBall);
-            // Music notes floating
-            const noteMat = new THREE.MeshStandardMaterial({ color: 0x9b59b6, emissive: 0x9b59b6, emissiveIntensity: 0.6 });
-            const note = new THREE.Mesh(new THREE.SphereGeometry(r*0.13, 10, 8), noteMat);
-            note.position.set(r*0.7, r*0.8, r*0.3); group.add(note);
+            // Teal hair tendrils sprouting from skull (downward — past shoulders)
+            for (const sx of [-1, 1]) {
+                const tendril = new THREE.Mesh(new THREE.CylinderGeometry(r*0.12, r*0.04, r*1.6, 10), sonicMat);
+                tendril.position.set(sx*r*0.4, r*3.2, -r*0.2); tendril.rotation.z = sx*0.4; group.add(tendril);
+            }
+            // Sound waves — translucent rings around chest
+            const waveMat = new THREE.MeshBasicMaterial({ color: sonicCol, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
+            for (let i = 0; i < 3; i++) {
+                const wave = new THREE.Mesh(new THREE.TorusGeometry(r*(0.6 + i*0.25), 0.5, 6, 20), waveMat);
+                wave.position.set(0, r*2.85, r*0.5); wave.rotation.y = Math.PI/2; group.add(wave);
+            }
+            // Microphone-cone tongue sticking out of the mouth
+            const tongue = new THREE.Mesh(new THREE.ConeGeometry(r*0.1, r*0.35, 8), new THREE.MeshStandardMaterial({ color: 0x444, metalness: 0.85, roughness: 0.25 }));
+            tongue.position.set(0, r*3.55, r*0.7); tongue.rotation.x = -Math.PI/2; group.add(tongue);
         } else if (name.includes('Dragon') || m.isBoss) {
-            // Horns, scaly back ridges, wings
-            const scaleMat = new THREE.MeshStandardMaterial({ color: baseCol, metalness: 0.7, roughness: 0.3, emissive: baseCol, emissiveIntensity: 0.1 });
+            // The corpse partially transformed into a dragon — scales, horns, wings, fire-breath
+            const scaleMat = new THREE.MeshStandardMaterial({ color: baseCol, metalness: 0.7, roughness: 0.3, emissive: baseCol, emissiveIntensity: 0.15 });
             const hornMat = new THREE.MeshStandardMaterial({ color: 0x2d3436, metalness: 0.95, roughness: 0.2 });
-            // Horns (2)
+            // Horns through the skull
             for (const sx of [-1, 1]) {
-                const horn = new THREE.Mesh(new THREE.ConeGeometry(r*0.18, r*0.7, 6), hornMat);
-                horn.position.set(sx*r*0.4, r*0.95, r*0.1); horn.rotation.z = sx*0.5; group.add(horn);
+                const horn = new THREE.Mesh(new THREE.ConeGeometry(r*0.18, r*0.85, 6), hornMat);
+                horn.position.set(sx*r*0.32, r*4.45, r*0.05); horn.rotation.z = sx*0.55; group.add(horn);
             }
-            // Back spikes (5)
-            for (let i = 0; i < 5; i++) {
-                const spike = new THREE.Mesh(new THREE.ConeGeometry(r*0.15, r*0.5 - i*r*0.03, 5), scaleMat);
-                spike.position.set(0, r*0.8 - i*r*0.05, -r*0.4 - i*r*0.18);
+            // Back spikes (scaly ridges from neck down spine)
+            for (let i = 0; i < 6; i++) {
+                const spike = new THREE.Mesh(new THREE.ConeGeometry(r*0.16, r*0.55 - i*r*0.04, 5), scaleMat);
+                spike.position.set(0, r*(3.5 - i*0.3), -r*0.45);
                 group.add(spike);
             }
-            // Wings (transparent membrane)
-            const wingMat = new THREE.MeshStandardMaterial({ color: baseCol, transparent: true, opacity: 0.7, side: THREE.DoubleSide, metalness: 0.3, roughness: 0.4 });
+            // Bat wings ripping through the back
+            const wingMat = new THREE.MeshStandardMaterial({ color: baseCol, transparent: true, opacity: 0.8, side: THREE.DoubleSide, metalness: 0.3, roughness: 0.4 });
             for (const sx of [-1, 1]) {
-                const wing = new THREE.Mesh(new THREE.PlaneGeometry(r*1.4, r*0.95), wingMat);
-                wing.position.set(sx*r*0.9, r*0.4, -r*0.2);
-                wing.rotation.y = sx*0.6; wing.rotation.z = sx*0.25;
+                const wing = new THREE.Mesh(new THREE.PlaneGeometry(r*1.8, r*1.2), wingMat);
+                wing.position.set(sx*r*1.0, r*3.2, -r*0.5);
+                wing.rotation.y = sx*0.7; wing.rotation.z = sx*0.3;
                 group.add(wing);
             }
-            // Snout extension
-            const snout = new THREE.Mesh(new THREE.ConeGeometry(r*0.32, r*0.55, 10), bodyMat);
-            snout.position.set(0, -r*0.05, r*1.1); snout.rotation.x = Math.PI/2; group.add(snout);
+            // Elongated dragon snout
+            const snout = new THREE.Mesh(new THREE.ConeGeometry(r*0.32, r*0.7, 10), skinMat);
+            snout.position.set(0, r*3.65, r*0.95); snout.rotation.x = Math.PI/2; group.add(snout);
+            // Glowing fire in mouth (about to breathe)
+            const fireGlow = new THREE.Mesh(new THREE.SphereGeometry(r*0.16, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff7700, transparent: true, opacity: 0.85 }));
+            fireGlow.position.set(0, r*3.62, r*1.1); group.add(fireGlow);
+            const fireLight = new THREE.PointLight(0xff7700, 1.2, 90); fireLight.position.set(0, r*3.62, r*1.1); group.add(fireLight);
+            // Scaly patches over arms/torso
+            for (let i = 0; i < 8; i++) {
+                const a = (i/8)*Math.PI*2;
+                const scale = new THREE.Mesh(new THREE.SphereGeometry(r*0.12, 8, 6), scaleMat);
+                scale.position.set(Math.cos(a)*r*0.55, r*(2.4 + Math.random()*0.9), Math.sin(a)*r*0.55);
+                scale.scale.set(1, 0.5, 0.3); group.add(scale);
+            }
         }
-        // HP bar background + fill — billboards parented to the group so they auto-position above
+        // HP bar background + fill — billboards parented to the group so they auto-position above the head
         const hpGroup = new THREE.Group();
         const hpBg = new THREE.Mesh(new THREE.PlaneGeometry(r*2.2, r*0.32), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.65, depthTest: false }));
         const hpFill = new THREE.Mesh(new THREE.PlaneGeometry(r*2.0, r*0.22), new THREE.MeshBasicMaterial({ color: 0x26de81, depthTest: false }));
         hpFill.position.z = 0.1;
         hpGroup.add(hpBg); hpGroup.add(hpFill);
-        hpGroup.position.set(0, r*1.55, 0);
+        hpGroup.position.set(0, r*4.7, 0);
         hpGroup.userData.fill = hpFill;
         group.add(hpGroup);
         group.userData.hpBar = hpGroup;
@@ -7431,13 +7916,14 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             (mesh, m) => {
                 // Idle bob — alive monsters gently bob up/down
                 const bob = m.hp > 0 ? Math.sin(Date.now()/350 + m.x*0.013) * (m.r||14) * 0.08 : 0;
-                mesh.position.set(m.x, (m.r||14) + bob, m.y);
+                // Humanoid zombie — group origin sits at the feet (y=0 on the ground)
+                mesh.position.set(m.x, bob, m.y);
                 const dx = player.x - m.x, dz = m.y - player.y;
                 mesh.rotation.y = Math.atan2(dx, dz);
                 const baseR = mesh.userData.baseR || 14;
                 mesh.scale.setScalar((m.r||14) / baseR);
                 // Hit flash
-                const body = mesh.children[0];
+                const body = mesh.userData.head || mesh.children[0];
                 if (body && body.material) {
                     if (m.hitFlash > 0) { body.material.emissive.setHex(0xffffff); body.material.emissiveIntensity = 1.2; }
                     else { body.material.emissive.setHex(_hex(m.color || '#ff3838')); body.material.emissiveIntensity = 0.08; }
@@ -7586,6 +8072,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         _three.muzzle.scale.setScalar(fireOK ? 1 + Math.random()*0.4 : 1);
         _three.muzzleLight.intensity = fireOK ? 2.5 : 0;
 
+        update3DEffects();
         renderer.render(scene, camera);
     }
 
@@ -7902,6 +8389,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
         // Particles
         for (const pt of particles){ if (pt.x < _cvx0 || pt.x > _cvx1 || pt.y < _cvy0 || pt.y > _cvy1) continue; ctx.globalAlpha=pt.life/pt.maxLife;ctx.fillStyle=pt.color;ctx.beginPath();ctx.arc(pt.x,pt.y,pt.r*(pt.life/pt.maxLife),0,Math.PI*2);ctx.fill();}
+        draw2DEffects(_cvx0, _cvy0, _cvx1, _cvy1);
         ctx.globalAlpha=1;
 
         // Monsters (cartoon style)
@@ -8265,25 +8753,29 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Background
         mctx.clearRect(0, 0, MW, MH);
         mctx.fillStyle = 'rgba(60,60,70,0.85)'; mctx.fillRect(0, 0, MW, MH);
-        // Buildings — small white rects
-        mctx.fillStyle = 'rgba(180,180,180,0.85)';
-        for (const b of buildings) mctx.fillRect(b.x*sx, b.y*sy, Math.max(1, b.w*sx), Math.max(1, b.h*sy));
-        // Pickups — yellow dots
-        mctx.fillStyle = '#feca57';
-        for (const pk of pickups) { mctx.beginPath(); mctx.arc(pk.x*sx, pk.y*sy, 1.5, 0, Math.PI*2); mctx.fill(); }
+        // Buildings — light gray BLOCKS (force a usable minimum size so they don't shrink to dots)
+        mctx.fillStyle = 'rgba(200,200,210,0.85)';
+        mctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        mctx.lineWidth = 1;
+        const _bScale = 4; // visual size multiplier — makes buildings clearly look like blocks
+        for (const b of buildings) {
+            const cx = (b.x + b.w/2) * sx;
+            const cy = (b.y + b.h/2) * sy;
+            const bw = Math.max(5, b.w * sx * _bScale);
+            const bh = Math.max(5, b.h * sy * _bScale);
+            mctx.fillRect(cx - bw/2, cy - bh/2, bw, bh);
+            mctx.strokeRect(cx - bw/2, cy - bh/2, bw, bh);
+        }
         // Traps — orange dots (active only)
         mctx.fillStyle = '#ff9f43';
-        for (const t of traps) { if (t.cooldown <= 0) { mctx.beginPath(); mctx.arc(t.x*sx, t.y*sy, 1.4, 0, Math.PI*2); mctx.fill(); } }
-        // Monsters — red dots
-        mctx.fillStyle = '#ff3838';
-        for (const m of monsters) { mctx.beginPath(); mctx.arc(m.x*sx, m.y*sy, m.isBoss ? 3.5 : 2, 0, Math.PI*2); mctx.fill(); }
-        // Remote players — cyan dots
-        mctx.fillStyle = '#48dbfb';
-        if (typeof remotePlayers !== 'undefined') for (const rp of remotePlayers) { if (rp && rp.hp > 0) { mctx.beginPath(); mctx.arc(rp.x*sx, rp.y*sy, 2.5, 0, Math.PI*2); mctx.fill(); } }
-        // Viewport rectangle (where the player can currently see)
-        if (typeof camera !== 'undefined' && camera) {
-            mctx.strokeStyle = 'rgba(255,255,255,0.45)'; mctx.lineWidth = 1;
-            mctx.strokeRect(camera.x*sx, camera.y*sy, W*sx, H*sy);
+        for (const t of traps) { if (t.cooldown <= 0) { mctx.beginPath(); mctx.arc(t.x*sx, t.y*sy, 1.6, 0, Math.PI*2); mctx.fill(); } }
+        // Monsters — bigger red dots with white outline for visibility
+        for (const m of monsters) {
+            const mr = m.isBoss ? 6 : 4.5;
+            mctx.fillStyle = '#ff3838';
+            mctx.beginPath(); mctx.arc(m.x*sx, m.y*sy, mr, 0, Math.PI*2); mctx.fill();
+            mctx.strokeStyle = '#fff'; mctx.lineWidth = 1;
+            mctx.beginPath(); mctx.arc(m.x*sx, m.y*sy, mr, 0, Math.PI*2); mctx.stroke();
         }
         // Player — green arrow triangle pointing in facing direction
         mctx.save();
