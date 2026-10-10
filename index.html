@@ -121,7 +121,7 @@
         @keyframes rollSpin { 0% { transform: rotateY(0deg) scale(0.8); opacity: 0.5; } 50% { transform: rotateY(180deg) scale(1.1); } 100% { transform: rotateY(360deg) scale(1); opacity: 1; } }
         .rolling { animation: rollSpin 0.6s ease; }
         @keyframes bounce { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(-50%,-50%) scale(1.1); } }
-        #status-overlay { position: absolute; top: 38%; left: 50%; transform: translate(-50%,-50%); font-family: 'Fredoka One', cursive; font-size: 2em; font-weight: bold; pointer-events: none; z-index: 25; display: none; text-transform: uppercase; letter-spacing: 4px; animation: bounce 0.4s ease; -webkit-text-stroke: 2px rgba(0,0,0,0.2); }
+        #status-overlay { position: absolute; top: 38%; left: 50%; transform: translate(-50%,-50%); width: max-content; max-width: 92%; line-height: 1.25; text-align: center; font-family: 'Fredoka One', cursive; font-size: 2em; font-weight: bold; pointer-events: none; z-index: 25; display: none; text-transform: uppercase; letter-spacing: 4px; animation: bounce 0.4s ease; -webkit-text-stroke: 2px rgba(0,0,0,0.2); }
         #pause-screen { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); background: #fff; border-radius: 20px; padding: 25px 40px; display: none; flex-direction: column; align-items: center; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,0.2); border: 4px solid #a29bfe; }
         #pause-screen h2 { font-family: 'Fredoka One', cursive; font-size: 2em; color: #6c5ce7; }
         #pause-screen p { color: #636e72; font-weight: 700; margin-top: 5px; font-size: 0.85em; }
@@ -1480,6 +1480,59 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function skinBulletColor() { const g = ARCADE_SKINS.gun; return !g ? null : (g.rainbow ? _skinRainbow(0) : g.bullet); }
     function skinTrailColor()  { const g = ARCADE_SKINS.gun; return !g ? null : (g.rainbow ? _skinRainbow(60) : g.trail); }
     function skinGlowColor()   { const g = ARCADE_SKINS.gun; return !g ? null : (g.rainbow ? _skinRainbow(30) : g.glow); }
+    // The colours the GUN MODEL itself is painted with while a gun skin is equipped (null = normal look).
+    // body = main colour, accent = darker grip/stock/details, light = rails/steel parts, glow = sights/barrel
+    // glow. `sig` changes only when a colour does, so the 3D viewmodel re-tints only on a real change.
+    // Cosmetic only — shapes, stats and emblems are never touched.
+    let _skinGunPalCache = null;
+    function skinGunPalette() {
+        const g = ARCADE_SKINS.gun; if (!g) return null;
+        const body = skinBulletColor(), trail = skinTrailColor(), glow = skinGlowColor();
+        const sig = body + trail + glow;
+        if (_skinGunPalCache && _skinGunPalCache.sig === sig) return _skinGunPalCache;
+        _skinGunPalCache = { sig, body, accent: shade(trail, -22), light: shade(body, 30), dark: shade(trail, -45), glow };
+        return _skinGunPalCache;
+    }
+    // Paint a 3D gun group (the first-person viewmodel) with the gun skin. Each material says what part
+    // it is via userData.skinRole; anything without a role (emblem, glass, the blaster's white core) is
+    // left alone, and pooled materials (userData.shared) are never touched. The original colours are
+    // cached on the material the first time, so a null skin puts back the EXACT normal look.
+    function skinTintGun3D(group, on) {
+        if (!group) return;
+        const pal = on ? skinGunPalette() : null;
+        const sig = pal ? pal.sig : '';
+        if (group.userData._skinSig === sig) return;      // nothing changed since the last frame
+        group.userData._skinSig = sig;
+        group.traverse(o => {
+            const mats = !o.material ? [] : Array.isArray(o.material) ? o.material : [o.material];
+            for (const m of mats) {
+                const role = m.userData && m.userData.skinRole;
+                if (!role || m.userData.shared || !m.color) continue;
+                const u = m.userData;
+                if (!pal) {
+                    if (!u._skinOrig) continue;
+                    m.color.setHex(u._skinOrig.color);
+                    if (m.emissive) m.emissive.setHex(u._skinOrig.emissive);
+                    if (u._skinOrig.ei !== undefined) m.emissiveIntensity = u._skinOrig.ei;
+                    if (u._skinOrig.metal !== undefined) m.metalness = u._skinOrig.metal;
+                    continue;
+                }
+                if (!u._skinOrig) u._skinOrig = { color: m.color.getHex(), emissive: m.emissive ? m.emissive.getHex() : 0,
+                                                  ei: m.emissiveIntensity, metal: m.metalness };
+                const c = role === 'body' ? pal.body : role === 'light' ? pal.light : role === 'accent' ? pal.accent
+                        : role === 'barrel' ? pal.dark : pal.glow;
+                m.color.set(c);
+                // Very shiny metal shows the environment more than its own colour; ease it off so the
+                // skin actually reads, and give the barrel/sights a gentle glow in the skin's glow colour.
+                if (u._skinOrig.metal !== undefined && u._skinOrig.metal > 0.55) m.metalness = 0.55;
+                if (m.emissive) {
+                    if (role === 'glow')        { m.emissive.set(pal.glow); m.emissiveIntensity = 0.5; }
+                    else if (role === 'barrel') { m.emissive.set(pal.glow); m.emissiveIntensity = 0.22; }
+                    else                        { m.emissive.setHex(u._skinOrig.emissive); if (u._skinOrig.ei !== undefined) m.emissiveIntensity = u._skinOrig.ei; }
+                }
+            }
+        });
+    }
     // i even = primary, odd = secondary
     function skinAbilityColor(i) {
         const a = ARCADE_SKINS.ability; if (!a) return null;
@@ -10137,6 +10190,7 @@ const col = b.color || BLDG_COLORS[0];
         // but nothing ever did: it ran at game start and on a trap knockback, and that was all. Walk
         // out of the chunk you spawned in and the city simply stopped generating.
         refreshChunks();
+        astralSecretTick();   // Astral Temple secret spot (invisible) — places it and drops a faint sparkle
 
         // Timers
         if (p.frozen > 0) { p.frozen--; if (p.frozen===0) p.disableImmune = 120; }
@@ -12931,9 +12985,13 @@ const col = b.color || BLDG_COLORS[0];
 
     // Draw a custom vector weapon pointing +x from the origin, sized by s, themed to `color`.
     // Caller translates/rotates to the hand and aim direction.
-    function drawWeaponIcon(ctx, shape, color, s, flat) {
+    function drawWeaponIcon(ctx, shape, color, s, flat, pal) {
+        // `pal` (skinGunPalette) = an arcade gun skin: repaints the metal/wood/steel parts and the glow.
+        // Same shape either way — a skin only ever changes colours.
+        if (pal) color = pal.glow;
         const dark = shade(color,-45), light = shade(color,45);
-        const metal='#3a3f44', dmetal='#22262a', wood='#6b4423', steel='#c8ccd0', black='#15181b';
+        const metal = pal ? pal.body : '#3a3f44', dmetal = pal ? pal.accent : '#22262a', wood = pal ? pal.accent : '#6b4423',
+              steel = pal ? pal.light : '#c8ccd0', black = pal ? pal.dark : '#15181b';
         ctx.lineCap='round'; ctx.lineJoin='round';
         const gy0=-1.3*s, gy1=1.3*s;
         // vertical gradient (top-lit → bottom-shadow) = rounded 3D tube look. `flat` = solid color for extrusion sides.
@@ -13152,12 +13210,14 @@ const col = b.color || BLDG_COLORS[0];
 
         // Weapon — custom design per equipped weapon (local player), else default vector gun/blade
         const aw = isLocal ? activeWeapon(p) : null;
+        // Arcade gun skin: the local player's GUN (not a melee weapon) is painted in the skin colours.
+        const gpal = (isLocal && p.cls.type !== 'melee') ? skinGunPalette() : null;
         if (aw) {
             // Draw the equipped weapon as its 2D vector design, held + aim-facing, glowing in its color
             const swing = (p.cls.type==='melee' && p.meleeSwing>0) ? Math.sin(p.meleeSwing*0.5)*0.5 : 0;
             const ga = p.angle + swing;
             const reach = p.cls.type==='melee' ? 6 : 7;
-            const wcol = aw.bcolor || aw.color || '#feca57';
+            const wcol = gpal ? gpal.glow : (aw.bcolor || aw.color || '#feca57');
             const shp = aw.shape || (p.cls.type==='melee'?'saber':'pistol');
             const sz = p.cls.type==='melee'?7:6.5;
             ctx.save();
@@ -13165,7 +13225,7 @@ const col = b.color || BLDG_COLORS[0];
             ctx.rotate(ga);
             if (Math.cos(ga) < 0) ctx.scale(1, -1); // keep grip down when aiming left
             ctx.shadowColor = wcol; ctx.shadowBlur = 4;
-            drawWeaponIcon(ctx, shp, wcol, sz);
+            drawWeaponIcon(ctx, shp, wcol, sz, undefined, gpal);
             ctx.restore();
             ctx.shadowBlur = 0;
         } else if (p.cls.type==='melee') {
@@ -13194,17 +13254,17 @@ const col = b.color || BLDG_COLORS[0];
             const bx = p.x + Math.cos(ga)*26, by = p.y + Math.sin(ga)*26 + bob;
             // Grip under barrel (perpendicular)
             const gripA = ga + Math.PI/2;
-            ctx.strokeStyle='#5d3a1a'; ctx.lineWidth=4; ctx.lineCap='round';
+            ctx.strokeStyle = gpal ? gpal.accent : '#5d3a1a'; ctx.lineWidth=4; ctx.lineCap='round';
             ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx+Math.cos(gripA)*5, hy+Math.sin(gripA)*5); ctx.stroke();
             // Barrel
-            ctx.strokeStyle='#2d3436'; ctx.lineWidth=6; ctx.lineCap='round';
+            ctx.strokeStyle = gpal ? gpal.body : '#2d3436'; ctx.lineWidth=6; ctx.lineCap='round';
             ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(bx, by); ctx.stroke();
             // Highlight top
-            ctx.strokeStyle='#7f8c8d'; ctx.lineWidth=2;
+            ctx.strokeStyle = gpal ? gpal.light : '#7f8c8d'; ctx.lineWidth=2;
             ctx.beginPath(); ctx.moveTo(hx+Math.cos(ga-Math.PI/2)*1.5, hy+Math.sin(ga-Math.PI/2)*1.5);
             ctx.lineTo(bx+Math.cos(ga-Math.PI/2)*1.5, by+Math.sin(ga-Math.PI/2)*1.5); ctx.stroke();
             // Muzzle tip
-            ctx.fillStyle='#1a1a1a'; ctx.beginPath(); ctx.arc(bx, by, 3, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = gpal ? gpal.glow : '#1a1a1a'; ctx.beginPath(); ctx.arc(bx, by, 3, 0, Math.PI*2); ctx.fill();
         }
         // Eyes (bob with body)
         const ex1=p.x+Math.cos(p.angle-0.4)*6, ey1=p.y+Math.sin(p.angle-0.4)*6 + bob;
@@ -13534,15 +13594,16 @@ const col = b.color || BLDG_COLORS[0];
             ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(-2, -120); ctx.lineTo(-1, -116-bladeLen+6); ctx.stroke();
         } else {
-            // Gun: barrel + sight
-            ctx.fillStyle = '#2d3436';
+            // Gun: barrel + sight (painted in the arcade gun skin's colours when one is equipped)
+            const gpal = skinGunPalette();
+            ctx.fillStyle = gpal ? gpal.body : '#2d3436';
             ctx.beginPath(); ctx.roundRect?.(- 8, - 150, 16, 75, 4); ctx.fill();
-            ctx.fillStyle = '#1a1a1a';
+            ctx.fillStyle = gpal ? gpal.accent : '#1a1a1a';
             ctx.beginPath(); ctx.roundRect?.(- 10, - 90, 20, 18, 3); ctx.fill();
-            ctx.fillStyle = '#444';
+            ctx.fillStyle = gpal ? gpal.dark : '#444';
             ctx.beginPath(); ctx.arc(0, - 155, 7, 0, Math.PI*2); ctx.fill();
             // Front sight
-            ctx.fillStyle = '#feca57';
+            ctx.fillStyle = gpal ? gpal.glow : '#feca57';
             ctx.fillRect(-2, -162, 4, 6);
         }
         ctx.restore();
@@ -16034,6 +16095,10 @@ const col = b.color || BLDG_COLORS[0];
             col:   new THREE.MeshStandardMaterial({ color: col, metalness: 0.5, roughness: 0.35, emissive: col, emissiveIntensity: 0.4 }),
             glass: new THREE.MeshStandardMaterial({ color: 0xdfe9ee, metalness: 0.2, roughness: 0.1, transparent: true, opacity: 0.55 }),
         };
+        // What each material is, so an arcade gun skin can repaint it (skinTintGun3D). These are
+        // fresh per call — never pooled — so a viewmodel can be tinted without touching anything else.
+        M.metal.userData.skinRole = 'body'; M.dark.userData.skinRole = 'accent'; M.steel.userData.skinRole = 'light';
+        M.wood.userData.skinRole = 'accent'; M.col.userData.skinRole = 'glow';
         const box = (w,h,d,mat,x,y,z,rz) => { const m=new THREE.Mesh(TG.Box(w,h,d),mat); m.position.set(x||0,y||0,z||0); if(rz)m.rotation.z=rz; g.add(m); return m; };
         const cyl = (r1,r2,h,mat,x,y,z,az) => { const m=new THREE.Mesh(TG.Cylinder(r1,r2,h,16),mat); if(az)m.rotation.x=Math.PI/2; m.position.set(x||0,y||0,z||0); g.add(m); return m; };
         const sph = (r,mat,x,y,z) => { const m=new THREE.Mesh(TG.Sphere(r,16,12),mat); m.position.set(x||0,y||0,z||0); g.add(m); return m; };
@@ -16103,7 +16168,7 @@ const col = b.color || BLDG_COLORS[0];
             default:
                 box(0.9,0.9,3.5,M.metal,0,0,-1.8); cyl(0.25,0.25,1.6,M.col,0,0,-3.6,true);
         }
-        buildWeaponAccent(g, accent, col);
+        buildWeaponAccent(g, accent, col);   // the emblem: its materials carry no skinRole, so skins leave it be
         return g;
     }
 
@@ -16328,6 +16393,20 @@ const col = b.color || BLDG_COLORS[0];
     function _disposeMesh(m) {
         m.traverse?.(_disposeOne);
         if (!m.traverse) _disposeOne(m);
+    }
+    // The built-in first-person gun (no custom weapon equipped): grip + body + barrel + sight.
+    // Each material is its own (never pooled) and says which part it is, for the arcade gun skin.
+    function _buildVmGun() {
+        const g = new THREE.Group();
+        const part = (geo, opts, role, x, y, z, rx) => {
+            const mat = new THREE.MeshStandardMaterial(opts); mat.userData.skinRole = role;
+            const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (rx) m.rotation.x = rx; g.add(m); return m;
+        };
+        part(TG.Box(1.2, 3, 1.5), { color: 0x222, metalness: 0.6, roughness: 0.4 }, 'accent', 0, -1, -1);                 // grip
+        part(TG.Box(1.6, 1.4, 4.5), { color: 0x2d3436, metalness: 0.85, roughness: 0.3 }, 'body', 0, 0.3, -2.5);          // body
+        part(TG.Cylinder(0.4, 0.4, 5, 12), { color: 0x111, metalness: 0.95, roughness: 0.2 }, 'barrel', 0, 0.3, -6, Math.PI/2); // barrel
+        part(TG.Box(0.3, 0.5, 0.4), { color: 0xfeca57, emissive: 0xfeca57, emissiveIntensity: 0.6 }, 'glow', 0, 1.1, -4);  // sight
+        return g;
     }
     // Scratch vectors for the first-person viewmodel, built once on first use (THREE may not be loaded
     // when this file is parsed).
@@ -17217,20 +17296,16 @@ const col = b.color || BLDG_COLORS[0];
                 const tip = new THREE.Mesh(TG.Cone(0.7, 2, 4), new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.95, roughness: 0.1 }));
                 tip.position.set(0, 0.5, -22.5); tip.rotation.x = Math.PI/2; wg.add(tip);
             } else {
-                // Gun: grip + body + barrel + sight
-                const grip = new THREE.Mesh(TG.Box(1.2, 3, 1.5), new THREE.MeshStandardMaterial({ color: 0x222, metalness: 0.6, roughness: 0.4 }));
-                grip.position.set(0, -1, -1); wg.add(grip);
-                const body = new THREE.Mesh(TG.Box(1.6, 1.4, 4.5), new THREE.MeshStandardMaterial({ color: 0x2d3436, metalness: 0.85, roughness: 0.3 }));
-                body.position.set(0, 0.3, -2.5); wg.add(body);
-                const barrel = new THREE.Mesh(TG.Cylinder(0.4, 0.4, 5, 12), new THREE.MeshStandardMaterial({ color: 0x111, metalness: 0.95, roughness: 0.2 }));
-                barrel.position.set(0, 0.3, -6); barrel.rotation.x = Math.PI/2; wg.add(barrel);
-                const sight = new THREE.Mesh(TG.Box(0.3, 0.5, 0.4), new THREE.MeshStandardMaterial({ color: 0xfeca57, emissive: 0xfeca57, emissiveIntensity: 0.6 }));
-                sight.position.set(0, 1.1, -4); wg.add(sight);
+                wg.add(_buildVmGun());
             }
+            wg.userData._skinSig = undefined;   // fresh materials: let the gun skin paint them
             _three._weaponMelee = wantMelee;
             _three._weaponSig = wSig;
             _three._weaponBuilt = true;
         }
+        // Arcade gun skin paints the gun in your hands (only re-tints when the skin's colour changes,
+        // so a rainbow or the shop's cycling skin animates without per-frame material work).
+        skinTintGun3D(wg, !wantMelee);
         // Position viewmodel: anchor in front-bottom-right of camera, swing when meleeSwing > 0.
         // It used to sit 1.5 units from a 72°-FOV camera, which blew the gun up until it read as a
         // wall across the lower half of the screen. Push it out and scale it down to read as held.
@@ -20528,6 +20603,7 @@ const col = b.color || BLDG_COLORS[0];
         let att=0;
         do { player.x=WORLD_W/2-W/2+100+Math.random()*(W-200); player.y=WORLD_H/2-H/2+100+Math.random()*(H-200); att++; }
         while ((ptInBld(player.x,player.y,player.r)||(player.cls.sunBurn&&!isInShade(player.x,player.y))) && att<100);
+        _astralSecret = null; astralSecretSpot();   // Astral Temple only: the hidden spot beside spawn
         gsTrackGame();
         questTrack('games', 1);
         MUSIC.start(); AMBIENCE.start(currentWorld && currentWorld.id);
@@ -20643,10 +20719,91 @@ const col = b.color || BLDG_COLORS[0];
     });
     let _lookHintShown = false;
 
+    // ======================== ASTRAL SECRET ========================
+    // An invisible spot ~80 units from where you spawn in the Astral Temple. Clicking it unlocks the
+    // arcade's MEDIUM QUEST (s.mediumUnlocked in the arcade save). Nothing is drawn and nothing
+    // collides with it; the click still fires your normal shot.
+    let _astralSecret = null;          // { x, y, owner } — owner is the player object of this run
+    const ASTRAL_SECRET_OFFSET = 80;   // distance from spawn
+    const ASTRAL_SECRET_HIT = 40;      // how close the click / aim ray must land
+    const ASTRAL_SECRET_REACH = 300;   // you must be at least this close to it
+    // Returns the spot for the current run, or null outside the Astral Temple. A new player object
+    // means a new run (startGame, Continue, multiplayer), so the spot is re-placed beside it.
+    function astralSecretSpot() {
+        if (!currentWorld || currentWorld.id !== 'astral' || !player) { _astralSecret = null; return null; }
+        if (_astralSecret && _astralSecret.owner === player) return _astralSecret;
+        // Fixed directions, tried in order: up-right first; skip any that land inside a building.
+        const dirs = [-Math.PI/4, Math.PI/4, 3*Math.PI/4, -3*Math.PI/4, 0, Math.PI/2, Math.PI, -Math.PI/2];
+        let pick = null;
+        for (const a of dirs) {
+            const x = player.x + Math.cos(a) * ASTRAL_SECRET_OFFSET, y = player.y + Math.sin(a) * ASTRAL_SECRET_OFFSET;
+            let blocked = false; try { blocked = ptInBld(x, y, 4); } catch (_e) {}
+            if (!blocked) { pick = { x, y }; break; }
+        }
+        if (!pick) pick = { x: player.x + ASTRAL_SECRET_OFFSET * Math.SQRT1_2, y: player.y - ASTRAL_SECRET_OFFSET * Math.SQRT1_2 };
+        _astralSecret = { x: pick.x, y: pick.y, owner: player };
+        return _astralSecret;
+    }
+    // Did this click land on the spot? Top-down uses the mouse's world position; every other camera
+    // uses the crosshair: the aim ray's ground hit, or (looking level) standing close and facing it.
+    function astralSecretClickHits(spot) {
+        const p = player;
+        if (Math.hypot(spot.x - p.x, spot.y - p.y) > ASTRAL_SECRET_REACH) return false;
+        if (cameraMode === 'topdown') return Math.hypot(mouseWorldX() - spot.x, mouseWorldY() - spot.y) <= ASTRAL_SECRET_HIT;
+        const pitch = aimsVertically() ? (p.pitch || 0) : 0;
+        if (pitch < -0.03) {   // looking down: where does the crosshair meet the floor?
+            const eye = cameraMode === 'fp3d' ? 22 : FP_EYE_HEIGHT;
+            const d = eye / Math.tan(-pitch);
+            const gx = p.x + Math.cos(p.angle) * d, gy = p.y + Math.sin(p.angle) * d;
+            if (Math.hypot(gx - spot.x, gy - spot.y) <= ASTRAL_SECRET_HIT) return true;
+        }
+        const dist = Math.hypot(spot.x - p.x, spot.y - p.y);
+        let da = Math.atan2(spot.y - p.y, spot.x - p.x) - p.angle;
+        da = Math.atan2(Math.sin(da), Math.cos(da));
+        return dist <= 60 && Math.abs(da) <= 25 * Math.PI / 180;
+    }
+    // Called on a left click. Never stops the shot; returns true only when the spot was clicked.
+    function checkAstralSecretClick() {
+        try {
+            if (!gameRunning || gamePaused || !player) return false;
+            const spot = astralSecretSpot();
+            if (!spot || !astralSecretClickHits(spot)) return false;
+            const KEY = 'daniels-arcade-v1';
+            let already = false;
+            try {
+                if (window.ArcadeShop && ArcadeShop.load) already = !!(ArcadeShop.load() || {}).mediumUnlocked;
+                else already = !!(JSON.parse(localStorage.getItem(KEY) || '{}') || {}).mediumUnlocked;
+            } catch (_e) {}
+            if (already) { showStatus('You already found the Astral secret 🔮', '#a29bfe'); return true; }
+            if (window.ArcadeShop && ArcadeShop.update) ArcadeShop.update(s => { s.mediumUnlocked = true; });
+            else { try { const s = JSON.parse(localStorage.getItem(KEY) || '{}'); s.mediumUnlocked = true; localStorage.setItem(KEY, JSON.stringify(s)); } catch (_e) {} }
+            // The banner is one big line, so the news comes in two short messages.
+            showStatus('🔮 MEDIUM QUEST UNLOCKED!', '#d6a2ff');
+            statusTimer = 150;
+            setTimeout(() => { if (gameRunning) { showStatus("Find it in the Arcade's quest 🔐", '#d6a2ff'); statusTimer = 150; } }, 2600);
+            try { SFX.waveStart(); SFX.pickup(); } catch (_e) {}
+            return true;
+        } catch (_e) { return false; }
+    }
+    // A very faint sparkle every few seconds at the spot (2D views) for curious players.
+    function astralSecretTick() {
+        const spot = astralSecretSpot();
+        if (!spot) return;
+        spot._t = (spot._t || 0) + 1;
+        if (spot._t % 240 !== 0) return;
+        particles.push({ x: spot.x + (Math.random() - 0.5) * 10, y: spot.y + (Math.random() - 0.5) * 10,
+            vx: 0, vy: -0.3, life: 40, maxLife: 40, color: '#d6a2ff', r: 1.2 });
+    }
+
     let shooting=false;
     canvas.addEventListener('mousedown', e => {
         // The click that takes mouse capture back is not a trigger pull.
         if (e.button===0 && cameraMode !== 'topdown' && document.pointerLockElement !== canvas) return;
+        if (e.button===0 && cameraMode === 'topdown' && e.clientX !== undefined) {
+            // Use the exact click position, not the last mousemove.
+            const r=canvas.getBoundingClientRect(); mouse.x=(e.clientX-r.left)*(W/r.width); mouse.y=(e.clientY-r.top)*(H/r.height);
+        }
+        if (e.button===0) checkAstralSecretClick();   // the secret never swallows the shot
         if(e.button===0)shooting=true;
     });
     canvas.addEventListener('mouseup', e => { if(e.button===0){ shooting=false; _pointerRegrab=false; } });
