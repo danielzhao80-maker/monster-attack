@@ -1812,6 +1812,20 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                 o.start(t+i*0.08); o.stop(t+i*0.08+0.1);
             });
         },
+        // ⚔️ Revenge — a rising brass fanfare that lands on a held chord.
+        revenge() {
+            const t=audioCtx.currentTime;
+            [[392,0],[523,0.12],[659,0.24],[784,0.36],[1047,0.52]].forEach(([f,d]) => {
+                const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+                const len = d >= 0.5 ? 0.7 : 0.16;
+                o.type='sawtooth'; o.frequency.setValueAtTime(f,t+d);
+                g.gain.setValueAtTime(0.0001,t+d);
+                g.gain.exponentialRampToValueAtTime(0.09,t+d+0.02);
+                g.gain.exponentialRampToValueAtTime(0.001,t+d+len);
+                o.connect(g); g.connect(audioCtx.destination);
+                o.start(t+d); o.stop(t+d+len+0.02);
+            });
+        },
     };
 
     const canvas = document.getElementById('game');
@@ -2180,7 +2194,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         { name:'Leviathan', emoji:'🐋', accessory:'👑', armorColor:'#0984e3', rarity:'legendary', rarityColor:'#f1c40f', color:'#0984e3', hp:58, speed:1.05, damage:15, score:98, isBossOnly:true, body:'serpent', habitat:'water', canSwallow:true, enrage:true, desc:'Boss only!' },
         { name:'Void Devourer', emoji:'🌌', accessory:'👑', armorColor:'#6c5ce7', rarity:'legendary', rarityColor:'#f1c40f', color:'#6c5ce7', hp:54, speed:1.05, damage:16, score:110, isBossOnly:true, body:'kraken', habitat:'void', canSwallow:true, phasing:true, desc:'Boss only!' },
         { name:'Star Titan', emoji:'⭐', accessory:'👑', armorColor:'#feca57', rarity:'legendary', rarityColor:'#f1c40f', color:'#feca57', hp:80, speed:0.72, damage:18, score:112, isBossOnly:true, body:'titan', habitat:'void', hasShield:true, isRanged:true, desc:'Boss only!' },
-        { name:'Reaper', emoji:'☠️', accessory:'👑', armorColor:'#00ffe0', rarity:'legendary', rarityColor:'#f1c40f', color:'#00ffe0', hp:38, speed:1.25, damage:15, score:100, isBossOnly:true, body:'wraith', habitat:'graveyard', phasing:true, teleports:true, canScream:true, desc:'Boss only!' },
+        { name:'Reaper', emoji:'☠️', accessory:'👑', armorColor:'#00ffe0', rarity:'legendary', rarityColor:'#f1c40f', color:'#00ffe0', hp:38, speed:1.25, damage:15, score:100, isBossOnly:true, body:'reaper', habitat:'graveyard', phasing:true, teleports:true, canScream:true, desc:'Boss only!' },
         { name:'Bone Colossus', emoji:'🦴', accessory:'👑', armorColor:'#e9e3d0', rarity:'legendary', rarityColor:'#f1c40f', color:'#e9e3d0', hp:76, speed:0.75, damage:17, score:104, isBossOnly:true, body:'golem', habitat:'graveyard', hasShield:true, splits:true, desc:'Boss only!' },
         { name:'Gumdrop Blob', emoji:'🍬', accessory:'👑', armorColor:'#fd79a8', rarity:'legendary', rarityColor:'#f1c40f', color:'#fd79a8', hp:60, speed:0.95, damage:13, score:96, isBossOnly:true, body:'blob', habitat:'toxic', splits:true, canSwallow:true, desc:'Boss only!' },
         { name:'Lollipop Golem', emoji:'🍭', accessory:'👑', armorColor:'#ff7675', rarity:'legendary', rarityColor:'#f1c40f', color:'#ff7675', hp:70, speed:0.8, damage:15, score:98, isBossOnly:true, body:'golem', habitat:'toxic', hasShield:true, enrage:true, desc:'Boss only!' },
@@ -3038,7 +3052,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         document.getElementById('mp-lobby').style.display='none';
         document.getElementById('mp-menu').style.display='none';
         document.getElementById('start-screen').style.display='flex';
-        if (gameRunning) { gameRunning=false; cancelAnimationFrame(animFrame); }
+        if (gameRunning) { revengeRunEnd(null); gameRunning=false; cancelAnimationFrame(animFrame); }
     }
 
     // Public servers start themselves.
@@ -3109,7 +3123,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Games quest and the God Survivor game tally sat at zero no matter how much co-op they played.
         gsTrackGame();
         questTrack('games', 1);
-        MUSIC.start(); AMBIENCE.start(currentWorld && currentWorld.id);
+        revengeRunStart(); MUSIC.start(); AMBIENCE.start(currentWorld && currentWorld.id);
         gameRunning = true;
         gameLoop();
         // Send input every frame
@@ -3496,7 +3510,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (d.type==='xp') { addXP(d.amount); return; }   // shared party XP from the host
         // Shared party rewards — the host landed a kill or cleared a wave, so we collect our own
         // copy of everything that comes with it (flesh into our pack, our quests, our season pass).
-        if (d.type==='kill') { applyKillRewards(!!d.boss); return; }
+        if (d.type==='kill') { applyKillRewards(!!d.boss); if (d.boss && d.name) revengeOnKill({ isBoss: true, name: d.name }); return; }
         if (d.type==='wave') { applyWaveRewards(d.wave); return; }
         if (d.type==='status') showStatus(d.text, d.color);
         else if (d.type==='sfx' && SFX[d.name]) SFX[d.name]();
@@ -3505,6 +3519,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             // Bank the pack first — same rule as gameOver(): the run ending must never cost a player
             // the flesh they already carried out. The guest path skipped this entirely.
             const _b = bankBackpack(true); if (_b > 0) showStatus(`\ud83c\udf92 Banked ${_b} \ud83c\udf56 from your backpack`, '#feca57');
+            revengeRunEnd(null);   // the run that held a Revenge chance is over
             document.getElementById('game-over-screen').style.display='flex'; document.getElementById('go-title').textContent='Game Over'; document.getElementById('final-score').textContent=`Score: ${d.score}`; document.getElementById('final-wave').textContent=`Wave ${d.wave}`; gameRunning=false; cancelAnimationFrame(animFrame); if(NET._inputLoop){clearInterval(NET._inputLoop);NET._inputLoop=null;}
         }
     }
@@ -3537,7 +3552,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         }
         showStatus(`CO-OP Wave 1: ${currentMonsterClass.name}`, currentMonsterClass.rarityColor);
         SFX.waveStart();
-        MUSIC.start(); AMBIENCE.start(currentWorld && currentWorld.id);
+        revengeRunStart(); MUSIC.start(); AMBIENCE.start(currentWorld && currentWorld.id);
         gameRunning = true; gameLoop();
     }
 
@@ -3651,6 +3666,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                 if (m.swallowed) o.swallowed = m.swallowed;
                 if (m.phasing) o.phasing = m.phasing;
                 if (m.hasShield) { o.hasShield = true; o.shieldUp = !!m.shieldUp; }
+                // A boss tells the guest it IS a boss, so the guest builds its real body (looked up by
+                // name in BODY_BY_NAME — the Reaper's walking figure, not a zombie), and how far it has
+                // risen out of its habitat (always sent: an omitted value would never be cleared).
+                if (m.isBoss) { o.isBoss = true; o.riseT = Math.round((m.riseT === undefined ? 1 : m.riseT) * 100) / 100; if (m.sink) o.sink = m.sink; }
                 return o;
             }),
             bullets: bullets.map(b=>({x:_r1(b.x),y:_r1(b.y),z:_r1(b.z||0),color:b.color,owner:b.owner,vx:_r1(b.vx),vy:_r1(b.vy),vz:_r1(b.vz||0),bemoji:b.bemoji,b3d:b.b3d,bsize:b.bsize})),
@@ -4228,9 +4247,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // make artifacts rarer for anybody — the odds are exactly what they are in single player.
         if (Math.random() < (isBoss ? 0.30 : 0.004)) grantRandomArtifact();
     }
-    function awardKill(isBoss) {
+    function awardKill(isBoss, name) {
         applyKillRewards(isBoss);
-        if (NET.mode === 'host' && NET.started) mpBroadcast({ t:'event', type:'kill', boss: !!isBoss });
+        // A boss kill names the boss, so a guest holding a Revenge chance can claim it too.
+        if (NET.mode === 'host' && NET.started) mpBroadcast(isBoss ? { t:'event', type:'kill', boss: true, name: name || '' }
+                                                                   : { t:'event', type:'kill', boss: false });
     }
 
     function applyWaveRewards(w) {
@@ -7963,10 +7984,11 @@ const col = b.color || BLDG_COLORS[0];
             SFX.monsterDie();
             addShake(m.isBoss ? 14 : 2);
             score += m.score;
-            awardKill(m.isBoss);   // pays THIS player and, in co-op, every guest too
+            awardKill(m.isBoss, m.name);   // pays THIS player and, in co-op, every guest too
             awardXP(xpForKill(m));
             explodeMonster(m);
             spawnPickup(m.x, m.y);
+            revengeOnKill(m);   // ⚔️ the Reaper that killed you last match — after the XP, so its banner wins
             if (player.cls.canCopy && bySelf) { player.copiedPower = true; player.copyTimer = 600; player.copySpeedBonus = 1.5; player.copiedMonsterName = m.name || ''; showStatus(`COPIED: ${m.name}`, '#ffeaa7'); }
             // Sikuna: every 10 kills spawns a Sikuna finger (up to 30 lifetime)
             if (player.cls.sikunaPower) {
@@ -10401,7 +10423,7 @@ const col = b.color || BLDG_COLORS[0];
 
         if (p.cls.sunBurn && !isInShade(p.x, p.y)) {
             p.sunBurnTimer++;
-            if (p.sunBurnTimer % 30 === 0) { p.hp--; particles.push({x:p.x,y:p.y-10,vx:0,vy:-2,life:20,maxLife:20,color:'#ff6600',r:3}); if (p.hp<=0){p.hp=0;playerDie();return;} }
+            if (p.sunBurnTimer % 30 === 0) { p.hp--; p._lastHitBy = null; particles.push({x:p.x,y:p.y-10,vx:0,vy:-2,life:20,maxLife:20,color:'#ff6600',r:3}); if (p.hp<=0){p.hp=0;playerDie();return;} }
         } else { p.sunBurnTimer = 0; }
 
         // Reload
@@ -10585,7 +10607,7 @@ const col = b.color || BLDG_COLORS[0];
                         if (pl.shieldUp && pl.cls.hasPlayerShield) { if(pl===player){SFX.shield();showStatus('SHIELD BLOCK!','#bdc3c7');} pl.shieldUp=false;pl.shieldRecharge=0;pl.invincible=20;hit=true;break; }
                         if (b.canWeb && !(pl.disableImmune>0)) { pl.slow = 120; if(pl===player){SFX.freeze();showStatus('WEBBED!','#2c3e50');} }
                         if (b.slowPlayer && !(pl.disableImmune>0)) { pl.slow = b.slowPlayer; if(pl===player){SFX.freeze();showStatus('SLOWED!','#5bc0de');} }
-                        playerHit(b.damage||5, pl);
+                        playerHit(b.damage||5, pl, b.from);
                         hit = true; break;
                     }
                 }
@@ -10697,7 +10719,7 @@ const col = b.color || BLDG_COLORS[0];
                 if (m.shootTimer <= 0 && dist < 350 && !playerInvisible) {
                     m.shootTimer = 80;
                     const a = Math.atan2(p.y-m.y, p.x-m.x);
-                    bullets.push({x:m.x,y:m.y,vx:Math.cos(a)*5,vy:Math.sin(a)*5,life:60,damage:m.damage,owner:'monster',color:m.freezeDuration?'#5bc0de':'#bdc3c7',slowPlayer:m.freezeDuration||0});
+                    bullets.push({x:m.x,y:m.y,vx:Math.cos(a)*5,vy:Math.sin(a)*5,life:60,damage:m.damage,owner:'monster',from:m.name,color:m.freezeDuration?'#5bc0de':'#bdc3c7',slowPlayer:m.freezeDuration||0});
                 }
             }
 
@@ -10726,7 +10748,7 @@ const col = b.color || BLDG_COLORS[0];
                 if (m.shootTimer <= 0 && dist < 250) {
                     m.shootTimer = 100;
                     const a = Math.atan2(p.y-m.y, p.x-m.x);
-                    bullets.push({x:m.x,y:m.y,vx:Math.cos(a)*4,vy:Math.sin(a)*4,life:50,damage:3,owner:'monster',color:'#555',canWeb:true});
+                    bullets.push({x:m.x,y:m.y,vx:Math.cos(a)*4,vy:Math.sin(a)*4,life:50,damage:3,owner:'monster',from:m.name,color:'#555',canWeb:true});
                 }
             }
 
@@ -10746,7 +10768,7 @@ const col = b.color || BLDG_COLORS[0];
                     m.fireTimer = cd;
                     const a = Math.atan2(p.y-m.y, p.x-m.x);
                     for (let f=0;f<shots;f++) {
-                        bullets.push({x:m.x,y:m.y,vx:Math.cos(a+(Math.random()-0.5)*0.3)*(4+Math.random()*2),vy:Math.sin(a+(Math.random()-0.5)*0.3)*(4+Math.random()*2),life:30,damage:fireDmg,owner:'monster',color:'#ff4400',isFlame:true});
+                        bullets.push({x:m.x,y:m.y,vx:Math.cos(a+(Math.random()-0.5)*0.3)*(4+Math.random()*2),vy:Math.sin(a+(Math.random()-0.5)*0.3)*(4+Math.random()*2),life:30,damage:fireDmg,owner:'monster',from:m.name,color:'#ff4400',isFlame:true});
                     }
                 }
             }
@@ -10769,7 +10791,7 @@ const col = b.color || BLDG_COLORS[0];
                     for (let j=0;j<6;j++) particles.push({x:m.x,y:m.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:10,maxLife:10,color:'#4a235a',r:3});
                     // Dark Lord also shoots on teleport
                     const a=Math.atan2(p.y-m.y,p.x-m.x);
-                    bullets.push({x:m.x,y:m.y,vx:Math.cos(a)*6,vy:Math.sin(a)*6,life:50,damage:m.damage,owner:'monster',color:'#9b59b6'});
+                    bullets.push({x:m.x,y:m.y,vx:Math.cos(a)*6,vy:Math.sin(a)*6,life:50,damage:m.damage,owner:'monster',from:m.name,color:'#9b59b6'});
                 }
             }
 
@@ -10782,7 +10804,7 @@ const col = b.color || BLDG_COLORS[0];
                 }
                 if (p.cls.dodgeChance && Math.random()<p.cls.dodgeChance) { if(p===player){SFX.dodge();showStatus('DODGED!','#2ecc71');} p.invincible=10;continue; }
                 if (m.canWeb && !(p.disableImmune>0)) { p.frozen = 60; if(p===player){SFX.freeze();showStatus('WEBBED!','#2c3e50');} }
-                playerHit(m.damage, p);
+                playerHit(m.damage, p, m.name);
             }
         }
 
@@ -11240,8 +11262,11 @@ const col = b.color || BLDG_COLORS[0];
         return true;
     }
 
-    function playerHit(dmg, target) {
+    // `src` names whatever dealt the hit (a monster's name — 'BOSS Reaper' — carried by its contact
+    // or its bullets). The LAST one is remembered, so a game over knows who landed the killing blow.
+    function playerHit(dmg, target, src) {
         const p = target || player;
+        if (p) p._lastHitBy = src || null;
         if (p === player && cheats.godMode) { p.invincible = 10; return; }
         // Dodge chance (pets / weapon buffs) — avoid the hit entirely (capped at 80% so you're never invincible)
         if (p.petDodge && Math.random() < Math.min(0.8, p.petDodge)) {
@@ -11723,6 +11748,62 @@ const col = b.color || BLDG_COLORS[0];
 
     // Draws a polished, unique drawn accessory (headgear) for a class/monster name at (cx,cy).
     // (cx,cy) is the top of the head — accessory grows upward into negative y.
+    // The ☠️ Reaper boss in the top-down and third-person views: a hooded figure on two walking legs,
+    // skull in the hood, bony hands, a scythe in the right hand — the same person the 3D view builds.
+    // `tint` replaces the robe colour while the boss flashes (hit / frozen / stunned …).
+    function drawReaper2D(x, y, R, tint, glow) {
+        const t = Date.now() / 140, step = Math.sin(t) * R * 0.12;
+        const robe = tint || '#1b1d21', bone = '#e9e3d0', eye = glow || '#00ffe0';
+        ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        // legs — dark shins under the hem, bony feet, alternating step
+        for (const side of [-1, 1]) {
+            const ly = y + R*0.62 + side*step;
+            ctx.fillStyle = '#121316'; ctx.fillRect(x + side*R*0.26 - R*0.1, ly, R*0.2, R*0.42);
+            ctx.fillStyle = bone; ctx.beginPath(); ctx.ellipse(x + side*R*0.26, ly + R*0.45, R*0.14, R*0.08, 0, 0, Math.PI*2); ctx.fill();
+        }
+        // scythe shaft behind the body, then the blade at its top
+        const sx0 = x + R*0.78, sy0 = y + R*1.0, sx1 = x + R*0.55, sy1 = y - R*1.55;
+        ctx.strokeStyle = '#4a3420'; ctx.lineWidth = Math.max(2, R*0.1);
+        ctx.beginPath(); ctx.moveTo(sx0, sy0); ctx.lineTo(sx1, sy1); ctx.stroke();
+        ctx.fillStyle = '#dfe6e9'; ctx.strokeStyle = '#636e72'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(sx1, sy1);
+        ctx.quadraticCurveTo(sx1 - R*0.6, sy1 - R*0.55, sx1 - R*1.35, sy1 + R*0.2);
+        ctx.quadraticCurveTo(sx1 - R*0.6, sy1 - R*0.2, sx1, sy1 + R*0.22);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        // robe — shoulders to a ragged hem
+        ctx.fillStyle = robe; ctx.strokeStyle = '#ff2d55'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x - R*0.48, y - R*0.35);
+        ctx.lineTo(x - R*0.78, y + R*0.7);
+        for (let i = 1; i <= 6; i++) ctx.lineTo(x - R*0.78 + i*R*0.26, y + R*(i % 2 ? 0.86 : 0.68));
+        ctx.lineTo(x + R*0.48, y - R*0.35); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = '#6b5440'; ctx.lineWidth = 2;                                    // rope belt
+        ctx.beginPath(); ctx.moveTo(x - R*0.6, y + R*0.12); ctx.lineTo(x + R*0.6, y + R*0.12); ctx.stroke();
+        // arms — sleeves and skeletal hands; the right one holds the shaft
+        for (const side of [-1, 1]) {
+            const hx = side < 0 ? x - R*0.72 : x + R*0.68, hy = side < 0 ? y + R*0.2 - step*0.5 : y + R*0.05;
+            ctx.strokeStyle = robe; ctx.lineWidth = R*0.26;
+            ctx.beginPath(); ctx.moveTo(x + side*R*0.42, y - R*0.28); ctx.lineTo(hx, hy - R*0.1); ctx.stroke();
+            ctx.fillStyle = bone; ctx.beginPath(); ctx.arc(hx, hy, R*0.12, 0, Math.PI*2); ctx.fill();
+        }
+        // hood with the skull inside it
+        const hy = y - R*0.62;
+        ctx.fillStyle = robe; ctx.strokeStyle = '#ff2d55'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x, hy - R*0.68);
+        ctx.quadraticCurveTo(x + R*0.62, hy - R*0.45, x + R*0.5, hy + R*0.42);
+        ctx.lineTo(x - R*0.5, hy + R*0.42);
+        ctx.quadraticCurveTo(x - R*0.62, hy - R*0.45, x, hy - R*0.68);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#050506'; ctx.beginPath(); ctx.ellipse(x, hy + R*0.05, R*0.34, R*0.38, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = bone; ctx.beginPath(); ctx.ellipse(x, hy + R*0.06, R*0.24, R*0.28, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillRect(x - R*0.13, hy + R*0.26, R*0.26, R*0.1);                                // jaw
+        ctx.fillStyle = '#050506';
+        for (const side of [-1, 1]) { ctx.beginPath(); ctx.arc(x + side*R*0.1, hy + R*0.02, R*0.075, 0, Math.PI*2); ctx.fill(); }
+        ctx.fillStyle = eye;
+        for (const side of [-1, 1]) { ctx.beginPath(); ctx.arc(x + side*R*0.1, hy + R*0.02, R*0.04 + 0.6, 0, Math.PI*2); ctx.fill(); }
+        ctx.fillStyle = '#050506'; ctx.fillRect(x - R*0.1, hy + R*0.29, R*0.2, Math.max(1, R*0.025)); // teeth line
+        ctx.restore();
+    }
+
     function drawAccessory(name, cx, cy, scale) {
         const s = scale || 1;
         ctx.save(); ctx.translate(cx, cy); ctx.lineCap='round'; ctx.lineJoin='round';
@@ -15425,6 +15506,83 @@ const col = b.color || BLDG_COLORS[0];
             }
             add(TG.Sphere(r*0.13, 10, 8), M.glow, r*0.46, r*3.86, r*0.5); // gem where blade meets shaft
 
+        } else if (kind === 'reaper') {
+            // The Grim Reaper as a PERSON, not a floating ghost: two legs that walk, two arms, a hooded
+            // robe, a skull in the hood with burning eyes, and a scythe gripped in the right hand.
+            // Legs and arms hang off pivot groups at the hip and shoulder so the renderer can swing them
+            // (userData.legs / userData.arms). Materials come from the shared _pf pool, except the skull,
+            // which the hit flash recolours and so must belong to this one boss.
+            const robeM  = _pf('reaper-robe',  () => new THREE.MeshStandardMaterial({ color: 0x17191c, roughness: 0.95, side: THREE.DoubleSide }));
+            const innerM = _pf('reaper-inner', () => new THREE.MeshStandardMaterial({ color: 0x030304, roughness: 1 }));
+            const boneM  = _pf('reaper-bone',  () => new THREE.MeshStandardMaterial({ color: 0xe9e3d0, roughness: 0.75 }));
+            const ropeM  = _pf('reaper-rope',  () => new THREE.MeshStandardMaterial({ color: 0x4a3b2a, roughness: 0.9 }));
+            const woodM  = _pf('reaper-wood',  () => new THREE.MeshStandardMaterial({ color: 0x3b2a1a, roughness: 0.85 }));
+            const bladeM = _pf('reaper-blade', () => new THREE.MeshStandardMaterial({ color: 0xc8d0d8, metalness: 0.85, roughness: 0.22 }));
+            const eyeM   = _pf('reaper-eye|' + col, () => new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 1.6, roughness: 0.3 }));
+            const legs = [], arms = [];
+            // ---- legs: hip pivot at 1.9r, so the swung foot still lands on y=0 ----
+            for (const side of [-1, 1]) {
+                const hip = new THREE.Group(); hip.position.set(side*r*0.3, r*1.9, 0); g.add(hip);
+                add(TG.Cylinder(r*0.2, r*0.17, r*0.95, 10), robeM, 0, -r*0.47, 0, 0, 0, 0, hip);   // thigh
+                add(TG.Cylinder(r*0.16, r*0.12, r*0.9, 10), robeM, 0, -r*1.37, 0, 0, 0, 0, hip);   // shin
+                add(TG.Sphere(r*0.12, 8, 6), boneM, 0, -r*1.82, 0, 0, 0, 0, hip);                  // ankle bone
+                add(TG.Box(r*0.26, r*0.12, r*0.5), boneM, 0, -r*1.84, r*0.14, 0, 0, 0, hip);       // skeletal foot
+                for (const tx of [-0.08, 0, 0.08]) add(TG.Cylinder(r*0.03, r*0.025, r*0.18, 5), boneM, r*tx, -r*1.86, r*0.45, Math.PI/2, 0, 0, hip); // toes
+                hip.userData.side = side;
+                legs.push(hip);
+            }
+            // ---- robe: skirt with a ragged hem, torso, rope belt ----
+            add(TG.Cylinder(r*0.6, r*0.92, r*1.05, 16, 1, true), robeM, 0, r*1.55, 0);          // skirt
+            for (let i = 0; i < 12; i++) {
+                const a = (i/12)*Math.PI*2;
+                add(TG.Cone(r*0.12, r*(0.22 + (i%3)*0.12), 5), robeM, Math.cos(a)*r*0.88, r*(0.98 - (i%3)*0.05), Math.sin(a)*r*0.88, Math.PI);
+            }
+            add(TG.Cylinder(r*0.46, r*0.6, r*1.2, 14), robeM, 0, r*2.6, 0);                      // torso
+            add(TG.Torus(r*0.58, r*0.05, 6, 18), ropeM, 0, r*2.05, 0, Math.PI/2);                // belt
+            add(TG.Cylinder(r*0.035, r*0.03, r*0.6, 5), ropeM, r*0.2, r*1.75, r*0.56);           // belt tail
+            for (const side of [-1, 1]) add(TG.Sphere(r*0.27, 12, 10), robeM, side*r*0.56, r*3.05, 0); // shoulders
+            // ---- arms: the left swings free, the right grips the scythe ----
+            for (const side of [-1, 1]) {
+                const sh = new THREE.Group(); sh.position.set(side*r*0.64, r*3.02, 0); g.add(sh);
+                sh.rotation.z = side*0.12;                                                     // hang slightly out
+                if (side > 0) sh.rotation.x = -0.6;                                            // scythe arm forward
+                add(TG.Cylinder(r*0.16, r*0.27, r*1.05, 10, 1, true), robeM, 0, -r*0.52, 0, 0, 0, 0, sh); // sleeve
+                add(TG.Cylinder(r*0.07, r*0.06, r*0.5, 6), boneM, 0, -r*0.85, 0, 0, 0, 0, sh);     // wrist bones
+                add(TG.Sphere(r*0.13, 10, 8), boneM, 0, -r*1.1, 0, 0, 0, 0, sh).scale.set(1, 0.8, 1); // hand
+                for (let f = 0; f < 4; f++) add(TG.Cylinder(r*0.025, r*0.02, r*0.24, 5), boneM, r*(f-1.5)*0.06, -r*1.28, r*0.03, 0.25, 0, 0, sh); // fingers
+                sh.userData.side = side; sh.userData.restX = sh.rotation.x;
+                arms.push(sh);
+            }
+            // Scythe — parented to the right hand and counter-tilted so the shaft stands upright
+            const scythe = new THREE.Group();
+            scythe.position.set(0, -r*1.1, 0); scythe.rotation.x = 0.6; scythe.rotation.z = -0.12;
+            arms[1].add(scythe);
+            add(TG.Cylinder(r*0.06, r*0.06, r*4.2, 8), woodM, 0, r*0.5, 0, 0, 0, 0, scythe);        // shaft
+            add(TG.Torus(r*0.09, r*0.03, 6, 12), bladeM, 0, r*2.45, 0, Math.PI/2, 0, 0, scythe);     // collar
+            add(TG.Sphere(r*0.1, 8, 6), eyeM, 0, r*2.62, 0, 0, 0, 0, scythe);                        // glowing pommel gem
+            for (let i = 0; i < 9; i++) {                                                            // curved blade
+                const t = i/8;
+                add(TG.Box(r*(0.42 - t*0.3), r*0.08, r*0.12), bladeM,
+                    r*(0.1 + Math.sin(t*1.45)*1.1), r*(2.55 - t*t*0.85), 0, 0, 0, -t*1.2, scythe);
+            }
+            // ---- hood with the skull inside it ----
+            add(TG.Torus(r*0.42, r*0.15, 8, 16), robeM, 0, r*3.22, 0, Math.PI/2);               // draped cowl
+            const hood = add(TG.Sphere(r*0.62, 16, 12, Math.PI/2 + 0.65, Math.PI*2 - 1.3, 0, Math.PI*0.72), robeM, 0, r*3.72, 0);
+            hood.scale.set(1, 1.2, 1.1);                                                         // open at the FRONT
+            add(TG.Cone(r*0.22, r*0.5, 8), robeM, 0, r*4.45, -r*0.3, -0.7);                      // drooping hood tip
+            add(TG.Sphere(r*0.5, 12, 10), innerM, 0, r*3.7, -r*0.14);                             // shadow inside the hood
+            head = add(TG.Sphere(r*0.32, 14, 12), new THREE.MeshStandardMaterial({ color: 0xe9e3d0, roughness: 0.7, emissive: col, emissiveIntensity: 0.08 }), 0, r*3.68, r*0.16);
+            head.scale.set(0.88, 1, 0.95);                                                       // the skull
+            add(TG.Box(r*0.26, r*0.14, r*0.2), boneM, 0, r*3.42, r*0.22);                        // jaw
+            add(TG.Box(r*0.22, r*0.03, r*0.03), innerM, 0, r*3.47, r*0.33);                      // teeth line
+            add(TG.Cone(r*0.04, r*0.08, 4), innerM, 0, r*3.6, r*0.45, Math.PI);                  // nose hole
+            for (const sx of [-1, 1]) {
+                add(TG.Sphere(r*0.09, 8, 6), innerM, sx*r*0.11, r*3.72, r*0.38);                  // eye socket
+                add(TG.Sphere(r*0.055, 8, 6), eyeM, sx*r*0.11, r*3.72, r*0.44);                    // burning eye
+            }
+            g.userData.legs = legs; g.userData.arms = arms;
+            g.userData.reaper = { legs, arms, head, hood, scythe };
+
         } else if (kind === 'serpent') {
             // A long body coiled on the ground, rearing into a head — no legs at all
             const N = 16;
@@ -17056,7 +17214,7 @@ const col = b.color || BLDG_COLORS[0];
                     }
                 }
                 // Idle bob — alive monsters gently bob up/down
-                let bob = m.hp > 0 ? Math.sin(Date.now()/350 + m.x*0.013) * (m.r||14) * 0.08 : 0;
+                let bob = (m.hp > 0 && !mesh.userData.legs) ? Math.sin(Date.now()/350 + m.x*0.013) * (m.r||14) * 0.08 : 0;
                 // A boss that summoned a habitat rises up out of it, then sits at its resting depth
                 // (the Kraken keeps its lower body in the water instead of standing on top of it).
                 if (m.isBoss && (m.riseT || 0) < 1) {
@@ -17064,6 +17222,26 @@ const col = b.color || BLDG_COLORS[0];
                     bob += -(m.r||32) * 3.4 * (1 - e);
                 }
                 if (m.sink) bob -= (m.r||32) * m.sink * Math.min(1, m.riseT || 1);
+                // A body with real legs (the Reaper) WALKS: hips and shoulders swing in step with how
+                // far it actually moved, easing to a stand when it stops. A blink is not a stride, so a
+                // jump of more than 40 units is ignored. No allocation — numbers on the monster only.
+                const _legs = mesh.userData.legs;
+                if (_legs) {
+                    const mv = (m._wlx !== undefined) ? Math.hypot(m.x - m._wlx, m.y - m._wly) : 0;
+                    m._wlx = m.x; m._wly = m.y;
+                    const walking = mv > 0.15 && mv < 40 && m.hp > 0;
+                    m._wamp = (m._wamp || 0) + ((walking ? 1 : 0) - (m._wamp || 0)) * 0.15;
+                    if (walking) m._wstep = (m._wstep || 0) + Math.min(mv, 4) * 0.09;
+                    const sw = Math.sin(m._wstep || 0) * 0.55 * m._wamp;
+                    for (let k = 0; k < _legs.length; k++) _legs[k].rotation.x = sw * _legs[k].userData.side;
+                    const _arms = mesh.userData.arms;
+                    if (_arms) for (let k = 0; k < _arms.length; k++) {
+                        const a = _arms[k];
+                        // the free arm swings against its leg; the scythe arm only sways
+                        a.rotation.x = a.userData.restX + (a.userData.side < 0 ? sw * 0.8 : -sw * 0.25);
+                    }
+                    bob += Math.abs(Math.sin(m._wstep || 0)) * (m.r||14) * 0.05 * m._wamp; // a step, not a hover
+                }
                 // Humanoid zombie — group origin sits at the feet (y=0 on the ground)
                 mesh.position.set(m.x, bob, m.y);
                 // Always face the player — front of the mesh is +Z, so aim its forward at the player
@@ -17729,9 +17907,16 @@ const col = b.color || BLDG_COLORS[0];
             // Drop shadow
             ctx.fillStyle='rgba(0,0,0,0.25)';
             ctx.beginPath(); ctx.ellipse(m.x, m.y+m.r+2, m.r*0.9, m.r*0.35, 0, 0, Math.PI*2); ctx.fill();
+            // The Reaper is a hooded PERSON with a scythe, not a ball with eyes.
+            const _reaper = isReaperBoss(m);
+            if (_reaper) {
+                _upright(m.x, m.y + bounce, () => drawReaper2D(m.x, m.y + bounce, m.r, col !== m.color ? col : null, m.color));
+                if (m.phasing) ctx.globalAlpha = 1;
+            }
             // Rarity aura — find the monster class to get rarityColor
-            const mcDef = MONSTER_CLASSES.find(c=>c.name===m.name || c.name==='Dragon' && m.name && m.name.indexOf('Dragon')>=0);
+            const mcDef = _reaper ? null : MONSTER_CLASSES.find(c=>c.name===m.name || c.name==='Dragon' && m.name && m.name.indexOf('Dragon')>=0);
             const mRc = (mcDef && mcDef.rarityColor) || '#888';
+            if (!_reaper) {
             if (m.isBoss || (mcDef && (mcDef.rarity==='legendary' || mcDef.rarity==='epic'))) {
                 const aura = ctx.createRadialGradient(m.x, m.y+bounce, m.r*0.6, m.x, m.y+bounce, m.r*2);
                 aura.addColorStop(0, _alpha(mRc,'55')); aura.addColorStop(1, _alpha(mRc,'00'));
@@ -17750,6 +17935,7 @@ const col = b.color || BLDG_COLORS[0];
             // Armor (chest plate, per-monster)
             if (mcDef) drawArmor(m.x, m.y + bounce, m.r, mcDef.armorColor, mcDef.rarityColor, mcDef.name);
             if (m.phasing) ctx.globalAlpha = 1;
+            }
 
             // Shield bubble
             if (m.hasShield && m.shieldUp) {
@@ -17761,7 +17947,8 @@ const col = b.color || BLDG_COLORS[0];
                 ctx.strokeStyle='rgba(255,107,107,0.7)';ctx.lineWidth=3;
                 ctx.beginPath();ctx.arc(m.x,m.y+bounce,m.r+3,0,Math.PI*2);ctx.stroke();
             }
-            // Big cartoon eyes (white with black pupil)
+            // Big cartoon eyes (white with black pupil) — the Reaper's are in its skull instead
+            if (!_reaper) {
             const ea=Math.atan2(player.y-m.y,player.x-m.x);
             const ex1=m.x+Math.cos(ea-0.4)*m.r*0.35, ey1=m.y+bounce+Math.sin(ea-0.4)*m.r*0.35;
             const ex2=m.x+Math.cos(ea+0.4)*m.r*0.35, ey2=m.y+bounce+Math.sin(ea+0.4)*m.r*0.35;
@@ -17779,14 +17966,16 @@ const col = b.color || BLDG_COLORS[0];
             ctx.beginPath();ctx.arc(ex2-1,ey2-1,1,0,Math.PI*2);ctx.fill();
             // Drawn accessory (per-monster headgear)
             if (mcDef) drawAccessory(mcDef.name, m.x, m.y + bounce - m.r + 1, m.isBoss ? 1.6 : 1);
+            }
             // Status indicators
             if (m.frozen > 0) { ctx.font='12px serif';ctx.textAlign='center';ctx.fillText('❄️',m.x,m.y-m.r-16); }
             if (m.stunned > 0) { ctx.font='12px serif';ctx.textAlign='center';ctx.fillText('💫',m.x,m.y-m.r-16); }
-            if (m.isBoss) { ctx.font='20px serif';ctx.textAlign='center';ctx.fillText('👑',m.x,m.y-m.r-8); }
+            const _lift = _reaper ? m.r*0.45 : 0;   // the hood stands taller than a round body
+            if (m.isBoss) { ctx.font='20px serif';ctx.textAlign='center';ctx.fillText('👑',m.x,m.y-m.r-8-_lift); }
             // Monster class emoji accessory (floats above)
             if (m.emoji) {
                 const bobE = Math.sin(Date.now()/260 + m.y) * 1.2;
-                const yOff = m.isBoss ? m.r+28 : m.r+6;
+                const yOff = (m.isBoss ? m.r+28 : m.r+6) + _lift;
                 ctx.font = m.isBoss ? '20px serif' : '14px serif'; ctx.textAlign='center';
                 ctx.fillText(m.emoji, m.x, m.y - yOff + bobE);
             }
@@ -18683,7 +18872,7 @@ const col = b.color || BLDG_COLORS[0];
                 }
                 refreshChunks(true);   // we may have stepped into a different chunk
             }
-            MUSIC.start(); AMBIENCE.start(currentWorld && currentWorld.id);
+            revengeRunStart(); MUSIC.start(); AMBIENCE.start(currentWorld && currentWorld.id);
             gameRunning = true; gameLoop();
         } catch(e) { console.error('Load failed', e); openRollScreen(); }
     }
@@ -20355,6 +20544,84 @@ const col = b.color || BLDG_COLORS[0];
         }, 800);
     }
 
+    // ======================== REVENGE ========================
+    // Die to the ☠️ Reaper and the game remembers (`monster_city_revenge` = { boss, armed, at }). The
+    // NEXT run that starts claims that chance (stamps its runId on the record). Kill the Reaper boss in
+    // that run → "⚔️ REVENGE!" and the arcade title 'revenge'. End that run any other way and the
+    // chance is gone — unless the Reaper killed you again, which arms it for the run after.
+    //
+    // The killer is `player._lastHitBy`, set by playerHit() from the monster's name (contact) or the
+    // bullet's `from` (its shots). Hits with no source (poison, traps, sunburn) clear it, so only a
+    // killing blow that really came from the Reaper counts.
+    const REVENGE_KEY = 'monster_city_revenge';
+    const ARCADE_SAVE_KEY = 'daniels-arcade-v1';
+    let _revengeRun = null;     // the runId this run holds the chance under, or null
+
+    function revengeLoad() {
+        try { const r = JSON.parse(localStorage.getItem(REVENGE_KEY));
+              return (r && typeof r === 'object' && r.armed) ? r : null; } catch (e) { return null; }
+    }
+    function revengeSave(r) {
+        try { if (r) localStorage.setItem(REVENGE_KEY, JSON.stringify(r)); else localStorage.removeItem(REVENGE_KEY); } catch (e) {}
+    }
+    // Bosses are named 'BOSS <class>'. The Reaper is boss-only, so its base name is enough.
+    function isReaperName(n) { return typeof n === 'string' && n.replace(/^BOSS\s+/, '') === 'Reaper'; }
+    function isReaperBoss(m) { return !!m && isReaperName(m.mut || m.name) && (!!m.isBoss || /^BOSS\s/.test(m.name || '')); }
+
+    // Every entry point that starts a run calls this (startGame, loadGame, startMultiplayerGame, mpClientStart).
+    function revengeRunStart() {
+        _revengeRun = null;
+        const r = revengeLoad();
+        if (!r) return;
+        // Already claimed by a run that never ended cleanly (tab closed mid-run) — that was its chance.
+        if (r.runId) { revengeSave(null); return; }
+        r.runId = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        revengeSave(r);
+        _revengeRun = r.runId;
+    }
+
+    // The run is over (game over, or leaving to the menu). `killer` is whatever landed the last hit.
+    function revengeRunEnd(killer) {
+        if (_revengeRun) { const r = revengeLoad(); if (r && r.runId === _revengeRun) revengeSave(null); }
+        _revengeRun = null;
+        if (!isReaperName(killer)) return false;
+        revengeSave({ boss: 'Reaper', armed: true, at: Date.now() });
+        showStatus('☠️ The Reaper got you…', '#00ffe0'); statusTimer = 150;
+        setTimeout(() => { showStatus('Beat it NEXT match for REVENGE!', '#ff2d55'); statusTimer = 150; }, 2400);
+        return true;
+    }
+
+    // Puts the 'revenge' title into the arcade save and equips it. Returns true if it was ALREADY owned.
+    function revengeGrantTitle() {
+        let had = false;
+        const grant = s => {
+            had = (s.owned || []).includes('revenge');
+            s.owned = [...new Set([...(s.owned || []), 'revenge'])];
+            s.equipped = s.equipped || {}; s.equipped.title = 'revenge';
+        };
+        const AS = (typeof window !== 'undefined' && window.ArcadeShop) || null;
+        if (AS && AS.update) { try { AS.update(grant); return had; } catch (e) {} }
+        let s = {};
+        try { s = JSON.parse(localStorage.getItem(ARCADE_SAVE_KEY)) || {}; } catch (e) { s = {}; }
+        if (!s || typeof s !== 'object' || Array.isArray(s)) s = {};
+        grant(s);
+        try { localStorage.setItem(ARCADE_SAVE_KEY, JSON.stringify(s)); } catch (e) {}
+        return had;
+    }
+
+    // Called for every monster that dies. Only the Reaper boss, in the run holding the chance, counts.
+    function revengeOnKill(m) {
+        if (!_revengeRun || !isReaperBoss(m)) return false;
+        const r = revengeLoad();
+        if (!r || r.runId !== _revengeRun) { _revengeRun = null; return false; }
+        revengeSave(null); _revengeRun = null;
+        const had = revengeGrantTitle();
+        try { SFX.revenge(); } catch (e) {}
+        showStatus('⚔️ REVENGE!', '#ff2d55'); statusTimer = 150;
+        if (!had) setTimeout(() => { showStatus('Title unlocked: ⚔️ Revenge', '#feca57'); statusTimer = 150; }, 2600);
+        return true;
+    }
+
     // ======================== ACCOUNTS & TITLES ========================
     const ACCOUNTS_KEY = 'monster_city_accounts';
     const PLAYER_KEY = 'monster_city_player_name';
@@ -20606,7 +20873,7 @@ const col = b.color || BLDG_COLORS[0];
         _astralSecret = null; astralSecretSpot();   // Astral Temple only: the hidden spot beside spawn
         gsTrackGame();
         questTrack('games', 1);
-        MUSIC.start(); AMBIENCE.start(currentWorld && currentWorld.id);
+        revengeRunStart(); MUSIC.start(); AMBIENCE.start(currentWorld && currentWorld.id);
         gameRunning = true; gameLoop();
     }
 
@@ -20617,6 +20884,7 @@ const col = b.color || BLDG_COLORS[0];
         if (!confirm('Leave this game and go back to the menu?\n\nYour run is saved — press Continue to come back to it.')) return;
         // Bank what you're carrying first, exactly like dying does, so quitting never costs you flesh.
         const banked = bankBackpack(true);
+        revengeRunEnd(null);   // quitting spends a Revenge chance just like losing does
         if (NET.mode !== 'single') {
             // In multiplayer the host IS the server, so leaving tears the room down for everyone —
             // mpLeave already handles disconnecting and resetting the net state.
@@ -20652,6 +20920,8 @@ const col = b.color || BLDG_COLORS[0];
         document.getElementById('final-score').textContent=`Score: ${score}`;
         document.getElementById('final-wave').textContent=`Wave ${wave} | ${chosenClass.emoji} ${chosenClass.name} vs ${currentMonsterClass.emoji} ${currentMonsterClass.name}`;
         if (NET.mode === 'host') mpBroadcast({t:'event', type:'gameOver', score, wave});
+        // Last: a Reaper kill arms Revenge for the next match (and its message must not be overwritten).
+        revengeRunEnd(player ? player._lastHitBy : null);
     }
 
     // ======================== INPUT ========================
