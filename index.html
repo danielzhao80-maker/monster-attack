@@ -2716,7 +2716,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // lunge for the same free id in the same millisecond.
     function mpBackToMatchmaking() {
         if (NET._inputLoop) { clearInterval(NET._inputLoop); NET._inputLoop = null; }
-        if (gameRunning) { gameRunning = false; cancelAnimationFrame(animFrame); }
+        if (gameRunning) { transferBackpackOnLeave(); gameRunning = false; cancelAnimationFrame(animFrame); }
         NET.mode='single'; NET.conns=[]; NET.hostConn=null; NET.lobby=[]; NET.started=false; NET.hostStarted=false;
         document.getElementById('mp-lobby').style.display='none';
         document.getElementById('game-over-screen').style.display='none';
@@ -3052,7 +3052,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         document.getElementById('mp-lobby').style.display='none';
         document.getElementById('mp-menu').style.display='none';
         document.getElementById('start-screen').style.display='flex';
-        if (gameRunning) { revengeRunEnd(null); gameRunning=false; cancelAnimationFrame(animFrame); }
+        if (gameRunning) { transferBackpackOnLeave(); revengeRunEnd(null); gameRunning=false; cancelAnimationFrame(animFrame); }
     }
 
     // Public servers start themselves.
@@ -3518,7 +3518,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         else if (d.type==='gameOver') {
             // Bank the pack first — same rule as gameOver(): the run ending must never cost a player
             // the flesh they already carried out. The guest path skipped this entirely.
-            const _b = bankBackpack(true); if (_b > 0) showStatus(`\ud83c\udf92 Banked ${_b} \ud83c\udf56 from your backpack`, '#feca57');
+            transferBackpackOnLeave();
             revengeRunEnd(null);   // the run that held a Revenge chance is over
             document.getElementById('game-over-screen').style.display='flex'; document.getElementById('go-title').textContent='Game Over'; document.getElementById('final-score').textContent=`Score: ${d.score}`; document.getElementById('final-wave').textContent=`Wave ${d.wave}`; gameRunning=false; cancelAnimationFrame(animFrame); if(NET._inputLoop){clearInterval(NET._inputLoop);NET._inputLoop=null;}
         }
@@ -3996,6 +3996,18 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         questTrack('banked', n);
         if (!quiet) { SFX.coin(); showStatus(`\ud83c\udf92 Banked ${n} \ud83c\udf56!`, '#26de81'); }
         renderBackpack();
+        return n;
+    }
+
+    // LEAVING A GAME moves every bit of meat in the pack into your main 🍖 — every way a run can end
+    // goes through here (Leave, game over, a guest's game over, multiplayer leave, losing the server,
+    // closing or reloading the tab). bankBackpack() takes the flesh OUT of the grid and saves the pack
+    // before it adds the coins, so a second call finds nothing: it can never pay out twice. Items and
+    // other stacks in the grid are left exactly where they are.
+    function transferBackpackOnLeave(silent) {
+        let n = 0;
+        try { n = bankBackpack(true); } catch (e) { n = 0; }
+        if (n > 0 && !silent) showStatus(`🎒 +${n.toLocaleString()} 🍖 moved to your meat!`, '#26de81');
         return n;
     }
 
@@ -18884,8 +18896,16 @@ const col = b.color || BLDG_COLORS[0];
     // 'pagehide' is the one that actually fires on iOS Safari — 'beforeunload' often does not — and
     // visibilitychange covers switching tabs or apps without closing anything. saveGame() no-ops when
     // there is no run in progress, so all three are safe to fire whenever.
-    window.addEventListener('pagehide', () => { if (NET.mode === 'single') saveGame(); });
-    window.addEventListener('beforeunload', () => { if (NET.mode === 'single') saveGame(); });
+    // Closing or reloading the tab is leaving the game too, in any mode: the pack's meat goes into your
+    // main 🍖 right here, synchronously (localStorage only). Whichever of the two fires second finds the
+    // flesh already gone, so nothing is paid twice. Switching tabs (visibilitychange) is NOT leaving,
+    // so it only saves.
+    function _onPageLeave() {
+        if (NET.mode === 'single') saveGame();
+        transferBackpackOnLeave(true);
+    }
+    window.addEventListener('pagehide', _onPageLeave);
+    window.addEventListener('beforeunload', _onPageLeave);
     document.addEventListener('visibilitychange', () => {
         if (document.hidden && NET.mode === 'single') saveGame();
     });
@@ -20883,7 +20903,7 @@ const col = b.color || BLDG_COLORS[0];
     function leaveToMenu() {
         if (!confirm('Leave this game and go back to the menu?\n\nYour run is saved — press Continue to come back to it.')) return;
         // Bank what you're carrying first, exactly like dying does, so quitting never costs you flesh.
-        const banked = bankBackpack(true);
+        const banked = transferBackpackOnLeave(true);
         revengeRunEnd(null);   // quitting spends a Revenge chance just like losing does
         if (NET.mode !== 'single') {
             // In multiplayer the host IS the server, so leaving tears the room down for everyone —
@@ -20902,14 +20922,13 @@ const col = b.color || BLDG_COLORS[0];
         const c3d = document.getElementById('game3d');    if (c3d) c3d.style.display = 'none';
         document.getElementById('start-screen').style.display = 'flex';
         checkSave();   // re-show the Continue button + save line for the run we just left
-        if (banked > 0) showStatus(`🎒 Banked ${banked} 🍖`, '#feca57');
+        if (banked > 0) showStatus(`🎒 +${banked.toLocaleString()} 🍖 moved to your meat!`, '#26de81');
     }
 
     function gameOver() {
         // Whatever survived in the pack is banked automatically — dying shouldn't cost you the flesh
         // you already carried out. The cap is the only thing that ever loses you any.
-        const _banked = bankBackpack(true);
-        if (_banked > 0) showStatus(`🎒 Banked ${_banked} 🍖 from your backpack`, '#feca57');
+        transferBackpackOnLeave();
         SFX.gameOver();
         AMBIENCE.stop();   // the air goes out of the world with you
         if (NET.mode === 'single') deleteSave();
