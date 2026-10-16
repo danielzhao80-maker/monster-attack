@@ -505,6 +505,60 @@ const Cl = JSON.parse(cool);
 check(!Cl.again && Cl.r.every(function(x){ return x === 'fired'; }), 'on cooldown the combo does nothing special; the keys fire normally', JSON.stringify(Cl.r));
 check(/Domain \d+s/.test(Cl.hud), 'the Domain cooldown shows on the ability line', Cl.hud);
 check(Cl.ready, 'and it is ready again after 60 seconds');
+// ---- Sikuna: the same E + Z + X combo opens Malevolent Shrine ----
+console.log('\nSikuna Domain:');
+const SIK_SETUP = GOJO_SETUP.replace("c.name === 'Gojo'", "c.name === 'Sikuna'");
+const sCombo = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 0;
+   var r = [abilityKeyPress('e', 1000), abilityKeyPress('z', 1100), abilityKeyPress('x', 1250)];
+   ${flush}
+   return JSON.stringify({ r:r, domain: !!player._domain, cd: player._domainCd, ecd: player._eCd, zcd: player.moveQCooldown,
+      xcd: player.moveFCooldown, form: !!player.form,
+      dome: gameEffects.some(function(e){ return e.type === 'dome' && e.maxR >= 300; }) }); })()`));
+check(sCombo.r[2] === 'domain' && sCombo.domain && sCombo.cd === 3600, 'E + Z + X inside the window opens Malevolent Shrine', JSON.stringify(sCombo.r));
+check(sCombo.ecd === 0 && sCombo.zcd === 0 && sCombo.xcd === 0 && !sCombo.form, 'and Finger / Demon Slash / Demon Form do NOT also fire',
+      'E ' + sCombo.ecd + ' / Z ' + sCombo.zcd + ' / X ' + sCombo.xcd);
+check(sCombo.dome, 'the Shrine draws a big dome through spawnGameEffect (2D and 3D)');
+const sDot = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 0; openDomain(player);
+   var m0 = monsters[0].hp, b0 = monsters[5].hp, hits = 0, last = monsters[0].hp, slowed = true, frozen = false;
+   for (var f = 0; f < 300; f++) { tickPlayerTimers(player);
+      if (monsters[0].hp < last) { hits++; last = monsters[0].hp; }
+      if (f < 290) monsters.forEach(function(m){ if (!(m.slow > 0)) slowed = false; if (m.frozen > 0) frozen = true; }); }
+   var cuts = 0; gameEffects.forEach(function(e){ if (e.type === 'cut') cuts++; });
+   var drew = 'ok'; try { draw2DEffects(-1e9, -1e9, 1e9, 1e9); } catch (e) { drew = e.message; }
+   return JSON.stringify({ small: m0 - monsters[0].hp, boss: b0 - monsters[5].hp, hits: hits, slowed: slowed, frozen: frozen,
+      cuts: cuts, drew: drew, over: player._domain === null }); })()`));
+check(sDot.hits >= 20 && sDot.small > 0 && sDot.over, 'monsters inside are slashed over and over, then it closes', sDot.hits + ' hits, -' + sDot.small);
+check(sDot.slowed && !sDot.frozen, 'they are slowed the whole time, never frozen');
+check(sDot.boss > 0 && sDot.boss < sDot.small, 'bosses take reduced but real damage', 'monster -' + sDot.small + ', boss -' + sDot.boss);
+check(sDot.cuts > 0 && sDot.drew === 'ok', 'red cut marks land on the monsters and draw in 2D', sDot.cuts + ' cuts / ' + sDot.drew);
+const gDot = JSON.parse(q(`(function(){ ${GOJO_SETUP}(3); gojoDomain(player); var m0 = monsters[0].hp;
+   for (var f = 0; f < 360; f++) tickPlayerTimers(player); return JSON.stringify({ d: m0 - monsters[0].hp, dmg: player.damage }); })()`));
+check(sDot.small >= gDot.d * 0.75 && sDot.small <= gDot.d * 1.25, 'total damage is in line with Unlimited Void', 'shrine -' + sDot.small + ' vs void -' + gDot.d);
+const sTwo = JSON.parse(q(`(function(){ ${SIK_SETUP}(3);
+   var r = [abilityKeyPress('x', 1000), abilityKeyPress('z', 1100)];
+   ${flush}
+   return JSON.stringify({ r:r, domain: !!player._domain, cd: player._domainCd, zcd: player.moveQCooldown, xcd: player.moveFCooldown }); })()`));
+check(!sTwo.domain && sTwo.cd === 0 && sTwo.zcd > 0 && sTwo.xcd > 0, 'only two keys: Demon Slash and Demon Form fire normally, no Domain', JSON.stringify(sTwo));
+const sLock = JSON.parse(q(`(function(){ ${SIK_SETUP}(2);
+   var r = [abilityKeyPress('e', 1000), abilityKeyPress('z', 1050), abilityKeyPress('x', 1100)];
+   ${flush}
+   return JSON.stringify({ r:r, domain: !!player._domain, cd: player._domainCd, zcd: player.moveQCooldown }); })()`));
+check(!sLock.domain && sLock.cd === 0 && sLock.r.every(function(x){ return x === 'fired'; }) && sLock.zcd > 0,
+      'at Lv.2 (Demon Form locked) there is no Domain, and keys are not held back', JSON.stringify(sLock.r));
+const sCool = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); openDomain(player); player._domain = null;
+   player._eCd = 0; player.moveQCooldown = 0; player.moveFCooldown = 0;
+   var r = [abilityKeyPress('e', 5000), abilityKeyPress('z', 5050), abilityKeyPress('x', 5100)];
+   ${flush}
+   var again = !!player._domain;
+   updateHUD(); var hud = document.getElementById('ability-display').textContent || '';
+   if (player.form) exitForm(player, true);
+   player._domainCd = 0; updateHUD(); var hudReady = document.getElementById('ability-display').textContent || '';
+   return JSON.stringify({ r:r, again: again, hud: hud, hudReady: hudReady, ready: domainReady(player) }); })()`));
+check(!sCool.again && sCool.r.every(function(x){ return x === 'fired'; }), 'on cooldown the combo does nothing special; the keys fire normally', JSON.stringify(sCool.r));
+check(/👹 Domain \d+s/.test(sCool.hud) && /👹 E\+Z\+X Domain/.test(sCool.hudReady), 'the HUD line shows "👹 E+Z+X Domain" and its cooldown', sCool.hud + ' / ' + sCool.hudReady);
+check(sCool.ready, 'and it is ready again once the cooldown runs out');
+check(q(`(function(){ ${SIK_SETUP}(3); return gojoDomainReady(player) === false && domainReady(player) === true; })()`) === true,
+      "Sikuna's Domain is his own, not Gojo's");
 q(`gameRunning = false; NET.mode = 'single';`);
 
 console.log('\n' + (ok ? 'ULTIMATES PASS' : 'ULTIMATES FAIL'));
