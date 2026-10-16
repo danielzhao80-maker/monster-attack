@@ -165,7 +165,11 @@ are SCHEDULED AHEAD on the audio clock (`pump()` tops up a 600ms queue); sequenc
 setInterval drifts and stumbles, especially once the tab is hidden. Toggle persists in
 `monster_city_music`.
 
-`makePlayerFigure(cls)` builds a real humanoid (31 meshes, feet at local y=0, class colour as armour)
+`makePlayerFigure(cls)` builds a SWAT officer (30 meshes, feet at local y=0): helmet + visor, plate carrier
+with pouches, belt, gloves, elbow/knee pads, boots, and a suit in the class `armorColor` covered in green
+camo dots from `swatCamoTexture(col)` (one cached 64px CanvasTexture per colour, never per frame). In 2D,
+`drawSwatBody2D` / `drawSwatHead2D` draw the same officer from above for every player (suit = `bodyColor`,
+so frozen/stunned tints still show). `tools/test-swat-look.js` covers both. It is
 used for other players in 3D — they were a single capsule. `makePetMesh3D(pet)` gives equipped pets a
 body in the 3D camera, where they previously did not exist at all; `rebuildPetRuntime()` stamps `_pet`
 on each runtime slot so the renderer knows which creature to build. Both use the `_pf()` material pool

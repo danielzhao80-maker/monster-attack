@@ -13207,6 +13207,110 @@ const col = b.color || BLDG_COLORS[0];
         } catch (e) { return null; }
     }
 
+    // ---- SWAT officer, top-down (top-down and third-person views) ----
+    // Drawn in a frame rotated to the aim (+x = facing). Suit = bodyColor (so frozen/stunned tints
+    // still read), vest/helmet = darker shades of the class armour colour, green camo dots on top.
+    function _swatGear(p, bodyColor) { return p.cls.armorColor || bodyColor; }
+    function _swatDots2D(cx, cy, rx, ry, rad) {
+        for (let i = 0; i < SWAT_DOTS.length; i += 2) {
+            const d = SWAT_DOTS[i];
+            ctx.fillStyle = SWAT_DOT_GREENS[d[3]];
+            ctx.beginPath(); ctx.arc(cx + (d[0]-0.5)*2*rx, cy + (d[1]-0.5)*2*ry, rad*(0.7 + d[2]*8), 0, Math.PI*2); ctx.fill();
+        }
+    }
+    function drawSwatBody2D(p, bodyColor, R, bob, outline, outlineW, swing) {
+        const gear = _swatGear(p, bodyColor);
+        const vest = swatDark(gear, 0.55), pad = '#23272b';
+        ctx.save();
+        ctx.translate(p.x, p.y + bob);
+        ctx.rotate(p.angle);
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        // Boots: step alternately while moving.
+        const moving = Math.hypot(p.vx || 0, p.vy || 0) > 0.3;
+        const stride = moving ? Math.sin(Date.now()/110 + p.x*0.01) * R*0.32 : 0;
+        ctx.fillStyle = pad;
+        ctx.beginPath(); ctx.ellipse(-R*0.15 + stride, -R*0.42, R*0.34, R*0.2, 0, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(-R*0.15 - stride, R*0.42, R*0.34, R*0.2, 0, 0, Math.PI*2); ctx.fill();
+        // Sleeves from each shoulder towards the weapon, with an elbow pad.
+        const ha = swing;
+        const hands = [[R*0.75, R*0.25], [R*1.2, -R*0.05]];
+        for (let i = 0; i < 2; i++) {
+            const sy = i === 0 ? R*0.82 : -R*0.82;
+            const hx = Math.cos(ha)*hands[i][0] - Math.sin(ha)*hands[i][1];
+            const hy = Math.sin(ha)*hands[i][0] + Math.cos(ha)*hands[i][1];
+            const ex = (0 + hx)*0.5 - R*0.05, ey = (sy + hy)*0.5 + (i === 0 ? R*0.12 : -R*0.12);
+            ctx.strokeStyle = shade(bodyColor, -30); ctx.lineWidth = R*0.42;
+            ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(ex, ey); ctx.lineTo(hx, hy); ctx.stroke();
+            ctx.strokeStyle = bodyColor; ctx.lineWidth = R*0.30;
+            ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(ex, ey); ctx.lineTo(hx, hy); ctx.stroke();
+            ctx.fillStyle = SWAT_DOT_GREENS[i+1];
+            ctx.beginPath(); ctx.arc((ex + hx)*0.5, (ey + hy)*0.5, R*0.08, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = pad;
+            ctx.beginPath(); ctx.arc(ex, ey, R*0.17, 0, Math.PI*2); ctx.fill();
+        }
+        // Shoulders / torso: the camo suit.
+        const rx = R*0.62, ry = R*1.0;
+        const g = ctx.createRadialGradient(-R*0.2, -R*0.3, 1, 0, 0, ry);
+        g.addColorStop(0, shade(bodyColor, 30)); g.addColorStop(0.45, bodyColor); g.addColorStop(1, shade(bodyColor, -35));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI*2); ctx.fill();
+        ctx.save();
+        ctx.beginPath(); ctx.ellipse(0, 0, rx - 0.5, ry - 0.5, 0, 0, Math.PI*2); ctx.clip();
+        _swatDots2D(0, 0, rx, ry, R*0.09);
+        ctx.restore();
+        ctx.strokeStyle = outline; ctx.lineWidth = outlineW;
+        ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI*2); ctx.stroke();
+        // Plate carrier with the class marking on it, three pouches across the front and a belt line.
+        ctx.fillStyle = vest;
+        ctx.beginPath(); ctx.roundRect(-R*0.48, -R*0.56, R*0.98, R*1.12, R*0.22); ctx.fill();
+        ctx.save();
+        ctx.beginPath(); ctx.roundRect(-R*0.48, -R*0.56, R*0.98, R*1.12, R*0.22); ctx.clip();
+        ctx.globalAlpha *= 0.55;
+        drawClassBodyPattern(p.cls.name, 0, 0, R*0.6);
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.roundRect(-R*0.48, -R*0.56, R*0.98, R*1.12, R*0.22); ctx.stroke();
+        ctx.fillStyle = pad;
+        for (const py of [-0.36, 0, 0.36]) {
+            ctx.beginPath(); ctx.roundRect(R*0.30, py*R - R*0.13, R*0.26, R*0.26, 1.5); ctx.fill();
+        }
+        ctx.strokeStyle = shade(vest, 25); ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(-R*0.3, -R*0.5); ctx.lineTo(-R*0.3, R*0.5); ctx.stroke();
+        ctx.restore();
+    }
+    function drawSwatHead2D(p, bodyColor, R, bob, swing) {
+        const gear = _swatGear(p, bodyColor);
+        const helm = swatDark(gear, 0.45), glove = '#23272b';
+        ctx.save();
+        ctx.translate(p.x, p.y + bob);
+        ctx.rotate(p.angle);
+        // Gloves gripping the weapon.
+        const hands = [[R*0.75, R*0.25], [R*1.2, -R*0.05]];
+        for (const [x0, y0] of hands) {
+            const hx = Math.cos(swing)*x0 - Math.sin(swing)*y0, hy = Math.sin(swing)*x0 + Math.cos(swing)*y0;
+            ctx.fillStyle = glove; ctx.beginPath(); ctx.arc(hx, hy, R*0.2, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.arc(hx - R*0.05, hy - R*0.06, R*0.08, 0, Math.PI*2); ctx.fill();
+        }
+        // Helmet dome.
+        const hr = R*0.52;
+        const hg = ctx.createRadialGradient(-hr*0.35, -hr*0.35, 1, 0, 0, hr);
+        hg.addColorStop(0, shade(helm, 35)); hg.addColorStop(1, shade(helm, -20));
+        ctx.fillStyle = hg;
+        ctx.beginPath(); ctx.arc(-R*0.04, 0, hr, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(-R*0.04, 0, hr, 0, Math.PI*2); ctx.stroke();
+        // Dark visor across the front, with a glint.
+        ctx.strokeStyle = '#0b0f14'; ctx.lineWidth = R*0.2;
+        ctx.beginPath(); ctx.arc(-R*0.04, 0, hr - R*0.06, -1.05, 1.05); ctx.stroke();
+        ctx.strokeStyle = '#5dade2'; ctx.lineWidth = R*0.05;
+        ctx.beginPath(); ctx.arc(-R*0.04, 0, hr - R*0.06, -0.75, -0.25); ctx.stroke();
+        // A few green dots on the helmet cover too.
+        ctx.fillStyle = SWAT_DOT_GREENS[0];
+        ctx.beginPath(); ctx.arc(-R*0.28, -R*0.16, R*0.07, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-R*0.18, R*0.24, R*0.06, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+    }
+
     function drawOnePlayer(p, isLocal) {
         if (!p || !p.cls) return;
         ctx.save();
@@ -13274,27 +13378,10 @@ const col = b.color || BLDG_COLORS[0];
 
         // Class-specific decorations behind the body (capes, tails, wings)
         drawClassBodyBehind(p.cls.name, p.x, p.y + bob, R);
-        // Body — gradient for 3D feel
-        const bodyGrad = ctx.createRadialGradient(p.x-3, p.y-4+bob, 2, p.x, p.y+bob, R);
-        bodyGrad.addColorStop(0, '#ffffffcc'); bodyGrad.addColorStop(0.3, bodyColor); bodyGrad.addColorStop(1, shade(bodyColor, -35));
-        ctx.fillStyle=bodyGrad;
-        ctx.beginPath();ctx.arc(p.x,p.y+bob,R,0,Math.PI*2);ctx.fill();
-        // Class-specific markings on the body (clipped to body circle)
-        ctx.save();
-        ctx.beginPath(); ctx.arc(p.x, p.y+bob, R-1, 0, Math.PI*2); ctx.clip();
-        drawClassBodyPattern(p.cls.name, p.x, p.y + bob, R);
-        ctx.restore();
-        // Rarity-colored outline
-        ctx.strokeStyle = isLocal ? rc : '#0abde3';
-        ctx.lineWidth = isLocal ? 3 : 4;
-        ctx.beginPath();ctx.arc(p.x,p.y+bob,R,0,Math.PI*2);ctx.stroke();
-        // Inner dark outline
-        ctx.strokeStyle='rgba(0,0,0,0.25)';ctx.lineWidth=1.5;
-        ctx.beginPath();ctx.arc(p.x,p.y+bob,R-2,0,Math.PI*2);ctx.stroke();
-
-        // Armor (chest plate, per-class)
-        drawArmor(p.x, p.y + bob, R, p.cls.armorColor, p.cls.rarityColor, p.cls.name);
-
+        // SWAT officer, seen from above: camo-dotted suit in the class colour, plate carrier, sleeves.
+        // Helmet and gloves go on after the gun so the hands hold it and the head sits on top.
+        const swatSwing = (p.cls.type==='melee' && p.meleeSwing>0) ? Math.sin(p.meleeSwing*0.5)*0.5 : 0;
+        drawSwatBody2D(p, bodyColor, R, bob, isLocal ? rc : '#0abde3', isLocal ? 3 : 4, swatSwing);
         // Shield bubble
         if (p.cls.hasPlayerShield && p.shieldUp) {
             ctx.strokeStyle='rgba(72,219,251,0.7)';ctx.lineWidth=3;ctx.setLineDash([5,5]);
@@ -13359,15 +13446,8 @@ const col = b.color || BLDG_COLORS[0];
             // Muzzle tip
             ctx.fillStyle = gpal ? gpal.glow : '#1a1a1a'; ctx.beginPath(); ctx.arc(bx, by, 3, 0, Math.PI*2); ctx.fill();
         }
-        // Eyes (bob with body)
-        const ex1=p.x+Math.cos(p.angle-0.4)*6, ey1=p.y+Math.sin(p.angle-0.4)*6 + bob;
-        const ex2=p.x+Math.cos(p.angle+0.4)*6, ey2=p.y+Math.sin(p.angle+0.4)*6 + bob;
-        ctx.fillStyle='#fff';
-        ctx.beginPath();ctx.arc(ex1,ey1,4,0,Math.PI*2);ctx.fill();
-        ctx.beginPath();ctx.arc(ex2,ey2,4,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle='#2d3436';
-        ctx.beginPath();ctx.arc(ex1+Math.cos(p.angle)*1.5,ey1+Math.sin(p.angle)*1.5,2,0,Math.PI*2);ctx.fill();
-        ctx.beginPath();ctx.arc(ex2+Math.cos(p.angle)*1.5,ey2+Math.sin(p.angle)*1.5,2,0,Math.PI*2);ctx.fill();
+        // Gloved hands on the weapon, then the helmet and visor over everything.
+        drawSwatHead2D(p, bodyColor, R, bob, swatSwing);
         // Drawn accessory (per-class headgear)
         drawAccessory(p.cls.name, p.x, p.y + bob - R + 1, 1);
         // Class accessory — emoji floating above head
@@ -15116,68 +15196,117 @@ const col = b.color || BLDG_COLORS[0];
     const _pfMat = new Map();
     function _pf(key, make) { let m = _pfMat.get(key); if (!m) { m = make(); m.userData.shared = true; _pfMat.set(key, m); } return m; }
 
+    // ---- SWAT suit: green camo dots over the class colour ----
+    // One small canvas per suit colour, painted ONCE and cached — never per frame. The 3D figure maps
+    // it onto the suit; the material colour stays white so the texture's own class colour shows true.
+    const SWAT_DOT_GREENS = ['#1e8449', '#27ae60', '#2ecc71', '#145a32'];
+    // Fixed dot layout (x, y, radius, green index) on a 0..1 tile, so every suit gets the same pattern.
+    const SWAT_DOTS = (() => {
+        const out = []; let s = 1337;
+        const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+        for (let i = 0; i < 26; i++) out.push([rnd(), rnd(), 0.035 + rnd() * 0.045, i % SWAT_DOT_GREENS.length]);
+        return out;
+    })();
+    const _swatCamoCache = new Map();
+    function swatCamoTexture(col) {
+        col = (typeof col === 'string' && col[0] === '#') ? col : '#ff9f43';
+        if (_swatCamoCache.has(col)) return _swatCamoCache.get(col);
+        const N = 64;
+        const c = document.createElement('canvas'); c.width = N; c.height = N;
+        const x = c.getContext('2d');
+        x.fillStyle = col; x.fillRect(0, 0, N, N);
+        for (const [u, v, rr, gi] of SWAT_DOTS) {
+            x.fillStyle = SWAT_DOT_GREENS[gi];
+            // draw wrapped copies so the dots tile seamlessly round a limb
+            for (const ox of [-N, 0, N]) for (const oy of [-N, 0, N]) {
+                x.beginPath(); x.arc(u * N + ox, v * N + oy, rr * N, 0, Math.PI * 2); x.fill();
+            }
+        }
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
+        tex.needsUpdate = true;
+        _swatCamoCache.set(col, tex);
+        return tex;
+    }
+    // Mix a "#rrggbb" toward dark tactical grey (amt 0..1) — the vest/helmet shade of a suit.
+    function swatDark(col, amt) {
+        if (typeof col !== 'string' || col[0] !== '#' || col.length < 7) col = '#ff9f43';
+        const g = [0x26, 0x2a, 0x2e];
+        return '#' + [1, 3, 5].map((o, i) => Math.round(parseInt(col.slice(o, o + 2), 16) * (1 - amt) + g[i] * amt)
+            .toString(16).padStart(2, '0')).join('');
+    }
+
+    // A SWAT officer: tactical helmet with a dark visor, camo-dotted suit in the class colour, a plate
+    // carrier with pouches, belt, gloves, elbow and knee pads, boots. Feet at local y=0.
     function makePlayerFigure(cls) {
         const g = new THREE.Group();
         const r = 9;                                   // body unit; the figure ends up ~40 tall
-        const accent = _hex((cls && (cls.armorColor || cls.rarityColor)) || '#a29bfe');
+        const suitCol = (cls && (cls.armorColor || cls.rarityColor)) || '#a29bfe';
+        const accent = _hex(suitCol);
         const skinM  = _pf('pf-skin',  () => new THREE.MeshStandardMaterial({ color: 0xf0c8a0, roughness: 0.75 }));
-        const hairM  = _pf('pf-hair',  () => new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 0.9 }));
-        const bootM  = _pf('pf-boot',  () => new THREE.MeshStandardMaterial({ color: 0x2f2a26, roughness: 0.8 }));
-        const pantM  = _pf('pf-pant',  () => new THREE.MeshStandardMaterial({ color: 0x37506b, roughness: 0.85 }));
-        const eyeW   = _pf('pf-eyew',  () => new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 }));
-        const eyeB   = _pf('pf-eyeb',  () => new THREE.MeshStandardMaterial({ color: 0x14181f, roughness: 0.3 }));
-        // The class colour is the armour, so you can tell players apart at a glance.
-        const armM   = _pf('pf-arm|' + accent, () => new THREE.MeshStandardMaterial({
-            color: accent, metalness: 0.55, roughness: 0.32, envMapIntensity: 1.25,
-            emissive: accent, emissiveIntensity: 0.10 }));
-        const trimM  = _pf('pf-trim|' + accent, () => new THREE.MeshStandardMaterial({
-            color: accent, metalness: 0.8, roughness: 0.18, emissive: accent, emissiveIntensity: 0.35 }));
+        const gearM  = _pf('pf-gear',  () => new THREE.MeshStandardMaterial({ color: 0x23272b, roughness: 0.7, metalness: 0.15 }));
+        const visorM = _pf('pf-visor', () => new THREE.MeshStandardMaterial({ color: 0x0b0f14, metalness: 0.9, roughness: 0.12,
+            emissive: 0x123a5a, emissiveIntensity: 0.35 }));
+        // The class colour is the SUIT, so you can tell players apart at a glance; green dots over it.
+        const suitM  = _pf('pf-suit|' + suitCol, () => new THREE.MeshStandardMaterial({
+            color: 0xffffff, map: swatCamoTexture(suitCol), roughness: 0.85 }));
+        const vestM  = _pf('pf-vest|' + suitCol, () => new THREE.MeshStandardMaterial({
+            color: _hex(swatDark(suitCol, 0.55)), roughness: 0.8, metalness: 0.1 }));
+        const helmM  = _pf('pf-helm|' + suitCol, () => new THREE.MeshStandardMaterial({
+            color: _hex(swatDark(suitCol, 0.45)), roughness: 0.45, metalness: 0.3,
+            emissive: accent, emissiveIntensity: 0.06 }));
 
-        const add = (geo, mat, x, y, z, rx, ry, rz) => {
+        const parts = {};
+        const add = (geo, mat, x, y, z, rx, ry, rz, name) => {
             const m = new THREE.Mesh(geo, mat);
             m.position.set(x, y, z);
             if (rx) m.rotation.x = rx; if (ry) m.rotation.y = ry; if (rz) m.rotation.z = rz;
-            m.castShadow = true; g.add(m); return m;
+            m.castShadow = true; g.add(m);
+            if (name) { m.name = name; (parts[name] = parts[name] || []).push(m); }
+            return m;
         };
 
-        // ---- legs ----
+        // ---- legs: boots, camo shins and thighs, kneepads ----
         for (const side of [-1, 1]) {
-            const hipX = side * r*0.28;
-            add(TG.Box(r*0.40, r*0.18, r*0.62), bootM, hipX, r*0.09, r*0.10);          // boot
-            add(TG.Cylinder(r*0.17, r*0.14, r*0.92, 10), pantM, hipX, r*0.66, 0);      // shin
-            add(TG.Sphere(r*0.13, 8, 6), pantM, hipX, r*1.14, 0);                      // knee
-            add(TG.Cylinder(r*0.22, r*0.18, r*0.95, 10), pantM, hipX, r*1.62, 0);      // thigh
+            const hipX = side * r*0.27;
+            add(TG.Box(r*0.40, r*0.24, r*0.64), gearM, hipX, r*0.12, r*0.10, 0, 0, 0, 'boot');
+            add(TG.Cylinder(r*0.17, r*0.15, r*0.92, 10), suitM, hipX, r*0.68, 0, 0, 0, 0, 'leg');
+            add(TG.Box(r*0.30, r*0.32, r*0.16), gearM, hipX, r*1.14, r*0.14, 0, 0, 0, 'kneepad');
+            add(TG.Cylinder(r*0.22, r*0.18, r*0.95, 10), suitM, hipX, r*1.62, 0, 0, 0, 0, 'leg');
         }
-        add(TG.Box(r*0.80, r*0.36, r*0.48), armM, 0, r*2.12, 0);                        // hips / belt
-        add(TG.Torus(r*0.40, r*0.055, 8, 20), trimM, 0, r*2.12, 0, Math.PI/2);          // belt trim
+        add(TG.Box(r*0.84, r*0.22, r*0.52), gearM, 0, r*2.12, 0, 0, 0, 0, 'belt');        // duty belt
 
-        // ---- torso ----
-        add(TG.Cylinder(r*0.50, r*0.56, r*1.05, 14), armM, 0, r*2.82, 0);               // chest
-        add(TG.Box(r*0.66, r*0.60, r*0.10), trimM, 0, r*2.92, r*0.50);                  // chest plate
-        add(TG.Sphere(r*0.13, 10, 8), trimM, 0, r*2.92, r*0.56);                        // gem
+        // ---- torso: camo shirt under a plate carrier with pouches ----
+        add(TG.Cylinder(r*0.48, r*0.50, r*1.10, 14), suitM, 0, r*2.78, 0, 0, 0, 0, 'torso');
+        add(TG.Cylinder(r*0.56, r*0.54, r*0.90, 14), vestM, 0, r*2.84, 0, 0, 0, 0, 'vest');
+        for (const px of [-0.28, 0, 0.28])
+            add(TG.Box(r*0.24, r*0.28, r*0.16), gearM, px * r, r*2.60, r*0.58, 0, 0, 0, 'pouch');
 
-        // ---- arms ----
+        // ---- arms: camo sleeves, elbow pads, gloves ----
         for (const side of [-1, 1]) {
-            const sx = side * r*0.62;
-            add(TG.Sphere(r*0.24, 12, 10), armM, sx, r*3.22, 0);                        // pauldron
-            add(TG.Cylinder(r*0.15, r*0.13, r*0.80, 10), skinM, sx, r*2.78, r*0.10, -0.45);
-            add(TG.Cylinder(r*0.13, r*0.11, r*0.78, 10), skinM, sx, r*2.12, r*0.34, -0.95);
-            add(TG.Sphere(r*0.15, 10, 8), skinM, sx, r*1.78, r*0.52);                    // hand
+            const sx = side * r*0.64;
+            add(TG.Sphere(r*0.22, 12, 10), suitM, sx, r*3.20, 0, 0, 0, 0, 'shoulder');
+            add(TG.Cylinder(r*0.15, r*0.13, r*0.80, 10), suitM, sx, r*2.78, r*0.10, -0.45, 0, 0, 'arm');
+            add(TG.Sphere(r*0.15, 10, 8), gearM, sx, r*2.44, r*0.24, 0, 0, 0, 'elbowpad');
+            add(TG.Cylinder(r*0.13, r*0.12, r*0.78, 10), suitM, sx, r*2.12, r*0.34, -0.95, 0, 0, 'arm');
+            add(TG.Sphere(r*0.16, 10, 8), gearM, sx, r*1.78, r*0.52, 0, 0, 0, 'glove');
         }
 
-        // ---- head ----
-        add(TG.Cylinder(r*0.17, r*0.20, r*0.22, 10), skinM, 0, r*3.45, 0);              // neck
-        const head = add(TG.Sphere(r*0.50, 18, 14), skinM, 0, r*3.92, 0);
+        // ---- head: face under a tactical helmet and visor ----
+        add(TG.Cylinder(r*0.18, r*0.20, r*0.24, 10), gearM, 0, r*3.44, 0);                 // collar / neck
+        const head = add(TG.Sphere(r*0.46, 16, 12), skinM, 0, r*3.88, 0, 0, 0, 0, 'face');
         head.scale.set(1, 1.06, 0.96);
-        add(TG.Sphere(r*0.52, 16, 12), hairM, 0, r*4.04, -r*0.05).scale.set(1, 0.62, 1); // hair
-        for (const side of [-1, 1]) {
-            add(TG.Sphere(r*0.105, 10, 8), eyeW, side * r*0.17, r*3.98, r*0.40);
-            add(TG.Sphere(r*0.048, 8, 6), eyeB, side * r*0.17, r*3.98, r*0.455);
-            add(TG.Sphere(r*0.10, 8, 6), skinM, side * r*0.48, r*3.88, 0);               // ear
-        }
-        add(TG.Box(r*0.26, r*0.045, r*0.05), eyeB, 0, r*3.74, r*0.46);                   // mouth
+        // Rounded helmet: a dome sitting on the brow, a touch bigger than the head.
+        add(TG.Sphere(r*0.56, 18, 10, 0, Math.PI*2, 0, Math.PI*0.5), helmM, 0, r*4.02, -r*0.02, 0, 0, 0, 'helmet');
+        // Dark visor band wrapping the front of the face at eye level, just under the brim.
+        add(TG.Cylinder(r*0.50, r*0.48, r*0.24, 16, 1, true, -Math.PI*0.42, Math.PI*0.84), visorM,
+            0, r*3.92, r*0.02, 0, 0, 0, 'visor');
+        for (const side of [-1, 1])                                                         // comms ear cups
+            add(TG.Cylinder(r*0.14, r*0.14, r*0.12, 10), gearM, side * r*0.50, r*3.82, 0, 0, 0, Math.PI/2, 'earcup');
 
         g.userData.head = head;
+        g.userData.parts = parts;
         return g;
     }
 
