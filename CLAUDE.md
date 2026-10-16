@@ -115,6 +115,7 @@ node tools/test-map-maker.js index.html     # map maker: draw, erase, traps, pla
 node tools/test-multiplayer.js index.html   # movement, prediction, interpolation, acceleration
 node tools/test-ultimates.js index.html     # ultimate forms: enter, transform, revert cleanly
 node tools/test-world-styles.js index.html  # per-world architecture across all 30 worlds
+node tools/test-summons-look.js index.html  # summons: one 2D+3D look per kind, mechanics unchanged
 ```
 
 ### Saves
@@ -448,3 +449,11 @@ The render buffer is then matched to the displayed size by `resize3DToDisplay()`
 900x550, so switching into a 3D camera while already fullscreen needs the catch-up). It passes
 `updateStyle=false` — otherwise Three.js writes the size back as inline style and fights the CSS
 again — and caps the buffer at 2200px, because a 2560px screen at dpr 1.5 is a 3840px buffer.
+
+### Summons
+Allies carry a `kind` stamped where they are created (skeleton, wolf, clone, decoy, gangster, ghost;
+`FORM_SUMMON_KIND` for forms), walls carry `brick`/`iron`, turrets `turret`. `drawSummon2D` /
+`drawWall2D` and `makeSummonMesh3D` (`SUMMON_BUILDERS`) / `makeTurretMesh3D` / `makeWallMesh3D` draw
+them; all stand on a green friendly ring. A summon with no kind falls back to the skeleton. New
+summon? Give it a kind, a 2D case and a 3D builder — `test-summons-look.js` checks all three and
+compares mechanics against a recorded baseline.

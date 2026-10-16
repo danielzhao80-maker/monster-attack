@@ -3692,11 +3692,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             }),
             bullets: bullets.map(b=>({x:_r1(b.x),y:_r1(b.y),z:_r1(b.z||0),color:b.color,owner:b.owner,vx:_r1(b.vx),vy:_r1(b.vy),vz:_r1(b.vz||0),bemoji:b.bemoji,b3d:b.b3d,bsize:b.bsize})),
             pickups: pickups.map(pk=>({x:pk.x,y:pk.y,type:pk.type,life:pk.life})),
-            walls: walls.map(w=>({x:w.x,y:w.y,hp:w.hp})),
+            walls: walls.map(w=>({x:w.x,y:w.y,hp:w.hp,kind:w.kind})),
             fireTiles: fireTiles.map(f=>({x:f.x,y:f.y,life:f.life,fromPlayer:f.fromPlayer})),
             poisonTiles: poisonTiles.map(pt=>({x:pt.x,y:pt.y,life:pt.life})),
-            allies: allies.map(a=>({x:a.x,y:a.y,r:a.r,life:a.life,hp:a.hp,maxHp:a.maxHp})),
-            turrets: turrets.map(t=>({x:t.x,y:t.y,r:t.r,hp:t.hp,maxHp:t.maxHp,angle:t.angle,ammo:t.ammo})),
+            allies: allies.map(a=>({x:a.x,y:a.y,r:a.r,life:a.life,hp:a.hp,maxHp:a.maxHp,kind:a.kind,cls:a.cls,color:a.color})),
+            turrets: turrets.map(t=>({x:t.x,y:t.y,r:t.r,hp:t.hp,maxHp:t.maxHp,angle:t.angle,ammo:t.ammo,kind:t.kind})),
             // Buildings and traps are GENERATED, not transmitted — the seed is the whole payload.
             worldSeed: _worldSeed, worldId: currentWorld ? currentWorld.id : null,
             t: _netNow(),   // the host's clock — what the client interpolates against
@@ -5168,7 +5168,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                 allies.push({
                     x: p.x + Math.cos(a)*30, y: p.y + Math.sin(a)*30,
                     r: 9, speed: 2.6, damage: Math.round(10 * power), color: elem.color,
-                    hp: 20, maxHp: 20, life: 600, atkCd: 0,
+                    hp: 20, maxHp: 20, life: 600, atkCd: 0, kind: 'ghost',
                 });
             }
             showStatus(`🌑 SHADOW ALLY x${count}!`, elem.color);
@@ -8033,7 +8033,7 @@ const col = b.color || BLDG_COLORS[0];
             }
             // Necromancer: dead enemy becomes ally (bosses cannot be revived)
             if (player.cls.necromancer && !m.isBoss) {
-                allies.push({ x: m.x, y: m.y, r: 10, speed: m.speed * 0.8, damage: 8, color: '#26de81', hp: 15, maxHp: 15, life: 600, atkCd: 0 });
+                allies.push({ x: m.x, y: m.y, r: 10, speed: m.speed * 0.8, damage: 8, color: '#26de81', hp: 15, maxHp: 15, life: 600, atkCd: 0, kind: 'skeleton' });
                 for (let k=0;k<6;k++) particles.push({x:m.x,y:m.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:15,maxLife:15,color:'#26de81',r:3});
             }
             // Hydra splits into 2
@@ -8260,6 +8260,10 @@ const col = b.color || BLDG_COLORS[0];
         if (!quiet && p === player) showStatus(`${F ? F.emoji : ''} form ended`, '#b2bec3');
         if (!quiet) _mvRing(p.x, p.y, (F && F.color) || '#fff', 18, 45);
     }
+    // What each summoning form calls up — a LOOK only; every one of them fights exactly the same.
+    // Bone Lord raises skeletons, Kingpin calls the crew, Alpha howls up wolves, and the two
+    // "you are several people now" forms (Shadow Legion, Legion) make see-through copies of you.
+    const FORM_SUMMON_KIND = { bonelord: 'skeleton', kingpin: 'gangster', alpha: 'wolf', shadow: 'clone', legion: 'clone' };
     // Ticked once per simulation step for every player who has one.
     function updateForm(p) {
         if (!p || !p.form) return;
@@ -8268,7 +8272,8 @@ const col = b.color || BLDG_COLORS[0];
         if (F && F.summon && p.form.t % 60 === 0) {
             allies.push({ x: p.x + (Math.random()-0.5)*70, y: p.y + (Math.random()-0.5)*70, r: 10,
                           speed: 1.6, damage: Math.floor(p.damage * 0.5), color: '#26de81',
-                          hp: 20, maxHp: 20, life: 600, atkCd: 0 });
+                          hp: 20, maxHp: 20, life: 600, atkCd: 0,
+                          kind: FORM_SUMMON_KIND[p.form.key] || 'skeleton', cls: p.cls && p.cls.name });
         }
         if (F && F.burn && p.form.t % 12 === 0) {
             fireTiles.push({ x: p.x, y: p.y, life: 150, fromPlayer: true });
@@ -8314,7 +8319,7 @@ const col = b.color || BLDG_COLORS[0];
         if (F && F.build && p.form.t % 45 === 0) {
             const a = (p.form.t / 45) * 1.1;
             const wx = p.x + Math.cos(a) * 70, wy = p.y + Math.sin(a) * 70;
-            if (!ptInBld(wx, wy, 15)) walls.push({ x: wx, y: wy, hp: 4 });
+            if (!ptInBld(wx, wy, 15)) walls.push({ x: wx, y: wy, hp: 4, kind: 'brick' });
         }
         if (p.form.t <= 0) exitForm(p);
     }
@@ -9487,7 +9492,7 @@ const col = b.color || BLDG_COLORS[0];
             z:{ cd:600, name:'Vanish', color:'#feca57', run:(p,mx,my)=>{ p.invincible=Math.max(p.invincible,1800); p.invisible=true; p.invisTimer=Math.max(p.invisTimer,1800); _mvRing(p.x,p.y,'#feca57',22,70); if(p===player)showStatus('👑 VANISH! Invincible + Invisible 30s','#feca57'); SFX.teleport(); } },
             x:{ cd:1800, name:'ADMIN MODE', color:'#feca57', emoji:'👑', cs:true, form:'adminmode', run:(p,mx,my)=>{ enterForm(p,'adminmode'); _mvDmgRadius(p,300,Math.floor(p.damage*2)); addShake(18); SFX.shout67(); } } },
         'The Iron': {
-            z:{ cd:240, name:'Iron Wall', color:'#7f8c8d', run:(p,mx,my)=>{ let n=0; for(let i=0;i<6;i++){const a=(Math.PI*2/6)*i;const wx=p.x+Math.cos(a)*55,wy=p.y+Math.sin(a)*55; if(!ptInBld(wx,wy,15)){walls.push({x:wx,y:wy,hp:3});n++;}} if(!n){ p.invincible=Math.max(p.invincible,120); if(p===player) showStatus('\ud83d\udee1\ufe0f Nowhere to build - bracing instead','#7f8c8d'); } _mvRing(p.x,p.y,'#7f8c8d',12,40); SFX.build(); } },
+            z:{ cd:240, name:'Iron Wall', color:'#7f8c8d', run:(p,mx,my)=>{ let n=0; for(let i=0;i<6;i++){const a=(Math.PI*2/6)*i;const wx=p.x+Math.cos(a)*55,wy=p.y+Math.sin(a)*55; if(!ptInBld(wx,wy,15)){walls.push({x:wx,y:wy,hp:3,kind:'iron'});n++;}} if(!n){ p.invincible=Math.max(p.invincible,120); if(p===player) showStatus('\ud83d\udee1\ufe0f Nowhere to build - bracing instead','#7f8c8d'); } _mvRing(p.x,p.y,'#7f8c8d',12,40); SFX.build(); } },
             x:{ cd:900, name:'FORTRESS', color:'#7f8c8d', emoji:'🏰', cs:true, form:'fortress', run:(p,mx,my)=>{ enterForm(p,'fortress'); SFX.shield(); } } },
         'The Nerd': {
             z:{ cd:180, name:'Bookworm', color:'#16a085', run:(p,mx,my)=>{ p.invincible=Math.max(p.invincible,180); p.hp=Math.min(p.maxHp,p.hp+20); _mvRing(p.x,p.y,'#16a085',10,30); SFX.shield(); } },
@@ -9514,8 +9519,8 @@ const col = b.color || BLDG_COLORS[0];
             z:{ cd:240, name:'Phase Walk', color:'#dfe6e9', run:(p,mx,my)=>{ p.invisible=true; p.invisTimer=Math.max(p.invisTimer,180); _mvRing(p.x,p.y,'#dfe6e9',10,30); SFX.teleport(); } },
             x:{ cd:900, name:'SOUL DRAIN', color:'#dfe6e9', emoji:'👻', cs:true, form:'wraith', run:(p,mx,my)=>{ enterForm(p,'wraith'); _mvDmgRadius(p,220,Math.floor(p.damage*1.5)); _mvRing(p.x,p.y,'#dfe6e9',24,80); SFX.revive(); } } },
         'Machine': {
-            z:{ cd:240, name:'Mini Turret', color:'#95a5a6', run:(p,mx,my)=>{ const ang=Math.atan2(my-p.y,mx-p.x); const tx=p.x+Math.cos(ang)*40,ty=p.y+Math.sin(ang)*40; if(!ptInBld(tx,ty,12)) { turrets.push({x:tx,y:ty,r:10,hp:20,maxHp:20,cooldown:0,angle:0,ammo:18}); _mvRing(tx,ty,'#95a5a6',10,25); SFX.build(); } else if(p===player) showStatus('🤖 No room for a turret there.','#b2bec3'); } },
-            x:{ cd:900, name:'MECH MODE', color:'#95a5a6', emoji:'🤖', cs:true, form:'mech', run:(p,mx,my)=>{ enterForm(p,'mech'); for(let i=0;i<4;i++){const a=(Math.PI*2/4)*i; turrets.push({x:p.x+Math.cos(a)*50,y:p.y+Math.sin(a)*50,r:12,hp:30,maxHp:30,cooldown:0,angle:0,ammo:30});} SFX.build(); } } },
+            z:{ cd:240, name:'Mini Turret', color:'#95a5a6', run:(p,mx,my)=>{ const ang=Math.atan2(my-p.y,mx-p.x); const tx=p.x+Math.cos(ang)*40,ty=p.y+Math.sin(ang)*40; if(!ptInBld(tx,ty,12)) { turrets.push({x:tx,y:ty,r:10,hp:20,maxHp:20,cooldown:0,angle:0,ammo:18,kind:'turret'}); _mvRing(tx,ty,'#95a5a6',10,25); SFX.build(); } else if(p===player) showStatus('🤖 No room for a turret there.','#b2bec3'); } },
+            x:{ cd:900, name:'MECH MODE', color:'#95a5a6', emoji:'🤖', cs:true, form:'mech', run:(p,mx,my)=>{ enterForm(p,'mech'); for(let i=0;i<4;i++){const a=(Math.PI*2/4)*i; turrets.push({x:p.x+Math.cos(a)*50,y:p.y+Math.sin(a)*50,r:12,hp:30,maxHp:30,cooldown:0,angle:0,ammo:30,kind:'turret'});} SFX.build(); } } },
         'Elemental Mage': {
             z:{ cd:240, name:'Elemental Ward', color:'#00ffe0', run:(p,mx,my)=>{ ELEMENTS.forEach((el,i)=>{ const a=(Math.PI*2/ELEMENTS.length)*i; const wx=p.x+Math.cos(a)*90, wy=p.y+Math.sin(a)*90; if(el.name==='Fire') fireTiles.push({x:wx,y:wy,life:260,fromPlayer:true}); else if(el.name==='Poison') poisonTiles.push({x:wx,y:wy,life:260}); else for(const m of monsters){ if(Math.hypot(m.x-wx,m.y-wy)<80){ if(el.name==='Ice') m.frozen=Math.max(m.frozen||0,120); else if(el.name==='Lightning') m.stunned=Math.max(m.stunned||0,110); else if(el.name==='Shadow') m.slow=Math.max(m.slow||0,220); } } if(el.name==='Holy') p.hp=Math.min(p.maxHp,p.hp+18); _mvRing(wx,wy,el.color,8,24); }); _mvRing(p.x,p.y,'#00ffe0',18,55); SFX.shield(); } },
             x:{ cd:1200, name:'ALL SIX', color:'#00ffe0', emoji:'🔮', cs:true, form:'archmage', run:(p,mx,my)=>{
@@ -9586,10 +9591,10 @@ const col = b.color || BLDG_COLORS[0];
             x:{ cd:900, name:'HOLLOW PURPLE', color:'#a55eea', emoji:'🟣', cs:true, form:'sixeyes', run:(p,mx,my)=>{ _gojoHollowPurple(p,mx,my); } } },
         // ====== SECRET ======
         'Builder': {
-            z:{ cd:180, name:'Wall Ring', color:'#00ffe0', run:(p,mx,my)=>{ let n=0; for(let i=0;i<8;i++){const a=(Math.PI*2/8)*i;const wx=p.x+Math.cos(a)*55,wy=p.y+Math.sin(a)*55; if(!ptInBld(wx,wy,15)){walls.push({x:wx,y:wy,hp:3});n++;}} if(!n){ p.invincible=Math.max(p.invincible,90); if(p===player) showStatus('\ud83d\udee1\ufe0f Nowhere to build - shielding instead','#00ffe0'); } SFX.build(); } },
-            x:{ cd:900, name:'SIEGE', color:'#7f8c8d', emoji:'🏗️', cs:true, form:'siege', run:(p,mx,my)=>{ enterForm(p,'siege'); for(let i=0;i<8;i++){const a=(Math.PI*2/8)*i; const wx=p.x+Math.cos(a)*70, wy=p.y+Math.sin(a)*70; if(!ptInBld(wx,wy,15)) walls.push({x:wx,y:wy,hp:5});} SFX.build(); } } },
+            z:{ cd:180, name:'Wall Ring', color:'#00ffe0', run:(p,mx,my)=>{ let n=0; for(let i=0;i<8;i++){const a=(Math.PI*2/8)*i;const wx=p.x+Math.cos(a)*55,wy=p.y+Math.sin(a)*55; if(!ptInBld(wx,wy,15)){walls.push({x:wx,y:wy,hp:3,kind:'brick'});n++;}} if(!n){ p.invincible=Math.max(p.invincible,90); if(p===player) showStatus('\ud83d\udee1\ufe0f Nowhere to build - shielding instead','#00ffe0'); } SFX.build(); } },
+            x:{ cd:900, name:'SIEGE', color:'#7f8c8d', emoji:'🏗️', cs:true, form:'siege', run:(p,mx,my)=>{ enterForm(p,'siege'); for(let i=0;i<8;i++){const a=(Math.PI*2/8)*i; const wx=p.x+Math.cos(a)*70, wy=p.y+Math.sin(a)*70; if(!ptInBld(wx,wy,15)) walls.push({x:wx,y:wy,hp:5,kind:'brick'});} SFX.build(); } } },
         'Necromancer': {
-            z:{ cd:240, name:'Raise Dead', color:'#00ffe0', run:(p,mx,my)=>{ for(let i=0;i<2;i++) allies.push({x:p.x+(Math.random()-0.5)*40,y:p.y+(Math.random()-0.5)*40,r:10,speed:3.0,damage:8,color:'#26de81',hp:15,maxHp:15,life:600,atkCd:0}); _mvRing(p.x,p.y,'#00ffe0',12,40); SFX.revive(); } },
+            z:{ cd:240, name:'Raise Dead', color:'#00ffe0', run:(p,mx,my)=>{ for(let i=0;i<2;i++) allies.push({x:p.x+(Math.random()-0.5)*40,y:p.y+(Math.random()-0.5)*40,r:10,speed:3.0,damage:8,color:'#26de81',hp:15,maxHp:15,life:600,atkCd:0,kind:'skeleton'}); _mvRing(p.x,p.y,'#00ffe0',12,40); SFX.revive(); } },
             x:{ cd:900, name:'SKULL KING', color:'#00ffe0', emoji:'💀', cs:true, form:'bonelord', run:(p,mx,my)=>{ enterForm(p,'bonelord'); _mvRing(p.x,p.y,'#26de81',22,60); SFX.revive(); } } },
         'Mind Swapper': {
             z:{ cd:180, name:'Confuse', color:'#5f27cd', run:(p,mx,my)=>{ for(const m of monsters) if(Math.hypot(m.x-p.x,m.y-p.y)<160) m.stunned=Math.max(m.stunned||0,180); _mvRing(p.x,p.y,'#5f27cd',12,50); SFX.shout67(); } },
@@ -9763,7 +9768,7 @@ const col = b.color || BLDG_COLORS[0];
             const wx = p.x + Math.cos(p.angle)*40, wy = p.y + Math.sin(p.angle)*40;
             // Say so when there is no room. A placement that refuses in silence is the same
             // experience as a key that does nothing.
-            if (!ptInBld(wx, wy, 15)) { walls.push({ x: wx, y: wy, hp: 3 }); SFX.build(); }
+            if (!ptInBld(wx, wy, 15)) { walls.push({ x: wx, y: wy, hp: 3, kind: 'brick' }); SFX.build(); }
             else if (p === player) showStatus('🧱 No room for a wall there.', '#b2bec3');
         }
 
@@ -10092,7 +10097,7 @@ const col = b.color || BLDG_COLORS[0];
             p._eCd = 330;
             allies.push({ x: p.x + Math.cos(p.angle)*70, y: p.y + Math.sin(p.angle)*70, r: 13,
                           speed: 0.6, damage: Math.floor(p.damage * 0.7), color: '#b2bec3',
-                          hp: 70, maxHp: 70, life: 660, atkCd: 0, decoy: true });
+                          hp: 70, maxHp: 70, life: 660, atkCd: 0, decoy: true, kind: 'decoy', cls: p.cls.name });
             p.invincible = Math.max(p.invincible, 60);
             _mvRing(p.x, p.y, '#b2bec3', 16, 48);
             if (p === player) showStatus('🪞 DECOY!', '#b2bec3');
@@ -10137,7 +10142,7 @@ const col = b.color || BLDG_COLORS[0];
                 const a = p.angle + (i ? 1.4 : -1.4);
                 allies.push({ x: p.x + Math.cos(a)*50, y: p.y + Math.sin(a)*50, r: 10,
                               speed: 3.4, damage: Math.floor(p.damage * 0.9), color: '#2d3436',
-                              hp: 22, maxHp: 22, life: 540, atkCd: 0 });
+                              hp: 22, maxHp: 22, life: 540, atkCd: 0, kind: 'clone', cls: p.cls.name });
             }
             p.invisible = true; p.invisTimer = Math.max(p.invisTimer || 0, 90);
             _mvRing(p.x, p.y, '#2d3436', 14, 42);
@@ -10178,7 +10183,7 @@ const col = b.color || BLDG_COLORS[0];
                 const a = (Math.PI * 2 / 3) * i + 0.3;
                 allies.push({ x: p.x + Math.cos(a)*60, y: p.y + Math.sin(a)*60, r: 11,
                               speed: 3.2, damage: Math.floor(p.damage * 0.9), color: '#a0522d',
-                              hp: 34, maxHp: 34, life: 900, atkCd: 0 });
+                              hp: 34, maxHp: 34, life: 900, atkCd: 0, kind: 'wolf' });
             }
             _mvRing(p.x, p.y, '#a0522d', 16, 48);
             if (p === player) showStatus('🐺 THE PACK IS OUT', '#a0522d');
@@ -10194,7 +10199,7 @@ const col = b.color || BLDG_COLORS[0];
             const tx = aimX, ty = aimY;
             if (!ptInBld(tx, ty, 14) && !ptInWall(tx, ty, 14)) {
                 p._eCd = 420;
-                turrets.push({ x:tx, y:ty, r:14, hp:60, maxHp:60, cooldown:0, angle:0, ammo:60 });
+                turrets.push({ x:tx, y:ty, r:14, hp:60, maxHp:60, cooldown:0, angle:0, ammo:60, kind:'turret' });
                 _mvRing(tx, ty, '#95a5a6', 14, 40);
                 if (p === player) showStatus('🤖 TURRET DEPLOYED', '#95a5a6');
                 SFX.build();
@@ -10207,7 +10212,7 @@ const col = b.color || BLDG_COLORS[0];
                 const a = (Math.PI * 2 / 3) * i;
                 allies.push({ x: p.x + Math.cos(a)*60, y: p.y + Math.sin(a)*60, r: 10,
                               speed: 1.8, damage: Math.floor(p.damage * 0.6), color: '#26de81',
-                              hp: 25, maxHp: 25, life: 780, atkCd: 0 });
+                              hp: 25, maxHp: 25, life: 780, atkCd: 0, kind: 'skeleton' });
             }
             _mvRing(p.x, p.y, '#26de81', 14, 45);
             if (p === player) showStatus('💀 RISE!', '#26de81');
@@ -10269,7 +10274,7 @@ const col = b.color || BLDG_COLORS[0];
                 const a = (Math.PI * 2 / 2) * i + 0.4;
                 allies.push({ x: p.x + Math.cos(a)*55, y: p.y + Math.sin(a)*55, r: 11,
                               speed: 2.0, damage: Math.floor(p.damage * 0.8), color: '#1c1c1c',
-                              hp: 30, maxHp: 30, life: 600, atkCd: 0 });
+                              hp: 30, maxHp: 30, life: 600, atkCd: 0, kind: 'gangster' });
             }
             _mvRing(p.x, p.y, '#1c1c1c', 14, 45);
             if (p === player) showStatus('🎩 CALL THE CREW!', '#1c1c1c');
@@ -10553,7 +10558,7 @@ const col = b.color || BLDG_COLORS[0];
                     const a = Math.random()*Math.PI*2;
                     const tx = rp.x + Math.cos(a)*40, ty = rp.y + Math.sin(a)*40;
                     if (tx>20 && tx<W-20 && ty>20 && ty<H-20 && !ptInBld(tx,ty,12) && !ptInWall(tx,ty,12)) {
-                        turrets.push({ x: tx, y: ty, r: 12, hp: 30, maxHp: 30, cooldown: 0, angle: 0, ammo: 25 });
+                        turrets.push({ x: tx, y: ty, r: 12, hp: 30, maxHp: 30, cooldown: 0, angle: 0, ammo: 25, kind: 'turret' });
                         break;
                     }
                 }
@@ -10686,7 +10691,7 @@ const col = b.color || BLDG_COLORS[0];
                     const a = Math.random()*Math.PI*2;
                     const tx = p.x + Math.cos(a)*40, ty = p.y + Math.sin(a)*40;
                     if (tx>20 && tx<W-20 && ty>20 && ty<H-20 && !ptInBld(tx,ty,12) && !ptInWall(tx,ty,12)) {
-                        turrets.push({ x: tx, y: ty, r: 12, hp: 30, maxHp: 30, cooldown: 0, angle: 0, ammo: 25 });
+                        turrets.push({ x: tx, y: ty, r: 12, hp: 30, maxHp: 30, cooldown: 0, angle: 0, ammo: 25, kind: 'turret' });
                         SFX.build();
                         showStatus('🤖 TURRET DEPLOYED', '#ff2d55');
                         for (let i=0;i<10;i++) particles.push({x:tx,y:ty,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:18,maxLife:18,color:'#ff2d55',r:3});
@@ -13730,6 +13735,238 @@ const col = b.color || BLDG_COLORS[0];
         ctx.restore();
     }
 
+    // ======================== SUMMONS (2D) ========================
+    // Everything your abilities call up used to be drawn as the SAME skeleton — the Beast Tamer's
+    // wolves, the Gangster's crew, the Ninja's clones, the Mirror Knight's decoy and the Shadow
+    // element's spirits all looked like the Necromancer's undead. Each summon now carries a `kind`
+    // (stamped where it is created) and gets its own drawing. Every one stands on a GREEN ring so a
+    // kid can tell "mine" from "a monster" at a glance. Looks only: size, speed and damage are untouched.
+    const SUMMON_KINDS = ['skeleton', 'wolf', 'clone', 'decoy', 'gangster', 'ghost'];
+    const SUMMON_EMOJI = { skeleton: '💀', wolf: '🐺', clone: '🥷', decoy: '🪞', gangster: '🕴️', ghost: '👻' };
+    const FRIEND_COL = '#26de81';
+    function summonKind(a) { return (a && SUMMON_EMOJI[a.kind]) ? a.kind : 'skeleton'; }
+    function summonClass(a) {
+        const n = a && a.cls;
+        return (n && CLASSES.find(c => c.name === n)) || (player && player.cls) || CLASSES[0];
+    }
+    // Which way a summon is heading, from how it moved since last frame (summons have no angle).
+    function _summonFacing(a) {
+        if (a._fx !== undefined) {
+            const dx = a.x - a._fx, dy = a.y - a._fy;
+            if (dx*dx + dy*dy > 0.01) a._face = Math.atan2(dy, dx);
+            a._mv = Math.hypot(dx, dy);
+        }
+        a._fx = a.x; a._fy = a.y;
+        return a._face || 0;
+    }
+    function _friendRing2D(x, y, r) {
+        ctx.save();
+        ctx.strokeStyle = FRIEND_COL; ctx.globalAlpha *= 0.85; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI*2); ctx.stroke();
+        // a little chevron in front, like the marker over a teammate
+        ctx.fillStyle = FRIEND_COL;
+        ctx.beginPath(); ctx.moveTo(x, y - r - 10); ctx.lineTo(x - 4, y - r - 15); ctx.lineTo(x + 4, y - r - 15); ctx.closePath(); ctx.fill();
+        ctx.restore();
+    }
+    function _drawSkeleton2D(a, x, y, r) {
+        const col = a.color || FRIEND_COL;
+        // Necromantic aura
+        const g = ctx.createRadialGradient(x, y, r*0.3, x, y, r*1.9);
+        g.addColorStop(0, _alpha(col,'55')); g.addColorStop(1, _alpha(col,'00'));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r*1.9, 0, Math.PI*2); ctx.fill();
+        // Bony arms and legs
+        ctx.strokeStyle = '#e9e3d0'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        const sw = Math.sin(Date.now()/120 + a.x) * r*0.2;
+        ctx.beginPath(); ctx.moveTo(x - r*0.45, y + r*0.1); ctx.lineTo(x - r*0.85, y + r*0.55 + sw); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + r*0.45, y + r*0.1); ctx.lineTo(x + r*0.85, y + r*0.55 - sw); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x - r*0.2, y + r*1.1); ctx.lineTo(x - r*0.3, y + r*1.5 - sw); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + r*0.2, y + r*1.1); ctx.lineTo(x + r*0.3, y + r*1.5 + sw); ctx.stroke();
+        // Rib cage
+        ctx.fillStyle = '#e9e3d0';
+        ctx.beginPath(); ctx.ellipse(x, y+r*0.45, r*0.55, r*0.8, 0, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#b9b199'; ctx.lineWidth = 1.5;
+        for (let k=0;k<3;k++){ const yy=y+r*0.15+k*r*0.28; ctx.beginPath(); ctx.moveTo(x-r*0.42, yy); ctx.lineTo(x+r*0.42, yy); ctx.stroke(); }
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + r*1.15); ctx.stroke();      // spine
+        // Skull
+        ctx.fillStyle = '#f4efdf';
+        ctx.beginPath(); ctx.arc(x, y-r*0.4, r*0.62, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#c9c1a8'; ctx.lineWidth = 1.5; ctx.stroke();
+        // Glowing eye sockets
+        ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 7; ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(x-r*0.24, y-r*0.44, r*0.17, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+r*0.24, y-r*0.44, r*0.17, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+        // Jaw teeth
+        ctx.strokeStyle = '#c9c1a8'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x-r*0.32, y-r*0.1); ctx.lineTo(x+r*0.32, y-r*0.1); ctx.stroke();
+        for (let k=-2;k<=2;k++){ ctx.beginPath(); ctx.moveTo(x+k*r*0.14, y-r*0.1); ctx.lineTo(x+k*r*0.14, y+r*0.02); ctx.stroke(); }
+    }
+    // A wolf seen from above: four legs that trot, a bushy tail, pointed ears and a snout.
+    function _drawWolf2D(a, x, y, r, ang) {
+        const fur = '#8a7d6b', dark = '#4a4038', light = '#cfc2ad';
+        const trot = Math.sin(Date.now()/90 + a.x) * r*0.28 * ((a._mv || 0) > 0.2 ? 1 : 0.15);
+        ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+        ctx.fillStyle = dark;
+        for (const [lx, ly, ph] of [[0.55, -0.42, 1], [0.55, 0.42, -1], [-0.5, -0.42, -1], [-0.5, 0.42, 1]]) {
+            ctx.beginPath(); ctx.ellipse(lx*r + ph*trot, ly*r, r*0.2, r*0.13, 0, 0, Math.PI*2); ctx.fill();
+        }
+        // Tail, swishing
+        const sw = Math.sin(Date.now()/160 + a.y) * r*0.35;
+        ctx.strokeStyle = fur; ctx.lineWidth = r*0.34; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-r*0.8, 0); ctx.quadraticCurveTo(-r*1.3, sw*0.5, -r*1.6, sw); ctx.stroke();
+        ctx.strokeStyle = light; ctx.lineWidth = r*0.2;
+        ctx.beginPath(); ctx.moveTo(-r*1.45, sw*0.85); ctx.lineTo(-r*1.62, sw); ctx.stroke();
+        // Body + darker saddle down the back
+        ctx.fillStyle = fur; ctx.beginPath(); ctx.ellipse(0, 0, r*0.95, r*0.5, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = dark; ctx.beginPath(); ctx.ellipse(-r*0.1, 0, r*0.62, r*0.2, 0, 0, Math.PI*2); ctx.fill();
+        // Head, ears, snout, nose, eyes
+        ctx.fillStyle = fur; ctx.beginPath(); ctx.arc(r*0.95, 0, r*0.42, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = dark;
+        for (const s of [-1, 1]) {
+            ctx.beginPath(); ctx.moveTo(r*0.95, s*r*0.2); ctx.lineTo(r*0.62, s*r*0.5); ctx.lineTo(r*0.88, s*r*0.42); ctx.closePath(); ctx.fill();
+        }
+        ctx.fillStyle = light; ctx.beginPath(); ctx.ellipse(r*1.35, 0, r*0.26, r*0.17, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#14181f'; ctx.beginPath(); ctx.arc(r*1.58, 0, r*0.08, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#ffd32a';
+        ctx.beginPath(); ctx.arc(r*1.08, -r*0.16, r*0.07, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(r*1.08,  r*0.16, r*0.07, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+    }
+    // A see-through copy of the SWAT figure in its owner's class colour — the same drawing the
+    // players use, at lower opacity. One scratch object, reused, so nothing is allocated per frame.
+    const _cloneScratch = { x: 0, y: 0, angle: 0, vx: 0, vy: 0, cls: null };
+    function _drawClone2D(a, x, y, r, ang, decoy) {
+        const cls = summonClass(a), s = _cloneScratch;
+        s.x = x; s.y = y; s.angle = ang; s.cls = cls;
+        s.vx = (a._mv || 0) > 0.2 ? Math.cos(ang) : 0; s.vy = (a._mv || 0) > 0.2 ? Math.sin(ang) : 0;
+        const col = cls.armorColor || a.color || '#b2bec3';
+        ctx.save();
+        ctx.globalAlpha *= decoy ? 0.6 : 0.45;
+        drawSwatBody2D(s, col, r, 0, decoy ? '#ecf0f1' : col, 2, 0);
+        drawSwatHead2D(s, col, r, 0, 0);
+        ctx.restore();
+        if (decoy) {   // a mirror shimmer sweeping across the copy
+            const t = (Date.now() / 600) % 1;
+            ctx.save(); ctx.globalAlpha *= 0.55; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(x - r + t*r*2, y - r); ctx.lineTo(x - r*1.4 + t*r*2, y + r); ctx.stroke();
+            ctx.restore();
+        }
+    }
+    // A hired gun from above: fedora with a red band, black suit shoulders, a tommy gun.
+    function _drawGangster2D(a, x, y, r, ang) {
+        ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+        // tommy gun: wooden stock, black body, round drum
+        ctx.fillStyle = '#6d4c2f'; ctx.fillRect(r*0.2, r*0.1, r*0.5, r*0.22);
+        ctx.fillStyle = '#1e1e1e'; ctx.fillRect(r*0.6, r*0.08, r*0.95, r*0.2);
+        ctx.beginPath(); ctx.arc(r*0.95, r*0.32, r*0.2, 0, Math.PI*2); ctx.fill();
+        // arms in suit sleeves to the gun
+        ctx.strokeStyle = '#1c1c1c'; ctx.lineWidth = r*0.3; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(0, -r*0.7); ctx.lineTo(r*0.8, r*0.1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, r*0.7); ctx.lineTo(r*0.4, r*0.25); ctx.stroke();
+        ctx.fillStyle = '#f0c8a0';
+        ctx.beginPath(); ctx.arc(r*0.8, r*0.1, r*0.14, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(r*0.4, r*0.25, r*0.14, 0, Math.PI*2); ctx.fill();
+        // suit shoulders, white shirt, red tie
+        ctx.fillStyle = '#1c1c1c'; ctx.beginPath(); ctx.ellipse(0, 0, r*0.55, r*0.9, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#ecf0f1'; ctx.beginPath(); ctx.moveTo(r*0.2, -r*0.22); ctx.lineTo(r*0.52, 0); ctx.lineTo(r*0.2, r*0.22); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#c0392b'; ctx.fillRect(r*0.28, -r*0.06, r*0.26, r*0.12);
+        // fedora: wide grey brim, black crown, red band
+        ctx.fillStyle = '#3d3d3d'; ctx.beginPath(); ctx.arc(0, 0, r*0.62, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#c0392b'; ctx.lineWidth = r*0.1; ctx.beginPath(); ctx.arc(0, 0, r*0.43, 0, Math.PI*2); ctx.stroke();
+        ctx.fillStyle = '#141414'; ctx.beginPath(); ctx.arc(0, 0, r*0.38, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#2d2d2d'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-r*0.3, 0); ctx.lineTo(r*0.3, 0); ctx.stroke();
+        ctx.restore();
+    }
+    // A spirit: rounded head, wavy hem, hollow eyes. Drawn upright so it reads in third person too.
+    function _drawGhost2D(a, x, y, r) {
+        const col = a.color || '#5f27cd';
+        const fl = Math.sin(Date.now()/260 + a.x) * 2;
+        const t = Date.now() / 140;
+        _upright(x, y, () => {
+            ctx.save();
+            const yy = y + fl;
+            const g = ctx.createRadialGradient(x, yy, r*0.2, x, yy, r*1.8);
+            g.addColorStop(0, _alpha(col, '66')); g.addColorStop(1, _alpha(col, '00'));
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, yy, r*1.8, 0, Math.PI*2); ctx.fill();
+            ctx.globalAlpha *= 0.8;
+            ctx.fillStyle = col;
+            ctx.beginPath();
+            ctx.arc(x, yy - r*0.2, r*0.85, Math.PI, 0);
+            ctx.lineTo(x + r*0.85, yy + r*0.75);
+            for (let k = 0; k < 4; k++) {           // wavy hem
+                const x0 = x + r*0.85 - (k + 0.5) * r*0.425;
+                ctx.quadraticCurveTo(x0, yy + r*(0.75 + (k % 2 ? -0.3 : 0.3) + Math.sin(t + k)*0.08), x + r*0.85 - (k + 1) * r*0.425, yy + r*0.75);
+            }
+            ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = shade(col, 40); ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.globalAlpha = Math.min(1, ctx.globalAlpha / 0.8);
+            ctx.fillStyle = '#0b0b12';
+            ctx.beginPath(); ctx.ellipse(x - r*0.3, yy - r*0.25, r*0.15, r*0.22, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(x + r*0.3, yy - r*0.25, r*0.15, r*0.22, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath(); ctx.arc(x - r*0.27, yy - r*0.3, r*0.05, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(x + r*0.33, yy - r*0.3, r*0.05, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        });
+    }
+    function drawSummon2D(a) {
+        const kind = summonKind(a);
+        const ang = _summonFacing(a);
+        const alpha = Math.min(a.life / 60, 1);
+        const r = a.r;
+        const bounce = (kind === 'skeleton') ? Math.sin(Date.now()/150 + a.x) * 2 : 0;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';                    // shadow
+        ctx.beginPath(); ctx.ellipse(a.x, a.y + r + 2, r*0.9, r*0.32, 0, 0, Math.PI*2); ctx.fill();
+        _friendRing2D(a.x, a.y, r);
+        switch (kind) {
+            case 'wolf':     _drawWolf2D(a, a.x, a.y, r, ang); break;
+            case 'clone':    _drawClone2D(a, a.x, a.y, r, ang, false); break;
+            case 'decoy':    _drawClone2D(a, a.x, a.y, r, ang, true); break;
+            case 'gangster': _drawGangster2D(a, a.x, a.y, r, ang); break;
+            case 'ghost':    _drawGhost2D(a, a.x, a.y, r); break;
+            default:         _drawSkeleton2D(a, a.x, a.y + bounce, r);
+        }
+        ctx.restore();
+    }
+    // Player-built walls. The Builder lays BRICK (with a little battlement on top); The Iron's walls
+    // are riveted STEEL plate. A green strip along the top marks them as yours.
+    function drawWall2D(w) {
+        const iron = w.kind === 'iron';
+        const x0 = w.x - 15, y0 = w.y - 15;
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x0 + 3, y0 + 4, 30, 30);
+        if (iron) {
+            const g = ctx.createLinearGradient(x0, y0, x0 + 30, y0 + 30);
+            g.addColorStop(0, '#bdc3c7'); g.addColorStop(0.5, '#7f8c8d'); g.addColorStop(1, '#4b5658');
+            ctx.fillStyle = g; ctx.fillRect(x0, y0, 30, 30);
+            ctx.strokeStyle = '#2d3436'; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, 30, 30);
+            ctx.lineWidth = 1.5;                                   // cross brace
+            ctx.beginPath(); ctx.moveTo(x0 + 3, y0 + 3); ctx.lineTo(x0 + 27, y0 + 27); ctx.moveTo(x0 + 27, y0 + 3); ctx.lineTo(x0 + 3, y0 + 27); ctx.stroke();
+            ctx.fillStyle = '#dfe6e9';
+            for (const [rx, ry] of [[4,4],[26,4],[4,26],[26,26],[15,4],[15,26],[4,15],[26,15]]) {
+                ctx.beginPath(); ctx.arc(x0 + rx, y0 + ry, 1.6, 0, Math.PI*2); ctx.fill();
+            }
+        } else {
+            ctx.fillStyle = '#b5523b'; ctx.fillRect(x0, y0, 30, 30);
+            ctx.strokeStyle = '#e8d9c4'; ctx.lineWidth = 1.2;      // mortar: rows of offset bricks
+            for (let row = 1; row < 4; row++) { ctx.beginPath(); ctx.moveTo(x0, y0 + row*7.5); ctx.lineTo(x0 + 30, y0 + row*7.5); ctx.stroke(); }
+            for (let row = 0; row < 4; row++) {
+                const off = (row % 2) ? 5 : 0;
+                for (let bx = off + 10; bx < 30; bx += 10) {
+                    ctx.beginPath(); ctx.moveTo(x0 + bx, y0 + row*7.5); ctx.lineTo(x0 + bx, y0 + (row+1)*7.5); ctx.stroke();
+                }
+            }
+            ctx.strokeStyle = '#6e2c1f'; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, 30, 30);
+            ctx.fillStyle = '#8e3b2a';                              // battlement teeth
+            for (const bx of [0, 11, 22]) ctx.fillRect(x0 + bx, y0 - 4, 8, 4);
+        }
+        ctx.fillStyle = FRIEND_COL; ctx.fillRect(x0, y0, 30, 2.5);  // "yours" strip
+        for (let h=0;h<w.hp;h++){ctx.fillStyle=FRIEND_COL;ctx.beginPath();ctx.arc(w.x-8+h*8,w.y+12,3,0,Math.PI*2);ctx.fill();}
+        ctx.restore();
+    }
+
     function drawOnePlayer(p, isLocal) {
         if (!p || !p.cls) return;
         ctx.save();
@@ -14098,7 +14335,7 @@ const col = b.color || BLDG_COLORS[0];
             sprites.push({ x:pk.x, y:pk.y, size: 22, emoji: e, hover: 6 });
         }
         for (const t of traps) sprites.push({ x:t.x, y:t.y, size: t.r*1.8, emoji: t.emoji, color: t.color });
-        for (const a of allies)   sprites.push({ x:a.x, y:a.y, size: 34, emoji: '💀', color: '#26de81' });
+        for (const a of allies)   sprites.push({ x:a.x, y:a.y, size: 34, emoji: SUMMON_EMOJI[summonKind(a)], color: FRIEND_COL });
         for (const tu of turrets) sprites.push({ x:tu.x, y:tu.y, size: 34, emoji: '🤖' });
         for (const b of bullets)  sprites.push({ x:b.x, y:b.y, size: 14, emoji: b.bemoji || '•', color: b.color || '#ffcc00', hover: 22 });
         for (const rp of remotePlayers) if (rp && rp.hp > 0) sprites.push({ x:rp.x, y:rp.y, size: 36, emoji: rp.cls?.emoji||'👤', name: rp.name });
@@ -14368,15 +14605,6 @@ const col = b.color || BLDG_COLORS[0];
         Dodecahedron: (...a) => _tg('D', THREE.DodecahedronGeometry, a),
         Ring:         (...a) => _tg('R', THREE.RingGeometry, a),
     };
-    // Every player-built wall block looks identical, so they all share one material.
-    let _wallMatCache = null;
-    function _wallMat() {
-        if (!_wallMatCache) {
-            _wallMatCache = new THREE.MeshStandardMaterial({ color: 0xc8a96f, metalness: 0.15, roughness: 0.7, envMapIntensity: 0.6 });
-            _wallMatCache.userData.shared = true;
-        }
-        return _wallMatCache;
-    }
 
     // ===== Time of day — rolled at game start, drives sky + ground + lighting =====
     const TIME_OF_DAY = [
@@ -15735,6 +15963,245 @@ const col = b.color || BLDG_COLORS[0];
 
         g.userData.head = head;
         g.userData.parts = parts;
+        return g;
+    }
+
+    // ======================== SUMMONS (3D) ========================
+    // Every ally used to be built as the same skeleton, and every turret allocated three brand-new
+    // materials. One builder per summon kind now, all from the shared _pf pool and TG geometry cache,
+    // no lights. Feet at local y=0, facing local +Z (like the pets). Each stands on a green ring.
+    function _summonParts(g) {
+        const parts = {};
+        const add = (geo, mat, x, y, z, name, sx, sy, sz) => {
+            const m = new THREE.Mesh(geo, mat);
+            m.position.set(x, y, z);
+            if (sx !== undefined) m.scale.set(sx, sy, sz);
+            m.castShadow = true; g.add(m);
+            if (name) { m.name = name; (parts[name] = parts[name] || []).push(m); }
+            return m;
+        };
+        g.userData.parts = parts;
+        return add;
+    }
+    function _friendRing3D(g, rad) {
+        const mat = _pf('summon-friend-ring', () => new THREE.MeshBasicMaterial({ color: 0x26de81, transparent: true, opacity: 0.85 }));
+        const ring = new THREE.Mesh(TG.Torus(rad, 0.9, 6, 26), mat);
+        ring.rotation.x = -Math.PI/2; ring.position.y = 0.6; ring.name = 'friendRing';
+        g.add(ring);
+        (g.userData.parts = g.userData.parts || {}).friendRing = [ring];
+        return ring;
+    }
+    function makeSkeletonMesh3D(col) {
+        const g = new THREE.Group(), add = _summonParts(g);
+        const bone = _pf('sk-bone', () => new THREE.MeshStandardMaterial({ color: 0xe9e3d0, roughness: 0.75 }));
+        const glowHex = _hex(col || '#26de81');
+        const glow = _pf('sk-glow|' + glowHex, () => new THREE.MeshBasicMaterial({ color: glowHex }));
+        const dark = _pf('sk-dark', () => new THREE.MeshStandardMaterial({ color: 0x1b1b1b, roughness: 0.9 }));
+        const legs = [];
+        for (const sx of [-1, 1]) {
+            legs.push(add(TG.Cylinder(0.9, 0.8, 9, 6), bone, sx*2.2, 4.8, 0, 'leg'));
+            add(TG.Box(1.8, 0.9, 3), bone, sx*2.2, 0.45, 0.6, 'foot');
+        }
+        add(TG.Box(6, 1.6, 3), bone, 0, 9.8, 0, 'pelvis');
+        add(TG.Cylinder(0.8, 0.8, 9, 6), bone, 0, 14.5, -0.8, 'spine');
+        for (let k = 0; k < 4; k++) {
+            const rib = add(TG.Torus(3.3 - k*0.3, 0.5, 5, 14), bone, 0, 12.2 + k*1.7, 0, 'rib');
+            rib.rotation.x = Math.PI/2;
+        }
+        for (const sx of [-1, 1]) {
+            const arm = add(TG.Cylinder(0.7, 0.6, 9, 6), bone, sx*4.4, 14.5, 0.8, 'arm');
+            arm.rotation.z = sx * 0.18; arm.rotation.x = -0.35;
+            add(TG.Sphere(0.9, 6, 5), bone, sx*5.1, 10.2, 2.2, 'hand');
+        }
+        add(TG.Sphere(3.6, 14, 11), bone, 0, 22, 0, 'skull');
+        add(TG.Box(4, 1.4, 3), bone, 0, 19.2, 0.8, 'jaw');
+        for (const sx of [-1, 1]) add(TG.Sphere(0.9, 8, 6), glow, sx*1.3, 22.3, 3.1, 'eye');
+        add(TG.Cone(0.5, 1, 4), dark, 0, 21, 3.4, 'nose');
+        g.userData.legs = legs;
+        return g;
+    }
+    // A real four-legged wolf: long body, four legs, a head with a snout, pointed ears, a bushy tail.
+    function makeWolfMesh3D() {
+        const g = new THREE.Group(), add = _summonParts(g);
+        const fur   = _pf('wolf-fur',   () => new THREE.MeshStandardMaterial({ color: 0x8a7d6b, roughness: 0.85 }));
+        const light = _pf('wolf-light', () => new THREE.MeshStandardMaterial({ color: 0xcfc2ad, roughness: 0.85 }));
+        const dark  = _pf('wolf-dark',  () => new THREE.MeshStandardMaterial({ color: 0x4a4038, roughness: 0.85 }));
+        const eye   = _pf('wolf-eye',   () => new THREE.MeshBasicMaterial({ color: 0xffd32a }));
+        add(TG.Sphere(5, 14, 10), fur, 0, 8, 0, 'body', 0.78, 0.72, 1.5);
+        add(TG.Sphere(3.6, 10, 8), dark, 0, 10.6, -0.5, 'saddle', 0.8, 0.4, 1.6);
+        add(TG.Sphere(3.4, 10, 8), light, 0, 6.6, 1.5, 'chest', 0.8, 0.7, 1.2);
+        const legs = [];
+        for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+            legs.push(add(TG.Cylinder(0.95, 0.8, 7, 7), fur, sx*2.3, 3.6, sz*4.4, 'leg'));
+            add(TG.Sphere(1.05, 7, 5), dark, sx*2.3, 0.4, sz*4.4 + 0.5, 'paw', 1, 0.6, 1.3);
+        }
+        add(TG.Sphere(2.6, 10, 8), fur, 0, 10.5, 6.2, 'neck');
+        add(TG.Sphere(3.1, 12, 10), fur, 0, 12, 8.4, 'head');
+        const snout = add(TG.Cone(1.6, 4.2, 8), light, 0, 11.2, 11.6, 'snout');
+        snout.rotation.x = Math.PI/2;
+        add(TG.Sphere(0.75, 7, 5), dark, 0, 11.3, 13.6, 'nose');
+        for (const sx of [-1, 1]) {
+            add(TG.Cone(1.1, 2.8, 5), fur, sx*1.6, 15.2, 7.6, 'ear');
+            add(TG.Sphere(0.55, 6, 5), eye, sx*1.3, 12.8, 10.6, 'eye');
+        }
+        const tail = add(TG.Cone(1.4, 7.5, 7), fur, 0, 10, -9.5, 'tail');
+        tail.rotation.x = -2.1;
+        add(TG.Sphere(0.9, 6, 5), light, 0, 8.2, -12.6, 'tailTip');
+        g.userData.legs = legs; g.userData.tail = tail;
+        return g;
+    }
+    // A see-through copy of the owner's SWAT figure. makePlayerFigure's materials are shared, so the
+    // translucent versions are cloned ONCE per (material, opacity) and cached too.
+    const _seeThroughCache = new Map();
+    function _seeThroughMat(m, op) {
+        let byOp = _seeThroughCache.get(m);
+        if (!byOp) { byOp = {}; _seeThroughCache.set(m, byOp); }
+        if (!byOp[op]) {
+            const c = m.clone();
+            c.transparent = true; c.opacity = op; c.depthWrite = false;
+            c.userData = { shared: true };
+            byOp[op] = c;
+        }
+        return byOp[op];
+    }
+    function makeCloneMesh3D(cls, decoy) {
+        const g = makePlayerFigure(cls);
+        const op = decoy ? 0.6 : 0.45;
+        for (const m of g.children) if (m.material) m.material = _seeThroughMat(m.material, op);
+        if (decoy) {   // the Mirror Knight's decoy carries a mirror shield
+            const mirror = _pf('decoy-mirror', () => new THREE.MeshStandardMaterial({
+                color: 0xecf0f1, metalness: 1, roughness: 0.05, emissive: 0x9fb4c0, emissiveIntensity: 0.35,
+                transparent: true, opacity: 0.85 }));
+            const add = (geo, mat, x, y, z, name) => { const mm = new THREE.Mesh(geo, mat); mm.position.set(x, y, z); mm.name = name;
+                g.add(mm); (g.userData.parts[name] = g.userData.parts[name] || []).push(mm); return mm; };
+            const sh = add(TG.Cylinder(5.5, 5.5, 0.8, 18), mirror, -7, 22, 4, 'mirror');
+            sh.rotation.z = Math.PI/2;
+        }
+        return g;
+    }
+    // A hired gun: suit, white shirt, red tie, a fedora with a band, and a tommy gun.
+    function makeGangsterMesh3D() {
+        const g = new THREE.Group(), add = _summonParts(g);
+        const suit  = _pf('gang-suit',  () => new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.7 }));
+        const shirt = _pf('gang-shirt', () => new THREE.MeshStandardMaterial({ color: 0xecf0f1, roughness: 0.8 }));
+        const tie   = _pf('gang-tie',   () => new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.6 }));
+        const hat   = _pf('gang-hat',   () => new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.75 }));
+        const skin  = _pf('pf-skin',    () => new THREE.MeshStandardMaterial({ color: 0xf0c8a0, roughness: 0.75 }));
+        const wood  = _pf('gang-wood',  () => new THREE.MeshStandardMaterial({ color: 0x6d4c2f, roughness: 0.8 }));
+        const steel = _pf('gang-steel', () => new THREE.MeshStandardMaterial({ color: 0x222428, metalness: 0.8, roughness: 0.35 }));
+        const legs = [];
+        for (const sx of [-1, 1]) {
+            legs.push(add(TG.Cylinder(1.3, 1.2, 10, 8), suit, sx*1.8, 5.5, 0, 'leg'));
+            add(TG.Box(2.4, 1.2, 3.6), steel, sx*1.8, 0.6, 0.6, 'shoe');
+        }
+        add(TG.Cylinder(4, 3.6, 10, 12), suit, 0, 15.5, 0, 'suit');
+        add(TG.Box(2.4, 6, 0.6), shirt, 0, 17, 3.6, 'shirt');
+        add(TG.Box(0.9, 5, 0.5), tie, 0, 16.5, 3.95, 'tie');
+        for (const sx of [-1, 1]) {
+            const arm = add(TG.Cylinder(1.1, 1, 8, 8), suit, sx*4.6, 16, 2, 'arm'); arm.rotation.x = -1.0;
+            add(TG.Sphere(1.1, 8, 6), skin, sx*2.6, 13.6, 6, 'hand');
+        }
+        add(TG.Sphere(3.2, 14, 10), skin, 0, 23.5, 0, 'head');
+        add(TG.Cylinder(5.4, 5.4, 0.5, 18), hat, 0, 25.6, 0, 'fedora');
+        add(TG.Cylinder(3.3, 3.6, 3.2, 14), hat, 0, 27.4, 0, 'fedora');
+        add(TG.Cylinder(3.65, 3.65, 0.8, 14), tie, 0, 26.3, 0, 'hatband');
+        // tommy gun, held across the hip, pointing forward
+        add(TG.Box(1.4, 1.6, 9), steel, 0, 13.8, 8, 'gun');
+        add(TG.Box(1.2, 2, 3.4), wood, 0, 13.4, 2.8, 'gun');
+        const drum = add(TG.Cylinder(1.9, 1.9, 1.2, 14), steel, 0, 12.2, 7.2, 'gun'); drum.rotation.z = Math.PI/2;
+        g.userData.legs = legs;
+        return g;
+    }
+    // A spirit: translucent rounded head, a hem of points, dark eyes. It floats.
+    function makeGhostMesh3D(col) {
+        const g = new THREE.Group(), add = _summonParts(g);
+        const hx = _hex(col || '#5f27cd');
+        const sheet = _pf('ghost-sheet|' + hx, () => new THREE.MeshStandardMaterial({
+            color: hx, emissive: hx, emissiveIntensity: 0.45, transparent: true, opacity: 0.72, roughness: 0.4, depthWrite: false }));
+        const dark = _pf('ghost-eye', () => new THREE.MeshBasicMaterial({ color: 0x0b0b12 }));
+        add(TG.Sphere(6, 16, 12, 0, Math.PI*2, 0, Math.PI*0.5), sheet, 0, 14, 0, 'sheet');
+        add(TG.Cylinder(6, 7.2, 9, 16, 1, true), sheet, 0, 9.5, 0, 'sheet');
+        for (let k = 0; k < 6; k++) {
+            const a = (k / 6) * Math.PI*2;
+            const c = add(TG.Cone(1.8, 3.4, 6), sheet, Math.cos(a)*5.6, 3.6, Math.sin(a)*5.6, 'tail');
+            c.rotation.x = Math.PI;
+        }
+        for (const sx of [-1, 1]) {
+            add(TG.Sphere(1.1, 8, 6), dark, sx*2.1, 15, 5.4, 'eye', 1, 1.5, 0.6);
+            add(TG.Sphere(1.6, 8, 6), sheet, sx*6.6, 10.5, 1.5, 'arm', 1.3, 0.8, 0.8);
+        }
+        g.userData.float = true;
+        return g;
+    }
+    const SUMMON_BUILDERS = {
+        skeleton: a => makeSkeletonMesh3D(a && a.color),
+        wolf:     () => makeWolfMesh3D(),
+        clone:    a => makeCloneMesh3D(summonClass(a), false),
+        decoy:    a => makeCloneMesh3D(summonClass(a), true),
+        gangster: () => makeGangsterMesh3D(),
+        ghost:    a => makeGhostMesh3D(a && a.color),
+    };
+    function makeSummonMesh3D(a) {
+        const kind = summonKind(a);
+        const body = SUMMON_BUILDERS[kind](a);
+        // Clones are copies of a ~40-tall player (r 14); scale them to the summon's own radius.
+        if (kind === 'clone' || kind === 'decoy') body.scale.setScalar((a.r || 14) / 14);
+        const g = new THREE.Group();
+        g.add(body);
+        g.userData.parts = body.userData.parts;
+        g.userData.legs = body.userData.legs; g.userData.tail = body.userData.tail;
+        g.userData.float = body.userData.float; g.userData.body = body; g.userData.kind = kind;
+        _friendRing3D(g, (a.r || 10) + 3);
+        return g;
+    }
+    // A turret on a base, its head (dome + barrel) turning to aim. Head barrel points along +X so
+    // head.rotation.y = -angle aims it.
+    function makeTurretMesh3D() {
+        const g = new THREE.Group(), add = _summonParts(g);
+        const metal = _pf('tur-metal', () => new THREE.MeshStandardMaterial({ color: 0x7f8c8d, metalness: 0.85, roughness: 0.3, envMapIntensity: 1.4 }));
+        const dark  = _pf('tur-dark',  () => new THREE.MeshStandardMaterial({ color: 0x2d3436, metalness: 0.8, roughness: 0.4 }));
+        const red   = _pf('tur-red',   () => new THREE.MeshStandardMaterial({ color: 0xff2d55, metalness: 0.5, roughness: 0.4, emissive: 0xff2d55, emissiveIntensity: 0.4 }));
+        add(TG.Cylinder(13, 15, 6, 20), dark, 0, 3, 0, 'base');
+        for (let k = 0; k < 3; k++) {     // tripod feet
+            const a = (k / 3) * Math.PI*2;
+            add(TG.Box(4, 2, 8), dark, Math.cos(a)*14, 1, Math.sin(a)*14, 'foot').rotation.y = -a + Math.PI/2;
+        }
+        const head = new THREE.Group(); head.position.y = 0; head.name = 'head'; g.add(head);
+        const hadd = (geo, mat, x, y, z, name) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.name = name;
+            head.add(m); (g.userData.parts[name] = g.userData.parts[name] || []).push(m); return m; };
+        const dome = hadd(TG.Sphere(9, 18, 14), metal, 0, 12, 0, 'dome'); dome.scale.set(1, 0.8, 1);
+        hadd(TG.Sphere(2.4, 10, 8), red, 7, 13, 0, 'eye');
+        const barrel = hadd(TG.Cylinder(2, 2, 22, 12), dark, 13, 12, 0, 'barrel'); barrel.rotation.z = Math.PI/2;
+        const tip = hadd(TG.Cylinder(2.6, 2.6, 3, 12), red, 24, 12, 0, 'muzzle'); tip.rotation.z = Math.PI/2;
+        g.userData.head = head;
+        _friendRing3D(g, 17);
+        return g;
+    }
+    // Player-built walls: same 30x50x30 block as before. Brick with mortar rows and a battlement, or
+    // riveted steel. A small green pennant on top says "ours".
+    function makeWallMesh3D(kind) {
+        const g = new THREE.Group(), add = _summonParts(g);
+        const iron = kind === 'iron';
+        const flagM = _pf('wall-flag', () => new THREE.MeshBasicMaterial({ color: 0x26de81 }));
+        const poleM = _pf('wall-pole', () => new THREE.MeshStandardMaterial({ color: 0x2d3436, roughness: 0.6 }));
+        if (iron) {
+            const steel = _pf('wall-steel', () => new THREE.MeshStandardMaterial({ color: 0x8a959a, metalness: 0.8, roughness: 0.35 }));
+            const band  = _pf('wall-band',  () => new THREE.MeshStandardMaterial({ color: 0x4b5658, metalness: 0.85, roughness: 0.4 }));
+            const rivet = _pf('wall-rivet', () => new THREE.MeshStandardMaterial({ color: 0xdfe6e9, metalness: 0.9, roughness: 0.2 }));
+            add(TG.Box(30, 50, 30), steel, 0, 25, 0, 'block').receiveShadow = true;
+            for (const y of [6, 25, 44]) add(TG.Box(30.6, 2.4, 30.6), band, 0, y, 0, 'plate');
+            for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [6, 25, 44])
+                add(TG.Sphere(0.9, 6, 4), rivet, sx*15.3, y, sz*15.3, 'rivet');
+        } else {
+            const brick  = _pf('wall-brick',  () => new THREE.MeshStandardMaterial({ color: 0xa94a35, roughness: 0.9 }));
+            const mortar = _pf('wall-mortar', () => new THREE.MeshStandardMaterial({ color: 0xd9ccb6, roughness: 0.95 }));
+            add(TG.Box(30, 50, 30), brick, 0, 25, 0, 'block').receiveShadow = true;
+            for (let k = 1; k < 7; k++) add(TG.Box(30.5, 0.7, 30.5), mortar, 0, k*7.2, 0, 'mortar');
+            for (const sx of [-1, 1]) for (const sz of [-1, 1])
+                add(TG.Box(8, 6, 8), brick, sx*11, 53, sz*11, 'merlon');
+        }
+        add(TG.Cylinder(0.5, 0.5, 12, 6), poleM, 0, 56, 0, 'pole');
+        add(TG.Box(0.4, 4, 7), flagM, 0, 60, 3.5, 'flag');
         return g;
     }
 
@@ -17747,12 +18214,8 @@ const col = b.color || BLDG_COLORS[0];
         // and a shader lookup for every block the player had ever placed. They're keyed by wall object
         // now, so a wall is built once when it appears and simply left alone after that.
         _syncMap(_three.wallMap, walls,
-            () => {
-                const m = new THREE.Mesh(TG.Box(30, 50, 30), _wallMat());
-                m.castShadow = true; m.receiveShadow = true;
-                return m;
-            },
-            (mesh, w) => mesh.position.set(w.x, 25, w.y));
+            w => makeWallMesh3D(w.kind),
+            (mesh, w) => mesh.position.set(w.x, 0, w.y));
         // Monsters — colored spheres scaled by radius
         // Infinite world — keep the ground slab centred under the player so it never runs out.
         // Snap to a coarse grid so the ground texture doesn't visibly slide as you walk.
@@ -17923,38 +18386,28 @@ const col = b.color || BLDG_COLORS[0];
                     mesh.traverse(o => { if (o.material) { o.material.transparent = true; o.material.opacity = dim ? 0.45 : 1; } });
                 }
             });
-        // Allies — green spheres
+        // Allies — each summon built as what it is (see SUMMON_BUILDERS), standing on a green ring
         _syncMap(allyMeshes, allies,
-            (a) => {
-                const g = new THREE.Group();
-                const bone = new THREE.MeshStandardMaterial({ color:0xe9e3d0, roughness:0.75 });
-                const glow = new THREE.MeshBasicMaterial({ color:_hex(a.color||'#26de81') });
-                const body = new THREE.Mesh(TG.Capsule(4.5, 6, 6, 12), bone); body.position.y = 8; g.add(body);
-                const head = new THREE.Mesh(TG.Sphere(5, 16, 12), bone); head.position.y = 15.5; g.add(head);
-                const jaw  = new THREE.Mesh(TG.Box(5, 2.2, 4), bone); jaw.position.y = 12.5; g.add(jaw);
-                const e1 = new THREE.Mesh(TG.Sphere(1.4, 8, 8), glow); e1.position.set(-2, 16, 4); g.add(e1);
-                const e2 = new THREE.Mesh(TG.Sphere(1.4, 8, 8), glow); e2.position.set(2, 16, 4); g.add(e2);
-                g.traverse(o => { if (o.isMesh) o.castShadow = true; });
-                return g;
-            },
-            (mesh, a) => mesh.position.set(a.x, 10, a.y));
-        // Turrets — base pedestal + rotating dome + gun barrel (barrel along +X so rotation.y=-angle aims it)
+            a => makeSummonMesh3D(a),
+            (mesh, a) => {
+                const ud = mesh.userData;
+                const mv = ud.lx !== undefined ? Math.hypot(a.x - ud.lx, a.y - ud.ly) : 0;
+                if (mv > 0.05) ud.face = Math.atan2(a.y - ud.ly, a.x - ud.lx);
+                ud.lx = a.x; ud.ly = a.y;
+                const walking = mv > 0.2;
+                ud.step = (ud.step || 0) + (walking ? 0.32 : 0.04);
+                const y = ud.float ? 4 + Math.sin(Date.now()/300 + a.x) * 1.5 : (walking ? Math.abs(Math.sin(ud.step)) * 1.2 : 0);
+                mesh.position.set(a.x, 0, a.y);
+                if (ud.body) ud.body.position.y = y;
+                mesh.rotation.y = Math.PI/2 - (ud.face || 0);
+                if (ud.legs) for (let i = 0; i < ud.legs.length; i++)
+                    ud.legs[i].rotation.x = walking ? Math.sin(ud.step + ((i === 0 || i === 3) ? 0 : Math.PI)) * 0.55 : 0;
+                if (ud.tail) ud.tail.rotation.z = Math.sin(Date.now()/160 + a.y) * 0.35;
+            });
+        // Turrets — base stays put, the head (dome + barrel) turns to aim
         _syncMap(turretMeshes, turrets,
-            () => {
-                const g = new THREE.Group();
-                const metal = new THREE.MeshStandardMaterial({ color:0x7f8c8d, metalness:0.85, roughness:0.3, envMapIntensity:1.4 });
-                const dark  = new THREE.MeshStandardMaterial({ color:0x2d3436, metalness:0.8, roughness:0.4 });
-                const red   = new THREE.MeshStandardMaterial({ color:0xff2d55, metalness:0.5, roughness:0.4, emissive:0xff2d55, emissiveIntensity:0.4 });
-                const base = new THREE.Mesh(TG.Cylinder(13,15,6,20), dark); base.position.y=3; g.add(base);
-                const ring = new THREE.Mesh(TG.Torus(11,1.5,8,22), red); ring.rotation.x=Math.PI/2; ring.position.y=6.5; g.add(ring);
-                const dome = new THREE.Mesh(TG.Sphere(9,18,14), metal); dome.scale.y=0.8; dome.position.y=12; g.add(dome);
-                const eye  = new THREE.Mesh(TG.Sphere(2.4,10,8), red); eye.position.set(7,13,0); g.add(eye);
-                const barrel = new THREE.Mesh(TG.Cylinder(2,2,22,12), dark); barrel.rotation.z=Math.PI/2; barrel.position.set(13,12,0); g.add(barrel);
-                const tip = new THREE.Mesh(TG.Cylinder(2.6,2.6,3,12), red); tip.rotation.z=Math.PI/2; tip.position.set(24,12,0); g.add(tip);
-                g.traverse(o => { o.castShadow = true; });
-                return g;
-            },
-            (mesh, tu) => { mesh.position.set(tu.x, 0, tu.y); mesh.rotation.y = -tu.angle; });
+            () => makeTurretMesh3D(),
+            (mesh, tu) => { mesh.position.set(tu.x, 0, tu.y); mesh.userData.head.rotation.y = -tu.angle; });
         // Remote players — colored capsules
         _syncMap(remoteMeshes, remotePlayers,
             rp => makePlayerFigure(rp.cls),
@@ -18300,17 +18753,8 @@ const col = b.color || BLDG_COLORS[0];
             ctx.beginPath(); ctx.arc(pt.x, pt.y, 8, 0, Math.PI*2); ctx.stroke();
         }
 
-        // Walls (cartoon brick)
-        for (const w of walls) {
-            ctx.fillStyle = '#f0932b';
-            ctx.beginPath(); ctx.roundRect(w.x-15, w.y-15, 30, 30, 6); ctx.fill();
-            ctx.strokeStyle = '#e17055'; ctx.lineWidth = 3;
-            ctx.beginPath(); ctx.roundRect(w.x-15, w.y-15, 30, 30, 6); ctx.stroke();
-            // Brick lines
-            ctx.strokeStyle = '#c44569'; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(w.x-15, w.y); ctx.lineTo(w.x+15, w.y); ctx.stroke();
-            for (let h=0;h<w.hp;h++){ctx.fillStyle='#26de81';ctx.beginPath();ctx.arc(w.x-8+h*8,w.y+12,3,0,Math.PI*2);ctx.fill();}
-        }
+        // Walls — brick for the Builder, riveted steel for The Iron
+        for (const w of walls) drawWall2D(w);
 
         // Traps — viewport culled
         const _cvx0 = _vx0 - 40, _cvy0 = _vy0 - 40;
@@ -18557,40 +19001,13 @@ const col = b.color || BLDG_COLORS[0];
             }
         }
 
-        // Allies — glowing-eyed skeleton minions
-        for (const a of allies) {
-            const bounce = Math.sin(Date.now()/150 + a.x) * 2;
-            const alpha = Math.min(a.life / 60, 1);
-            const col = a.color || '#26de81', r = a.r, y = a.y + bounce;
-            ctx.globalAlpha = alpha;
-            // Necromantic aura
-            const g = ctx.createRadialGradient(a.x, y, r*0.3, a.x, y, r*1.9);
-            g.addColorStop(0, _alpha(col,'55')); g.addColorStop(1, _alpha(col,'00'));
-            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(a.x, y, r*1.9, 0, Math.PI*2); ctx.fill();
-            // Bone body
-            ctx.fillStyle = '#e9e3d0';
-            ctx.beginPath(); ctx.ellipse(a.x, y+r*0.45, r*0.55, r*0.8, 0, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = '#b9b199'; ctx.lineWidth = 1.5;
-            for (let k=0;k<3;k++){ const yy=y+r*0.15+k*r*0.28; ctx.beginPath(); ctx.moveTo(a.x-r*0.42, yy); ctx.lineTo(a.x+r*0.42, yy); ctx.stroke(); }
-            // Skull head
-            ctx.fillStyle = '#f4efdf';
-            ctx.beginPath(); ctx.arc(a.x, y-r*0.4, r*0.62, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = '#c9c1a8'; ctx.lineWidth = 1.5; ctx.stroke();
-            // Glowing eye sockets
-            ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 7; ctx.fillStyle = col;
-            ctx.beginPath(); ctx.arc(a.x-r*0.24, y-r*0.44, r*0.17, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(a.x+r*0.24, y-r*0.44, r*0.17, 0, Math.PI*2); ctx.fill();
-            ctx.restore();
-            // Jaw teeth
-            ctx.strokeStyle = '#c9c1a8'; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(a.x-r*0.32, y-r*0.1); ctx.lineTo(a.x+r*0.32, y-r*0.1); ctx.stroke();
-            for (let k=-2;k<=2;k++){ ctx.beginPath(); ctx.moveTo(a.x+k*r*0.14, y-r*0.1); ctx.lineTo(a.x+k*r*0.14, y+r*0.02); ctx.stroke(); }
-            ctx.globalAlpha = 1;
-        }
+        // Allies — each summon drawn as what it is (skeleton, wolf, clone, crew, spirit)
+        for (const a of allies) drawSummon2D(a);
 
         // Turrets (Machine) — metal base + bolts + rotating dome + barrel with muzzle
         for (const t of turrets) {
             const R = t.r;
+            _friendRing2D(t.x, t.y, R);
             // Base plate
             ctx.fillStyle = '#2d3436'; ctx.beginPath(); ctx.arc(t.x, t.y, R, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = '#7f8c8d'; ctx.beginPath(); ctx.arc(t.x, t.y, R*0.82, 0, Math.PI*2); ctx.fill();
