@@ -166,6 +166,12 @@ check(parts.parts.glove === 2 && parts.parts.kneepad === 2 && parts.parts.boot =
 check(parts.head, 'the figure still exposes its head');
 check(parts.meshes >= 25 && parts.meshes <= 40, 'mesh budget stays reasonable', parts.meshes + ' meshes');
 check(q(`__FT.lights`) === 0, 'the figure adds no lights');
+const gojo3d = JSON.parse(q(`__withFake(function(){
+  var g = makePlayerFigure(CLASSES.find(function(c){ return c.name === 'Gojo'; })), p = g.userData.parts;
+  return JSON.stringify({ hair: (p.hair||[]).length, fold: (p.blindfold||[]).length, meshes: g.children.length,
+    shared: g.children.every(function(m){ return m.material && m.material.userData.shared; }) }); })`));
+check(gojo3d.hair > 0 && gojo3d.fold === 1 && gojo3d.meshes <= 40 && gojo3d.shared,
+      'Gojo wears white spiky hair and a blindfold in 3D, inside the mesh budget', gojo3d.meshes + ' meshes');
 check(q(`__withFake(function(){ var g = makePlayerFigure(CLASSES[0]);
   return g.children.every(function(m){ return m.material && m.material.userData.shared; }); })`) === true,
   'every material comes from the shared _pf pool');

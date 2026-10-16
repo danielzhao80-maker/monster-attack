@@ -426,6 +426,87 @@ const pierceResult = q(`(function(){
 check(pierceResult === 'ok', 'an Archer volley passes through a line of monsters',
       pierceResult === 'ok' ? '3 of 3 hit by one volley' : pierceResult);
 
+// ---- Gojo: rollable, redeemable, and his E + Z + X Domain combo ----
+console.log('\nGojo:');
+check(q(`(function(){ var c = CLASSES.find(function(c){ return c.name === 'Gojo'; });
+   return !!c && c.rarity === 'mythical' && CLASSES.filter(function(k){ return k.rarity === 'mythical'; }).indexOf(c) >= 0; })()`) === true,
+   'Gojo is in the mythical roll pool');
+check(q(`(function(){ guaranteedClass = null; document.getElementById('code-input').value = 'gojo';
+   try { localStorage.removeItem('monster_city_used_codes'); } catch(e){}
+   redeemCode(); var g = guaranteedClass && guaranteedClass.name; guaranteedClass = null; return g; })()`) === 'Gojo',
+   'the GOJO code unlocks Gojo for the next roll');
+// A stocked Gojo at Lv.3 with five monsters and one boss around him.
+const GOJO_SETUP = `(function(lvl){
+   chosenClass = CLASSES.find(function(c){ return c.name === 'Gojo'; });
+   player = createPlayer(); player.x = 4500; player.y = 2750; player.angle = 0;
+   player.charLevel = lvl; player.moveZUnlocked = lvl >= 2; player.moveXUnlocked = lvl >= 3;
+   player._eCd = 0; player.moveQCooldown = 0; player.moveFCooldown = 0; player._domainCd = 0; player._domain = null;
+   if (player.form) exitForm(player, true);
+   NET.mode = 'single'; gameRunning = true; buildings = []; bullets = []; particles = [];
+   _combo.keys = []; __deferred.length = 0;
+   monsters = [];
+   for (var i = 0; i < 5; i++) monsters.push({ x:4560+i*20, y:2750, r:14, hp:5000, maxHp:5000, name:'Z', emoji:'Z',
+      color:'#7bed9f', speed:1, frozen:0, stunned:0, slow:0, score:1, damage:5 });
+   monsters.push({ x:4500, y:2850, r:32, hp:50000, maxHp:50000, name:'BOSS Z', emoji:'Z', color:'#f00', speed:1,
+      frozen:0, stunned:0, slow:0, score:1, damage:5, isBoss:true });
+})`;
+const flush = `for (var g = 0; g < 6 && __deferred.length; g++) { var b = __deferred.splice(0, __deferred.length); b.forEach(function(f){ try { f(); } catch(e){} }); }`;
+const combo = q(`(function(){ ${GOJO_SETUP}(3);
+   var r = [abilityKeyPress('e', 1000), abilityKeyPress('z', 1100), abilityKeyPress('x', 1250)];
+   ${flush}
+   return JSON.stringify({ r:r, domain: !!player._domain, cd: player._domainCd, ecd: player._eCd, zcd: player.moveQCooldown,
+      xcd: player.moveFCooldown, frozen: monsters.filter(function(m){ return !m.isBoss && m.frozen > 0; }).length,
+      bossSlow: monsters.filter(function(m){ return m.isBoss; })[0].slow > 0,
+      dome: gameEffects.some(function(e){ return e.type === 'dome'; }) }); })()`);
+const C = JSON.parse(combo);
+check(C.r[2] === 'domain' && C.domain && C.cd === 3600, 'E + Z + X inside the window opens the Domain', JSON.stringify(C.r));
+check(C.ecd === 0 && C.zcd === 0 && C.xcd === 0, 'and Red, Blue and Hollow Purple do NOT also fire',
+      'E ' + C.ecd + ' / Z ' + C.zcd + ' / X ' + C.xcd);
+check(C.frozen === 5 && C.bossSlow, 'everything inside is frozen (a boss is slowed instead)', C.frozen + ' frozen');
+check(C.dome, 'the Domain draws its dome through spawnGameEffect, so 3D sees it too');
+check(q(`(function(){ try { draw2DEffects(-1e9, -1e9, 1e9, 1e9); return 'ok'; } catch (e) { return e.message; } })()`) === 'ok',
+      'and the dome draws in 2D without throwing');
+const dot = q(`(function(){ ${GOJO_SETUP}(3); gojoDomain(player);
+   var m0 = monsters[0].hp, b0 = monsters[5].hp;
+   for (var f = 0; f < 360; f++) tickPlayerTimers(player);
+   return JSON.stringify({ small: m0 - monsters[0].hp, boss: b0 - monsters[5].hp, over: player._domain === null }); })()`);
+const D = JSON.parse(dot);
+check(D.small > 0 && D.boss > 0 && D.boss < D.small && D.over,
+      'it hurts everything inside over time, bosses less but for real, then closes', 'monster -' + D.small + ', boss -' + D.boss);
+const two = q(`(function(){ ${GOJO_SETUP}(3);
+   var r = [abilityKeyPress('e', 1000), abilityKeyPress('z', 1100)];
+   ${flush}
+   return JSON.stringify({ r:r, domain: !!player._domain, cd: player._domainCd, ecd: player._eCd, zcd: player.moveQCooldown }); })()`);
+const T = JSON.parse(two);
+check(!T.domain && T.cd === 0 && T.ecd > 0 && T.zcd > 0, 'only two keys: Red and Blue fire normally, no Domain', JSON.stringify(T));
+const late = q(`(function(){ ${GOJO_SETUP}(3);
+   var r = [abilityKeyPress('e', 1000), abilityKeyPress('z', 1100), abilityKeyPress('x', 1450)];
+   ${flush}
+   return JSON.stringify({ r:r, domain: !!player._domain, ecd: player._eCd, zcd: player.moveQCooldown, xcd: player.moveFCooldown }); })()`);
+const Lt = JSON.parse(late);
+check(!Lt.domain && Lt.ecd > 0 && Lt.zcd > 0 && Lt.xcd > 0, 'the third key too late: three normal moves, no Domain', JSON.stringify(Lt.r));
+const locked = q(`(function(){ ${GOJO_SETUP}(2);
+   var r = [abilityKeyPress('e', 1000), abilityKeyPress('z', 1050), abilityKeyPress('x', 1100)];
+   ${flush}
+   return JSON.stringify({ r:r, domain: !!player._domain, ecd: player._eCd }); })()`);
+const Lk = JSON.parse(locked);
+check(!Lk.domain && Lk.r.every(function(x){ return x === 'fired'; }) && Lk.ecd > 0,
+      'with Hollow Purple still locked there is no Domain, and keys are not held back', JSON.stringify(Lk.r));
+const cool = q(`(function(){ ${GOJO_SETUP}(3); gojoDomain(player); player._domain = null;
+   player._eCd = 0; player.moveQCooldown = 0; player.moveFCooldown = 0;
+   var r = [abilityKeyPress('e', 5000), abilityKeyPress('z', 5050), abilityKeyPress('x', 5100)];
+   ${flush}
+   var again = !!player._domain;
+   var hud = '';
+   updateHUD(); hud = document.getElementById('ability-display').textContent || '';
+   for (var f = 0; f < 3600; f++) tickPlayerTimers(player);
+   return JSON.stringify({ r:r, again: again, hud: hud, ready: gojoDomainReady(player) }); })()`);
+const Cl = JSON.parse(cool);
+check(!Cl.again && Cl.r.every(function(x){ return x === 'fired'; }), 'on cooldown the combo does nothing special; the keys fire normally', JSON.stringify(Cl.r));
+check(/Domain \d+s/.test(Cl.hud), 'the Domain cooldown shows on the ability line', Cl.hud);
+check(Cl.ready, 'and it is ready again after 60 seconds');
+q(`gameRunning = false; NET.mode = 'single';`);
+
 console.log('\n' + (ok ? 'ULTIMATES PASS' : 'ULTIMATES FAIL'));
 
 process.exit(ok ? 0 : 1);

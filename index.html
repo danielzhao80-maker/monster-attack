@@ -2161,6 +2161,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         { name:'Ghost', emoji:'👻', accessory:'🔗', armorColor:'#dfe6e9', rarity:'mythical', rarityColor:'#ff2d55', speed:4.0, hp:80, damage:12, fireRate:7, ammo:30, type:'ranged', ghostMode:true, desc:'[E] Turn invisible — enemies ignore you!' },
         { name:'Machine', emoji:'🤖', accessory:'🔧', armorColor:'#95a5a6', rarity:'mythical', rarityColor:'#ff2d55', speed:3.0, hp:100, damage:10, fireRate:8, ammo:30, type:'ranged', canSpawnTurret:true, desc:'Auto-spawns a turret every 60s' },
         { name:'Sikuna', emoji:'👹', accessory:'🔥', armorColor:'#e84118', rarity:'mythical', rarityColor:'#ff2d55', speed:3.5, hp:110, damage:12, fireRate:7, ammo:30, type:'ranged', sikunaPower:true, desc:'Eat Sikuna fingers for +50% speed & damage (10s)!' },
+        { name:'Gojo', emoji:'🕶️', accessory:'♾️', armorColor:'#1b2440', rarity:'mythical', rarityColor:'#ff2d55', speed:3.4, hp:105, damage:12, fireRate:7, ammo:30, type:'ranged', infinity:true, desc:'Infinity guard • [E] Red • [Z] Blue • [X] Hollow Purple' },
         { name:'Calm Kid', emoji:'😌', accessory:'☮️', armorColor:'#74b9ff', rarity:'secret', rarityColor:'#00ffe0', speed:4.0, hp:200, damage:30, fireRate:5, ammo:60, type:'ranged', dodgeChance:0.7, desc:'70% dodge bullets & melee — super strong gun!' },
         { name:'Supporter', emoji:'💖', accessory:'⚕️', armorColor:'#26de81', rarity:'secret', rarityColor:'#00ffe0', speed:3.2, hp:130, damage:6, fireRate:8, ammo:30, type:'ranged', isSupporter:true, desc:'[E] Open Buff Panel — strongest, longest buffs!' },
     ];
@@ -2887,6 +2888,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             }
             const rp = remotePlayers.find(r => r.idx === entryIdx);
             if (rp) { rp.input = d; rp.lastSeq = d.seq;
+                if (d.domain) rp._domainReq = true;   // latched: a one-packet flag must not be missed
                 // The host simulates their shots, so the host is where the element choice must live.
                 if (d.elemPick !== null && d.elemPick !== undefined) rp.elemPick = d.elemPick;
                 else if (d.elemNext) { const c = (rp.elemPick == null) ? ELEM_RAINBOW : rp.elemPick;
@@ -3141,8 +3143,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         NET._seq = (NET._seq || 0) + 1;
         _predHist.push({ seq: NET._seq, x: player ? player.x : 0, y: player ? player.y : 0 });
         if (_predHist.length > 120) _predHist.shift();
-        NET.hostConn.send({ t:'input', seq: NET._seq, mvx: _dir?_dir.x:0, mvy: _dir?_dir.y:0, keys: {...keys}, mx: mouseWorldX(), my: mouseWorldY(), shooting, angle: player ? player.angle : 0, pitch: (aimsVertically() && player) ? (player.pitch || 0) : 0, speedMode: player?player.speedMode:1, ability: NET._abilityFlag, reload: NET._reloadFlag, moveQ: NET._moveQFlag, moveF: NET._moveFFlag, useItem: NET._useItem || null, elemPick: (NET._elemPick === undefined ? null : NET._elemPick), elemNext: NET._elemNext || false });
-        NET._abilityFlag=false; NET._reloadFlag=false; NET._moveQFlag=false; NET._moveFFlag=false; NET._useItem=null; NET._elemPick=undefined; NET._elemNext=false;
+        NET.hostConn.send({ t:'input', seq: NET._seq, mvx: _dir?_dir.x:0, mvy: _dir?_dir.y:0, keys: {...keys}, mx: mouseWorldX(), my: mouseWorldY(), shooting, angle: player ? player.angle : 0, pitch: (aimsVertically() && player) ? (player.pitch || 0) : 0, speedMode: player?player.speedMode:1, ability: NET._abilityFlag, reload: NET._reloadFlag, moveQ: NET._moveQFlag, moveF: NET._moveFFlag, domain: NET._domainFlag || false, useItem: NET._useItem || null, elemPick: (NET._elemPick === undefined ? null : NET._elemPick), elemNext: NET._elemNext || false });
+        NET._abilityFlag=false; NET._reloadFlag=false; NET._moveQFlag=false; NET._moveFFlag=false; NET._domainFlag=false; NET._useItem=null; NET._elemPick=undefined; NET._elemNext=false;
     }
 
     // Declared HERE, above every use. It used to sit next to mpBroadcastState, 400 lines further
@@ -3319,6 +3321,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Run the form's countdown for DISPLAY only. Expiry belongs to the host — a guest that ended
         // its own form early would fight the host's stats until the next packet.
         if (player && player.form && player.form.t > 0) player.form.t--;
+        if (player && player._domainCd > 0) player._domainCd--;   // display only, like the form timer
         // Bleed any outstanding correction in over several frames rather than yanking the player on
         // packet arrival. Applying it in one lump 20 times a second is visible as a stutter even when
         // the total distance is right; spread over the frames between packets it is invisible, and it
@@ -4722,6 +4725,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             if (c.necromancer) return '💀 Necromancer';
             if (c.canSpawnTurret) return '🤖 Turret';
             if (c.sikunaPower) return '👹 Sikuna';
+            if (c.infinity) return '♾️ Infinity';
             if (c.isSupporter) return '💖 Buff Panel';
             return '— passive —';
         };
@@ -5282,6 +5286,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             'Ghost':          ['Spirit Blaster','🔫','👻','#dfe6e9','blaster','orb',     {dodge:0.3}],
             'Machine':        ['Auto Turret','🤖','🔩','#95a5a6','turret','gear',        {ammo:60, firerate:0.85}],
             'Sikuna':         ['Demon Horn','📯','🔥','#39c5bb','horn','flame',          {dmgmult:1.3, crit:6}],
+            'Gojo':           ['Limitless Focus','♾️','🔵','#3fa9ff','blaster','infinity',  {dmgmult:1.2, defense:6}, 'infinity'],
             'Calm Kid':       ['Zen Bow','🏹','🏹','#74b9ff','bow','ring',               {maxhp:100, defense:4}, 'arrow'],
             'Supporter':      ['Heal Ray','💉','💖','#fd79a8','blaster','heart',         {maxhp:120, lifesteal:1}],
             // ----- the newer classes: each gets its own weapon, not the generic fallback -----
@@ -5307,7 +5312,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             'Supporter':'heal', 'Scaredy Cat':'stun', 'The Nerd':'shock',
             'Bomber':'explode', 'Storm Caller':'shock', 'Plague Doctor':'poison', 'Chef':'burn',
             'Time Keeper':'slow', 'Gravity Mage':'pull', 'Bard':'stun', 'Beast Tamer':'slow',
-            'Archer':'poison',
+            'Archer':'poison', 'Gojo':'slow',
             // Elemental Mage has NO entry on purpose: its bullets already carry their own element.
             // A beffect here would stamp one effect over all six and silently flatten the class.
         };
@@ -8054,6 +8059,7 @@ const col = b.color || BLDG_COLORS[0];
         'Ghost':           { name:'Vanish',        emoji:'👻', color:'#dfe6e9', desc:'Step out of the world' },
         'Machine':         { name:'Deploy Turret', emoji:'🤖', color:'#95a5a6', desc:'It shoots so you do not have to' },
         'Sikuna':          { name:'Finger Sacrifice', emoji:'👹', color:'#e84118', desc:'Spend a finger for raw power' },
+        'Gojo':            { name:'Red Reversal',  emoji:'🔴', color:'#ff4757', desc:'A red blast that shoves them all away' },
         'Calm Kid':        { name:'Zen Burst',     emoji:'🧘', color:'#74b9ff', desc:'Full health, briefly untouchable' },
         'Supporter':       { name:'Buff Panel',    emoji:'💖', color:'#fd79a8', desc:'Hand a teammate a boost' },
         'Archer':          { name:'Volley',        emoji:'🏹', color:'#6ab04c', desc:'Five arrows that pass through' },
@@ -8183,6 +8189,9 @@ const col = b.color || BLDG_COLORS[0];
         alpha:    { name:'ALPHA',       emoji:'🐺', color:'#a0522d', dur:600,
                     hpBonus:170, dmgMult:1.6, speedMult:1.3, fireRate:6, summon:true, lifesteal:2, scale:1.4,
                     blurb:'The pack answers, and so do you.' },
+        sixeyes:  { name:'SIX EYES',    emoji:'👁️', color:'#3fa9ff', dur:540,
+                    hpBonus:130, dmgMult:1.8, speedMult:1.15, fireRate:5, crit:8, stillness:true, scale:1.3,
+                    blurb:'You see everything. Nothing near you moves fast.' },
         beacon:   { name:'BEACON',      emoji:'💖', color:'#fd79a8', dur:660,
                     hpBonus:180, dmgMult:1.2, speedMult:1.15, fireRate:7, mend:5, aura:10, scale:1.3,
                     blurb:'Everyone near you gets better at this.' },
@@ -8268,6 +8277,10 @@ const col = b.color || BLDG_COLORS[0];
         if (F && F.chill && p.form.t % 30 === 0) {
             for (const m of monsters) if (Math.hypot(m.x - p.x, m.y - p.y) < 320) m.slow = Math.max(m.slow || 0, 90);
         }
+        if (F && F.stillness && p.form.t % 40 === 0) {
+            // Six Eyes: everything close to Gojo is caught in Infinity and crawls.
+            for (const m of monsters) if (Math.hypot(m.x - p.x, m.y - p.y) < 220) m.slow = Math.max(m.slow || 0, 60);
+        }
         if (F && F.plagueAura && p.form.t % 45 === 0) {
             for (const m of monsters) if (Math.hypot(m.x - p.x, m.y - p.y) < 260) m._plague = Math.max(m._plague || 0, 300);
         }
@@ -8304,6 +8317,8 @@ const col = b.color || BLDG_COLORS[0];
             if (p._rewindT >= 300) { p._rewindT = 0; p._rewindSnap = { x: p.x, y: p.y, hp: p.hp }; }
         }
         if (p._nerdCrit > 0) { p._nerdCrit--; if (p._nerdCrit === 0) p.gsCrit = Math.max(0, (p.gsCrit || 0) - 4); }
+        if (p._domainCd > 0) p._domainCd--;
+        if (p._domain) tickGojoDomain(p);
         updateForm(p);
     }
 
@@ -8589,6 +8604,7 @@ const col = b.color || BLDG_COLORS[0];
             'CORRUPTED':      { shape:'gear',      mount:'float', mark:'grid',   n:9,  r:23, spin:0.28,  bob:2 },
             'LEGION':         { shape:'ghost',     mount:'float', mark:'runes',  n:9,  r:24, spin:0.06,  bob:5 },
             'DEMON FORM':     { shape:'flame',     mount:'slam',  mark:'spikes', n:8,  r:26, spin:0,     bob:0 },
+            'HOLLOW PURPLE':  { shape:'orb',       mount:'float', mark:'ring',   n:3,  r:27, spin:0.35,  bob:3 },
             'ZEN':            { shape:'lantern',   mount:'float', mark:'petals', n:5,  r:21, spin:0.02,  bob:4 },
             'BEACON':         { shape:'cross',     mount:'float', mark:'petals', n:7,  r:22, spin:0.05,  bob:5 },
         };
@@ -8791,6 +8807,20 @@ const col = b.color || BLDG_COLORS[0];
                 ctx.strokeStyle = e.color; ctx.lineWidth = 2; ctx.globalAlpha = (1 - p) * 0.4;
                 ctx.beginPath(); ctx.arc(e.x, e.y, rad * 0.7, 0, Math.PI*2); ctx.stroke();
                 ctx.globalAlpha = 1 - p;
+            } else if (e.type === 'dome') {
+                // Gojo's Domain: a sphere of space that snaps open, hangs there, then fades.
+                const grow = Math.min(1, p / 0.12), fade = p > 0.8 ? (p - 0.8) / 0.2 : 0;
+                const rad = e.maxR * (0.2 + 0.8 * grow);
+                ctx.globalAlpha = 0.35 * (1 - fade);
+                const dg = ctx.createRadialGradient(e.x, e.y, rad * 0.1, e.x, e.y, rad);
+                dg.addColorStop(0, '#0b0620'); dg.addColorStop(0.75, _alpha(e.color, '88')); dg.addColorStop(1, _alpha('#3fa9ff', 'cc'));
+                ctx.fillStyle = dg;
+                ctx.beginPath(); ctx.arc(e.x, e.y, rad, 0, Math.PI*2); ctx.fill();
+                ctx.globalAlpha = 0.9 * (1 - fade);
+                ctx.strokeStyle = '#3fa9ff'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.arc(e.x, e.y, rad, 0, Math.PI*2); ctx.stroke();
+                ctx.strokeStyle = '#a29bfe'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(e.x, e.y, rad * 0.93, e.t * 0.05, e.t * 0.05 + Math.PI * 1.2); ctx.stroke();
             } else if (e.type === 'slash') {
                 const a = e.angle, sweep = 1.2, rad = 70 + p * 20;
                 ctx.strokeStyle = e.color; ctx.lineWidth = Math.max(3, 16 * (1 - p)); ctx.lineCap = 'round';
@@ -8863,6 +8893,12 @@ const col = b.color || BLDG_COLORS[0];
                 } else if (e.type === 'pillar') {
                     mesh = new THREE.Mesh(TG.Cylinder(8, 14, 100, 16, 1, true), new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true, opacity: 1, side: THREE.DoubleSide }));
                     mesh.position.set(e.x, 50, e.y);
+                } else if (e.type === 'dome') {
+                    // A real half-sphere over the ground, seen from inside and out.
+                    mesh = new THREE.Mesh(TG.Sphere(1, 28, 14, 0, Math.PI*2, 0, Math.PI*0.5),
+                        new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false }));
+                    mesh.position.set(e.x, 0, e.y);
+                    mesh.scale.setScalar(e.maxR * 0.2);
                 } else if (e.type === 'banhammer') {
                     mesh = build3DBanHammer();
                     mesh.scale.setScalar(1.7 * 20);
@@ -8953,6 +8989,13 @@ const col = b.color || BLDG_COLORS[0];
                 e._mesh.traverse(o => { if (o.material && 'opacity' in o.material) { o.material.transparent = true; o.material.opacity = 1 - fade; } });
                 continue;
             }
+            if (e.type === 'dome') {
+                const grow = Math.min(1, p / 0.12), fade = p > 0.8 ? (p - 0.8) / 0.2 : 0;
+                e._mesh.scale.setScalar(e.maxR * (0.2 + 0.8 * grow));
+                e._mesh.rotation.y = e.t * 0.01;
+                e._mesh.material.opacity = 0.3 * (1 - fade);
+                continue;
+            }
             if (e.type === 'banhammer') {
                 // Fall from the sky (ease-in), land ~40% into life, hold, fade only at the very end
                 const fall = Math.min(1, p / 0.4), ease = fall*fall;
@@ -9014,7 +9057,7 @@ const col = b.color || BLDG_COLORS[0];
         if (cls.canBuild) return 'ring';
         if (cls.flamingPower || cls.canTeleport) return 'lightning';
         if (cls.hasPlayerShield || cls.fireImmune) return 'pillar';
-        if (cls.mindSwap || cls.ghostMode || cls.necromancer || cls.canSpawnTurret || cls.sikunaPower) return 'burst';
+        if (cls.mindSwap || cls.ghostMode || cls.necromancer || cls.canSpawnTurret || cls.sikunaPower || cls.infinity) return 'burst';
         return 'ring';
     }
 
@@ -9033,6 +9076,7 @@ const col = b.color || BLDG_COLORS[0];
         if (cls.necromancer) return '💀';
         if (cls.canSpawnTurret) return '🤖';
         if (cls.sikunaPower) return '👹';
+        if (cls.infinity)    return '🔴';
         if (cls.isSupporter) return '💖';
         if (cls.canCopy)     return '🎭';
         if (cls.hasPlayerShield) return '🛡️';
@@ -9055,6 +9099,197 @@ const col = b.color || BLDG_COLORS[0];
         for (let i=0;i<16;i++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:18,maxLife:18,color,r:3});
         p.invincible = Math.max(p.invincible, 25);
         return true;
+    }
+    // ======================== GOJO ========================
+    // A fan tribute to Gojo Satoru. Red pushes, Blue pulls, and Hollow Purple is the two thrown
+    // together — a purple beam that wipes out the line it travels. Pressing E + Z + X at once opens
+    // his Domain (see abilityKeyPress below). Every visual goes through spawnGameEffect so it shows in
+    // the 3D camera modes too; particles alone would be invisible there.
+
+    // Z — Blue Lapse: a point where you aim that drags everything near it together, then crushes it.
+    function _gojoBlue(p, mx, my) {
+        let ang = Math.atan2(my - p.y, mx - p.x), dist = Math.min(320, Math.hypot(mx - p.x, my - p.y) || 200);
+        const cx = p.x + Math.cos(ang) * dist, cy = p.y + Math.sin(ang) * dist;
+        let n = 0;
+        for (const m of monsters) {
+            const d = Math.hypot(m.x - cx, m.y - cy);
+            if (d < 240 && d > 1) {
+                const keep = m.isBoss ? 0.7 : 0.25;          // bosses only budge a little
+                const nx = cx + (m.x - cx) * keep, ny = cy + (m.y - cy) * keep;
+                if (!ptInBld(nx, ny, m.r || 12)) { m.x = nx; m.y = ny; }
+                m.slow = Math.max(m.slow || 0, 90);
+            }
+        }
+        for (let i = monsters.length - 1; i >= 0; i--) {
+            const m = monsters[i];
+            if (m && Math.hypot(m.x - cx, m.y - cy) < 130) { hitMonster(m, i, Math.floor(p.damage * 1.6)); n++; }
+        }
+        spawnGameEffect('ring',  cx, cy, '#3fa9ff', { maxR: 240, maxT: 30 });
+        spawnGameEffect('burst', cx, cy, '#74b9ff', { maxR: 120, maxT: 34 });
+        _mvRing(cx, cy, '#3fa9ff', 16, 60);
+        if (p === player) showStatus(n ? `🔵 BLUE! x${n}` : '🔵 BLUE!', '#3fa9ff');
+        SFX.freeze();
+    }
+
+    // X — Hollow Purple: a huge purple orb fired forward. Everything in its path is wiped out (bosses
+    // take a heavy hit instead), and Gojo opens his Six Eyes form.
+    function _gojoHollowPurple(p, mx, my) {
+        if (p === player) { try { showGojoCutscene('HOLLOW PURPLE', '🔴 + 🔵 = 🟣', '#a55eea'); } catch (e) {} }
+        enterForm(p, 'sixeyes');
+        const ang = Math.atan2(my - p.y, mx - p.x), ux = Math.cos(ang), uy = Math.sin(ang);
+        const LEN = 720, HALF = 55;
+        for (let i = monsters.length - 1; i >= 0; i--) {
+            const m = monsters[i]; if (!m) continue;
+            const dx = m.x - p.x, dy = m.y - p.y;
+            const along = dx * ux + dy * uy, across = Math.abs(dx * uy - dy * ux);
+            if (along > -20 && along < LEN && across < HALF + (m.r || 12)) {
+                hitMonster(m, i, Math.floor(p.damage * (m.isBoss ? 3 : 6)));
+            }
+        }
+        for (let k = 1; k <= 9; k++) {
+            const d = k * 80;
+            spawnGameEffect('burst', p.x + ux * d, p.y + uy * d, k % 2 ? '#a55eea' : '#6c5ce7', { maxR: 70, maxT: 24 + k * 3 });
+        }
+        spawnGameEffect('lightning', p.x, p.y, '#a29bfe', { maxR: 120, maxT: 26 });
+        for (let k = 0; k < 24; k++) {
+            const d = Math.random() * LEN;
+            particles.push({ x: p.x + ux * d, y: p.y + uy * d, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 24, maxLife: 24, color: '#a55eea', r: 5 });
+        }
+        addShake(16);
+        SFX.shout67();
+    }
+
+    // A short Gojo set-piece over the game view: a red orb and a blue orb collide into purple.
+    // Visual only — callers wrap it in try/catch and the effect runs regardless.
+    function showGojoCutscene(title, sub, color) {
+        if (!document.getElementById('gojo-cut-style')) {
+            const st = document.createElement('style');
+            st.id = 'gojo-cut-style';
+            st.textContent = `
+                @keyframes gojoRed  { 0%{transform:translateX(-260px) scale(0.6);opacity:0} 20%{opacity:1} 70%{transform:translateX(-18px) scale(1)} 100%{transform:translateX(0) scale(0.2);opacity:0} }
+                @keyframes gojoBlue { 0%{transform:translateX(260px) scale(0.6);opacity:0} 20%{opacity:1} 70%{transform:translateX(18px) scale(1)} 100%{transform:translateX(0) scale(0.2);opacity:0} }
+                @keyframes gojoPurple { 0%,55%{transform:scale(0);opacity:0} 75%{transform:scale(1.4);opacity:1} 100%{transform:scale(3.2);opacity:0} }
+                @keyframes gojoTitle { 0%,45%{opacity:0;transform:scale(0.6)} 65%{opacity:1;transform:scale(1.1)} 90%{opacity:1;transform:scale(1)} 100%{opacity:0} }`;
+            document.head.appendChild(st);
+        }
+        const host = document.getElementById('game-wrap') || document.body;
+        const el = document.createElement('div');
+        el.style.cssText = 'position:absolute;inset:0;z-index:21;pointer-events:none;display:flex;flex-direction:column;justify-content:center;align-items:center;overflow:hidden;border-radius:16px;background:radial-gradient(circle,rgba(40,10,70,0.55),rgba(0,0,0,0.25) 70%);';
+        const orb = (c, anim) => `<div style="position:absolute;width:90px;height:90px;border-radius:50%;background:radial-gradient(circle,#fff,${c} 45%,transparent 72%);box-shadow:0 0 50px ${c};animation:${anim} 1.1s ease-in forwards;"></div>`;
+        el.innerHTML = orb('#ff4757', 'gojoRed') + orb('#3fa9ff', 'gojoBlue') +
+            `<div style="position:absolute;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,#fff,${color} 40%,transparent 70%);box-shadow:0 0 90px ${color};animation:gojoPurple 1.3s ease-out forwards;"></div>` +
+            `<div style="position:relative;font-family:'Fredoka One',cursive;font-size:2.3em;color:#fff;letter-spacing:5px;text-shadow:0 0 30px ${color},2px 2px 0 rgba(0,0,0,0.6);animation:gojoTitle 1.5s ease forwards;">${title}</div>` +
+            `<div style="position:relative;font-family:'Fredoka One',cursive;font-size:1em;color:${color};letter-spacing:6px;animation:gojoTitle 1.5s ease forwards;">${sub}</div>`;
+        host.appendChild(el);
+        setTimeout(() => el.remove(), 1600);
+    }
+
+    // ---- Domain Expansion: Unlimited Void (E + Z + X together) ----
+    const GOJO_DOMAIN_CD = 3600;   // 60 s
+    const GOJO_DOMAIN_R  = 420;    // how far the domain reaches
+    const GOJO_DOMAIN_T  = 360;    // 6 s inside it
+    function gojoDomainReady(p) {
+        if (!p || !p.cls || !p.cls.infinity || p.hp <= 0) return false;
+        if (p.frozen > 0 || p.stunned > 0) return false;
+        const lvl = p.charLevel || 1;
+        if (lvl < 2 && !p.moveZUnlocked) return false;   // needs Blue...
+        if (lvl < 3 && !p.moveXUnlocked) return false;   // ...and Hollow Purple
+        return !((p._domainCd || 0) > 0);
+    }
+    function gojoDomain(p) {
+        if (!gojoDomainReady(p)) return false;
+        if (typeof gameRunning !== 'undefined' && !gameRunning) return false;
+        p._domainCd = GOJO_DOMAIN_CD;
+        p._domain = { x: p.x, y: p.y, t: GOJO_DOMAIN_T };
+        p.invincible = Math.max(p.invincible || 0, 90);
+        const local = p === player;
+        _asLocalDamage(local, () => {
+            for (let i = monsters.length - 1; i >= 0; i--) {
+                const m = monsters[i]; if (!m) continue;
+                if (Math.hypot(m.x - p.x, m.y - p.y) < GOJO_DOMAIN_R) {
+                    // Everything inside stops. A boss is too big to stop completely — it is slowed.
+                    if (m.isBoss) m.slow = Math.max(m.slow || 0, 240);
+                    else m.frozen = Math.max(m.frozen || 0, 240);
+                    hitMonster(m, i, Math.floor(p.damage * 4 * (m.isBoss ? 0.35 : 1)), false, local);
+                }
+            }
+        });
+        spawnGameEffect('dome',  p.x, p.y, '#6c5ce7', { maxR: GOJO_DOMAIN_R, maxT: GOJO_DOMAIN_T });
+        spawnGameEffect('ring',  p.x, p.y, '#3fa9ff', { maxR: GOJO_DOMAIN_R, maxT: 40 });
+        spawnGameEffect('burst', p.x, p.y, '#a55eea', { maxR: GOJO_DOMAIN_R * 0.6, maxT: 40 });
+        addShake(18);
+        if (local) {
+            showStatus('🤞 DOMAIN EXPANSION...', '#a29bfe');
+            setTimeout(() => { if (typeof gameRunning === 'undefined' || gameRunning) showStatus('♾️ UNLIMITED VOID!', '#3fa9ff'); }, 900);
+            try { showGojoCutscene('DOMAIN EXPANSION', 'UNLIMITED VOID', '#6c5ce7'); } catch (e) {}
+        }
+        try { SFX.rollResult('secret'); } catch (e) {}
+        return true;
+    }
+    // Ticked from tickPlayerTimers, so a guest's domain runs on the host exactly like the host's own.
+    function tickGojoDomain(p) {
+        const d = p._domain; if (!d) return;
+        d.t--;
+        if (d.t % 30 === 0) {
+            const local = p === player;
+            _asLocalDamage(local, () => {
+                for (let i = monsters.length - 1; i >= 0; i--) {
+                    const m = monsters[i]; if (!m) continue;
+                    if (Math.hypot(m.x - d.x, m.y - d.y) < GOJO_DOMAIN_R) {
+                        if (m.isBoss) m.slow = Math.max(m.slow || 0, 60);
+                        else m.frozen = Math.max(m.frozen || 0, 45);
+                        hitMonster(m, i, Math.max(1, Math.floor(p.damage * 1.6 * (m.isBoss ? 0.35 : 1))), false, local);
+                    }
+                }
+            });
+        }
+        if (d.t <= 0) p._domain = null;
+    }
+
+    // ---- Ability keys, with Gojo's three-key combo ----
+    // Normally a key fires at once. While Gojo's Domain is ready, E/Z/X are held for a moment: all
+    // three inside the window open the Domain INSTEAD of the separate moves; otherwise the held keys
+    // fire as normal when the window runs out.
+    const COMBO_WINDOW_MS = 300;
+    const _combo = { keys: [], t0: 0, gen: 0 };
+    function _fireAbilitySlot(slot) {
+        if (typeof NET !== 'undefined' && NET.mode === 'client') {
+            if (slot === 'e') NET._abilityFlag = true; else if (slot === 'z') NET._moveQFlag = true; else NET._moveFFlag = true;
+        } else {
+            if (slot === 'e') useAbility(); else if (slot === 'z') useMoveQ(); else useMoveF();
+        }
+    }
+    function _comboFlush() {
+        const ks = _combo.keys; _combo.keys = []; _combo.gen++;
+        for (const k of ks) _fireAbilitySlot(k);
+    }
+    function _triggerDomainLocal() {
+        if (typeof NET !== 'undefined' && NET.mode === 'client') {
+            // The host runs it (and owns the cooldown); we start our copy of the cooldown for the HUD.
+            NET._domainFlag = true;
+            player._domainCd = GOJO_DOMAIN_CD;
+            showStatus('🤞 DOMAIN EXPANSION — UNLIMITED VOID!', '#a29bfe');
+            try { showGojoCutscene('DOMAIN EXPANSION', 'UNLIMITED VOID', '#6c5ce7'); } catch (e) {}
+            return true;
+        }
+        return gojoDomain(player);
+    }
+    function abilityKeyPress(slot, now) {
+        if (now === undefined) now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        if (!gojoDomainReady(player)) { if (_combo.keys.length) _comboFlush(); _fireAbilitySlot(slot); return 'fired'; }
+        if (_combo.keys.length && now - _combo.t0 > COMBO_WINDOW_MS) _comboFlush();
+        if (!_combo.keys.length) {
+            _combo.t0 = now;
+            const g = ++_combo.gen;
+            setTimeout(() => { if (_combo.gen === g) _comboFlush(); }, COMBO_WINDOW_MS);
+        }
+        if (!_combo.keys.includes(slot)) _combo.keys.push(slot);
+        if (_combo.keys.length === 3) {
+            _combo.keys = []; _combo.gen++;          // the separate moves never fire
+            _triggerDomainLocal();
+            return 'domain';
+        }
+        return 'buffered';
     }
     // Mimic — apply the killed monster's signature ability to the player.
     // `boosted` doubles ranges/durations/damage for the X (Final Form) version.
@@ -9239,6 +9474,9 @@ const col = b.color || BLDG_COLORS[0];
         'Sikuna': {
             z:{ cd:180, name:'Demon Slash', color:'#e84118', run:(p,mx,my)=>{ const ang=Math.atan2(my-p.y,mx-p.x); for(let i=0;i<3;i++){const a=ang+(i-1)*0.45; _mvSpray(p,1,a,0,Math.floor(p.damage*2),'#e84118',14);} SFX.shoot(); } },
             x:{ cd:900, name:'DEMON FORM', color:'#e84118', emoji:'👹', cs:true, form:'demon', run:(p,mx,my)=>{ enterForm(p,'demon'); _mvDmgRadius(p,260,Math.floor(p.damage*2)); addShake(15); SFX.shoot(); } } },
+        'Gojo': {
+            z:{ cd:240, name:'Blue Lapse', color:'#3fa9ff', run:(p,mx,my)=>{ _gojoBlue(p,mx,my); } },
+            x:{ cd:900, name:'HOLLOW PURPLE', color:'#a55eea', emoji:'🟣', cs:true, form:'sixeyes', run:(p,mx,my)=>{ _gojoHollowPurple(p,mx,my); } } },
         // ====== SECRET ======
         'Builder': {
             z:{ cd:180, name:'Wall Ring', color:'#00ffe0', run:(p,mx,my)=>{ let n=0; for(let i=0;i<8;i++){const a=(Math.PI*2/8)*i;const wx=p.x+Math.cos(a)*55,wy=p.y+Math.sin(a)*55; if(!ptInBld(wx,wy,15)){walls.push({x:wx,y:wy,hp:3});n++;}} if(!n){ p.invincible=Math.max(p.invincible,90); if(p===player) showStatus('\ud83d\udee1\ufe0f Nowhere to build - shielding instead','#00ffe0'); } SFX.build(); } },
@@ -9346,7 +9584,7 @@ const col = b.color || BLDG_COLORS[0];
         if (c.canTeleport) return 'Teleport'; if (c.canShout) return '67!'; if (c.canBuild) return 'Build';
         if (c.canScream) return 'Scream'; if (c.canSwallow) return 'Swallow'; if (c.speedModes) return 'Speed Mode';
         if (c.canRevive) return 'Revive'; if (c.mindSwap) return 'Possess'; if (c.ghostMode) return 'Vanish';
-        if (c.necromancer) return 'Raise Dead'; if (c.canSpawnTurret) return 'Turret'; if (c.sikunaPower) return 'Finger';
+        if (c.necromancer) return 'Raise Dead'; if (c.canSpawnTurret) return 'Turret'; if (c.sikunaPower) return 'Finger'; if (c.infinity) return 'Red';
         if (c.isSupporter) return 'Buff'; if (c.canCopy) return 'Copy'; if (c.allInOne) return 'All In One';
         return c.name || 'Ability';
     }
@@ -9879,6 +10117,30 @@ const col = b.color || BLDG_COLORS[0];
             if (p === player) showStatus('👹 FINGER SACRIFICE!', '#e84118');
             SFX.shout67();
         }
+        // Gojo — Red Reversal: a red blast that shoves everything near him away, hard.
+        if (p.cls.infinity && (p._eCd||0) <= 0) {
+            p._eCd = 300;
+            let n = 0;
+            for (let i = monsters.length - 1; i >= 0; i--) {
+                const m = monsters[i];
+                const d = Math.hypot(m.x - p.x, m.y - p.y);
+                if (d < 220) {
+                    const a = Math.atan2(m.y - p.y, m.x - p.x);
+                    const push = m.isBoss ? 40 : 130;
+                    const nx = m.x + Math.cos(a) * push, ny = m.y + Math.sin(a) * push;
+                    if (!ptInBld(nx, ny, m.r || 12)) { m.x = nx; m.y = ny; }
+                    m.stunned = Math.max(m.stunned || 0, 50);
+                    hitMonster(m, i, Math.floor(p.damage * 1.8));
+                    n++;
+                }
+            }
+            spawnGameEffect('burst', p.x, p.y, '#ff4757', { maxR: 220, maxT: 30 });
+            spawnGameEffect('ring',  p.x, p.y, '#ff6b81', { maxR: 220, maxT: 26 });
+            _mvRing(p.x, p.y, '#ff4757', 16, 50);
+            addShake(6);
+            if (p === player) showStatus(n ? `🔴 RED! x${n}` : '🔴 RED!', '#ff4757');
+            SFX.shoot();
+        }
         // Flash — Blink: a hard dash forward, no aiming needed, briefly untouchable.
         if (p.cls.speedModes && (p._eCd||0) <= 0) {
             p._eCd = 240;
@@ -10162,6 +10424,8 @@ const col = b.color || BLDG_COLORS[0];
         } else if (!inp.moveF) {
             rp._moveFHandled = false;
         }
+        // Gojo's Domain (E + Z + X together on the guest's side) — latched when the packet arrived.
+        if (rp._domainReq) { rp._domainReq = false; gojoDomain(rp); }
         // Class passives for remote players
         // Flame: fire trail
         if (rp.cls.flamingPower) {
@@ -10815,8 +11079,16 @@ const col = b.color || BLDG_COLORS[0];
                     if (p.hitsTaken>=p.cls.reflectEvery) { p.hitsTaken=0; if(p===player){SFX.reflect();showStatus('REFLECT!','#e67e22');} hitMonster(m,i,15);p.invincible=20;continue; }
                 }
                 if (p.cls.dodgeChance && Math.random()<p.cls.dodgeChance) { if(p===player){SFX.dodge();showStatus('DODGED!','#2ecc71');} p.invincible=10;continue; }
+                // Gojo — Infinity: whatever touches him is held off a little, and only part of the hit
+                // gets through (15% of the time none of it does).
+                if (p.cls.infinity) {
+                    const ia = Math.atan2(m.y - p.y, m.x - p.x);
+                    const hx = m.x + Math.cos(ia) * 8, hy = m.y + Math.sin(ia) * 8;
+                    if (!ptInBld(hx, hy, m.r)) { m.x = hx; m.y = hy; }
+                    if (Math.random() < 0.15) { if(p===player) showStatus('♾️ INFINITY!','#3fa9ff'); p.invincible=12; continue; }
+                }
                 if (m.canWeb && !(p.disableImmune>0)) { p.frozen = 60; if(p===player){SFX.freeze();showStatus('WEBBED!','#2c3e50');} }
-                playerHit(m.damage, p, m.name);
+                playerHit(p.cls.infinity ? Math.max(1, Math.ceil(m.damage * 0.6)) : m.damage, p, m.name);
             }
         }
 
@@ -11739,6 +12011,8 @@ const col = b.color || BLDG_COLORS[0];
         'Builder': drawArmorConstruction,
         // Demonic spikes
         'Sikuna': drawArmorDemonic,
+        // Dark navy uniform
+        'Gojo': drawArmorStealth,
         // Halo
         'Calm Kid': drawArmorHalo,
         // Theatrical split
@@ -12177,6 +12451,23 @@ const col = b.color || BLDG_COLORS[0];
             ctx.beginPath(); ctx.arc(3*s, -1*s, 0.4*s, 0, Math.PI*2); ctx.fill();
             break;
         }
+        case 'Gojo': { // White spiky hair sticking up, black blindfold band across the eyes
+            ctx.fillStyle='#f5f6fa'; ctx.strokeStyle='#c8d0e0'; ctx.lineWidth=0.5;
+            ctx.beginPath();
+            ctx.moveTo(-6.5*s, 0);
+            const tips = [[-7*s,-6*s],[-4*s,-3*s],[-3*s,-10*s],[-1*s,-4*s],[1*s,-11*s],[2.5*s,-4*s],[4.5*s,-9*s],[5*s,-3*s],[7.5*s,-5.5*s]];
+            for (const [tx, ty] of tips) ctx.lineTo(tx, ty);
+            ctx.lineTo(6.5*s, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle='#ffffff';
+            ctx.beginPath(); ctx.moveTo(-1.5*s, -3*s); ctx.lineTo(0.8*s, -9*s); ctx.lineTo(0.5*s, -3*s); ctx.closePath(); ctx.fill();
+            // blindfold
+            ctx.fillStyle='#111216'; ctx.fillRect(-7*s, -0.5*s, 14*s, 2.6*s);
+            ctx.fillStyle='rgba(63,169,255,0.55)'; ctx.fillRect(-7*s, -0.5*s, 14*s, 0.5*s);
+            // the knot's tails flutter out the side
+            ctx.fillStyle='#111216';
+            ctx.beginPath(); ctx.moveTo(6.5*s, 0); ctx.lineTo(9.5*s, -1*s); ctx.lineTo(9*s, 1.5*s); ctx.closePath(); ctx.fill();
+            break;
+        }
         case 'Sikuna': { // Demon horns: black curved with gold rings, glowing tips
             ctx.fillStyle='#1a1a1a';
             ctx.beginPath();
@@ -12481,6 +12772,21 @@ const col = b.color || BLDG_COLORS[0];
             for (let i = -2; i <= 2; i++) {
                 ctx.beginPath(); ctx.arc(cx + i*4, cy + R*0.95, 4, 0, Math.PI*2); ctx.fill();
             }
+            break;
+        }
+        case 'Gojo': { // Infinity: a faint blue ring held off his body, with a purple glint orbiting it
+            const ar = R * 1.45 + Math.sin(frame * 0.06) * 1.5;
+            const ag = ctx.createRadialGradient(cx, cy, R * 0.9, cx, cy, ar + 4);
+            ag.addColorStop(0, 'rgba(63,169,255,0)'); ag.addColorStop(0.8, 'rgba(63,169,255,0.18)'); ag.addColorStop(1, 'rgba(63,169,255,0)');
+            ctx.fillStyle = ag;
+            ctx.beginPath(); ctx.arc(cx, cy, ar + 4, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = 'rgba(63,169,255,0.55)'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(cx, cy, ar, 0, Math.PI*2); ctx.stroke();
+            const ga = frame * 0.05;
+            ctx.fillStyle = '#a55eea';
+            ctx.beginPath(); ctx.arc(cx + Math.cos(ga) * ar, cy + Math.sin(ga) * ar, 2.2, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#ff4757';
+            ctx.beginPath(); ctx.arc(cx - Math.cos(ga) * ar, cy - Math.sin(ga) * ar, 1.6, 0, Math.PI*2); ctx.fill();
             break;
         }
         case 'Dragon':
@@ -12970,6 +13276,12 @@ const col = b.color || BLDG_COLORS[0];
             ctx.beginPath(); ctx.arc(cx + R*0.6, cy + R*0.5, 1.5, 0, Math.PI*2); ctx.fill();
             break;
         }
+        case 'Gojo': { // a small blue infinity sign on the chest
+            ctx.strokeStyle = '#3fa9ff'; ctx.lineWidth = 1.4;
+            ctx.beginPath(); ctx.arc(cx - 2.6, cy, 2.4, 0, Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(cx + 2.6, cy, 2.4, 0, Math.PI*2); ctx.stroke();
+            break;
+        }
         case 'Sikuna': { // X tribal mark
             ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2; ctx.lineCap = 'round';
             ctx.beginPath();
@@ -13346,6 +13658,7 @@ const col = b.color || BLDG_COLORS[0];
         else if (p.cls.name==='Necromancer') bodyColor = '#2d3436';
         else if (p.cls.name==='Machine') bodyColor = '#95a5a6';
         else if (p.cls.name==='Sikuna') bodyColor = '#e84118';
+        else if (p.cls.name==='Gojo') bodyColor = '#24305e';
         else if (p.cls.name==='Calm Kid') bodyColor = '#74b9ff';
         else if (p.cls.name==='Supporter') bodyColor = '#26de81';
         else if (p.cls.name==='Archer') bodyColor = '#2ecc71';
@@ -15304,6 +15617,14 @@ const col = b.color || BLDG_COLORS[0];
             0, r*3.92, r*0.02, 0, 0, 0, 'visor');
         for (const side of [-1, 1])                                                         // comms ear cups
             add(TG.Cylinder(r*0.14, r*0.14, r*0.12, 10), gearM, side * r*0.50, r*3.82, 0, 0, 0, Math.PI/2, 'earcup');
+        if (cls && cls.name === 'Gojo') {
+            // White spiky hair poking out of the helmet, and a black blindfold over the visor.
+            const hairM = _pf('pf-gojo-hair', () => new THREE.MeshStandardMaterial({ color: 0xf5f6fa, roughness: 0.6 }));
+            const foldM = _pf('pf-gojo-fold', () => new THREE.MeshStandardMaterial({ color: 0x111216, roughness: 0.8 }));
+            for (const [hx, hz, tilt] of [[-0.22, 0.05, 0.45], [0.02, -0.1, 0], [0.24, 0.05, -0.45]])
+                add(TG.Cone(r*0.16, r*0.55, 8), hairM, hx * r, r*4.55, hz * r, 0, 0, tilt, 'hair');
+            add(TG.Cylinder(r*0.52, r*0.52, r*0.16, 18, 1, true), foldM, 0, r*3.92, 0, 0, 0, 0, 'blindfold');
+        }
 
         g.userData.head = head;
         g.userData.parts = parts;
@@ -16379,6 +16700,9 @@ const col = b.color || BLDG_COLORS[0];
                 add(TG.Cone(0.16,0.6,8),cm,0.3,0,0); break;
             case 'ring':
                 add(TG.Torus(0.4,0.1,10,20),cm,0,0,0); break;
+            case 'infinity':   // Gojo's Limitless: two loops side by side, blue and purple
+                add(TG.Torus(0.26,0.08,10,20),cm,-0.25,0,0);
+                add(TG.Torus(0.26,0.08,10,20),new THREE.MeshStandardMaterial({ color: 0xa55eea, emissive: 0xa55eea, emissiveIntensity: 0.6 }),0.25,0,0); break;
         }
     }
 
@@ -16503,6 +16827,10 @@ const col = b.color || BLDG_COLORS[0];
             case 'blackhole':
                 A(TG.Sphere(2.3,16,12), new THREE.MeshBasicMaterial({color:0x000000}));
                 A(TG.Torus(2.9,0.4,8,22), new THREE.MeshBasicMaterial({color:0x8a63ff}), 0,0,0, 0,Math.PI/2,0);
+                break;
+            case 'infinity':
+                A(TG.Torus(1.2,0.4,8,16),mat,0,0,-1.2,0,Math.PI/2,0);
+                A(TG.Torus(1.2,0.4,8,16),new THREE.MeshBasicMaterial({color:0xa55eea}),0,0,1.2,0,Math.PI/2,0);
                 break;
             case 'orb': default: A(TG.Sphere(2.6,10,8),mat);
         }
@@ -18410,7 +18738,13 @@ const col = b.color || BLDG_COLORS[0];
         }
         renderElemPicker();
         updateFsHud();
-        const abilityText = ab + qPart + fPart + elemPart;
+        // Gojo's Domain has its own cooldown, so it gets its own spot on the line.
+        let domainPart = '';
+        if (p.cls.infinity && xUnlocked && zUnlocked) {
+            const _dcd = Math.ceil((p._domainCd || 0) / 60);
+            domainPart = _dcd > 0 ? ` | ♾️ Domain ${_dcd}s` : ' | ♾️ E+Z+X Domain';
+        }
+        const abilityText = ab + qPart + fPart + elemPart + domainPart;
         _setHud('ability-display', abilityText);
         // On-screen cooldown overlay for the 3D / first-person views (the #hud text is hard to see there)
         const a3d = _hudEls.get('ability-hud-3d') !== undefined ? _hudEls.get('ability-hud-3d')
@@ -18447,6 +18781,7 @@ const col = b.color || BLDG_COLORS[0];
             else if (c.necromancer) eIcon = '💀';
             else if (c.canSpawnTurret) eIcon = '🤖';
             else if (c.sikunaPower) eIcon = '👹';
+            else if (c.infinity) eIcon = '🔴';
             else if (c.isSupporter) eIcon = '💖';
             else if (c.canCopy) eIcon = '🎭';
             else if (c.hasPlayerShield) eIcon = '🛡️';
@@ -19497,6 +19832,7 @@ const col = b.color || BLDG_COLORS[0];
         'SCIENCE':    { reward: 'class', className: 'Scientist', msg: 'Unlocked Scientist for next roll!' },
         'NECRO':      { reward: 'class', className: 'Necromancer', msg: 'Unlocked Necromancer for next roll!' },
         'SIKUNA':     { reward: 'class', className: 'Sikuna', msg: 'Unlocked Sikuna for next roll!' },
+        'GOJO':       { reward: 'class', className: 'Gojo', msg: 'Unlocked Gojo for next roll!' },
         'BUILDER':    { reward: 'class', className: 'Builder', msg: 'Unlocked Builder for next roll!' },
         'SPEEDSTER':  { reward: 'class', className: 'Flash', msg: 'Unlocked Flash for next roll!' },
         'MOVESALL':   { reward: 'move', msg: 'Pick a class, then pick Z or X to unlock!' },
@@ -21084,15 +21420,11 @@ const col = b.color || BLDG_COLORS[0];
         keys[k]=true;
         if (NET.mode==='client') {
             if (k==='r') NET._reloadFlag = true;
-            if (k==='e') NET._abilityFlag = true;
-            if (k==='z') NET._moveQFlag = true;
-            if (k==='x') NET._moveFFlag = true;
         } else {
             if (k==='r') reload();
-            if (k==='e') useAbility();
-            if (k==='z') useMoveQ();
-            if (k==='x') useMoveF();
         }
+        // E / Z / X go through abilityKeyPress so Gojo can press all three for his Domain.
+        if (k==='e' || k==='z' || k==='x') abilityKeyPress(k);
         // Elemental Mage: pick what you fire. Checked before speedModes so 1-3 can't mean two things
         // at once — no class has both, and this way the picker is never silently eaten.
         if (player && canPickElement(player)) {
@@ -21337,13 +21669,13 @@ const col = b.color || BLDG_COLORS[0];
         const pauseBtn = document.getElementById('touch-pause');
         const shootBtn = document.getElementById('touch-shoot');
         if (reloadBtn) reloadBtn.addEventListener('click', e => { e.preventDefault(); if (NET.mode==='client') NET._reloadFlag = true; else reload(); });
-        if (abilityBtn) abilityBtn.addEventListener('click', e => { e.preventDefault(); if (NET.mode==='client') NET._abilityFlag = true; else useAbility(); });
+        if (abilityBtn) abilityBtn.addEventListener('click', e => { e.preventDefault(); abilityKeyPress('e'); });
         const fullBtn = document.getElementById('touch-full');
         if (fullBtn) fullBtn.addEventListener('click', e => { e.preventDefault(); toggleFullscreen(); });
         const moveZBtn = document.getElementById('touch-movez');
         const moveXBtn = document.getElementById('touch-movex');
-        if (moveZBtn) moveZBtn.addEventListener('click', e => { e.preventDefault(); if (NET.mode==='client') NET._moveQFlag = true; else useMoveQ(); });
-        if (moveXBtn) moveXBtn.addEventListener('click', e => { e.preventDefault(); if (NET.mode==='client') NET._moveFFlag = true; else useMoveF(); });
+        if (moveZBtn) moveZBtn.addEventListener('click', e => { e.preventDefault(); abilityKeyPress('z'); });
+        if (moveXBtn) moveXBtn.addEventListener('click', e => { e.preventDefault(); abilityKeyPress('x'); });
         const fpvBtn = document.getElementById('touch-fpv');
         if (fpvBtn) fpvBtn.addEventListener('click', e => { e.preventDefault(); cycleCameraMode(); });
         if (pauseBtn) pauseBtn.addEventListener('click', e => { e.preventDefault(); if (gameRunning) togglePause(); });
