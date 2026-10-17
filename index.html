@@ -2535,510 +2535,6 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         return themeMonster(pool[Math.floor(Math.random() * pool.length)]);
     }
 
-    // ======================== MONSTER LOOKS ========================
-    // Every wave monster used to be the same zombie body with a different emoji over its head, so a
-    // "Comet", a "Riot Husk" and a "Torch Thug" all looked alike. Each name now resolves to a LOOK:
-    //
-    //   body plan  — humanoid / beast (four legs) / blob / spirit (floats, no legs) / construct
-    //                (robot or golem) / flier (wings)
-    //   surface    — what it is made of: icy, fiery, rocky, metal, ghostly, slimy, plant, cosmic…
-    //   props      — one or two things that say what it is: a riot shield, a torch, a rune, a tail…
-    //
-    // It is purely a LOOK. Hitbox, size, speed, damage, AI and spawning are untouched, and it is
-    // derived from the monster's NAME (plus the world for unknown names), which multiplayer already
-    // sends — so a guest sees exactly what the host sees with no new packet data.
-    //
-    // Everything is data: one primitive list per plan / surface / prop, built by ONE 3D builder
-    // (makeThemedMonsterMesh) and drawn by ONE 2D renderer (drawMonsterLook2D) from the same numbers,
-    // so the flat views cannot drift from the 3D one. Sizes are in units of the monster's radius r,
-    // feet at y=0, the monster faces +z.
-    //
-    // Primitive shapes: sph [radius] · hemi [radius] (dome, open side down) · box [w,h,d] ·
-    // cyl [rTop,rBottom,h] · cone [r,h] (points +y) · tor [R,tube] (ring in the xy plane) ·
-    // oct [r] · dod [r].
-    // Materials: 'body' (the monster's own colour on its surface) · 'bodyDk' (a darker shade) ·
-    // 'eye' · 'acc' (the surface's accent) · '#hex' matte · '!#hex' glowing · '~#hex' see-through ·
-    // '*#hex' shiny metal.
-    const _MH = Math.PI / 2;
-
-    // Anchors are [x, y, z, k]: props are placed relative to them and scaled by k, so a hat sits on a
-    // humanoid's head and on top of a blob alike.
-    const MONSTER_PLANS = {
-        // A shambling person: stiff arms reaching forward, legs that WALK.
-        humanoid: { height: 4.35,
-            anchors: { top:[0,4.28,0], head:[0,3.75,0], face:[0,3.8,0.5], body:[0,2.45,0], chest:[0,2.6,0.47],
-                       back:[0,2.85,-0.45], handR:[0.62,2.68,1.25], handL:[-0.62,2.68,1.25],
-                       shoulderR:[0.55,3.15,0], shoulderL:[-0.55,3.15,0], base:[0,0.12,0], tail:[0,1.75,-0.4] },
-            parts: [
-                { s:'cyl', d:[0.2,0.15,1.7], p:[-0.28,0.85,0], m:'body', role:'leg', pv:[-0.28,1.7,0], side:-1 },
-                { s:'cyl', d:[0.2,0.15,1.7], p:[ 0.28,0.85,0], m:'body', role:'leg', pv:[ 0.28,1.7,0], side: 1 },
-                { s:'cyl', d:[0.5,0.42,1.5], p:[0,2.45,0], m:'body', role:'torso' },
-                { s:'cyl', d:[0.15,0.12,1.3], p:[-0.62,2.9,0.6], m:'body', role:'arm', r:[-1.25,0,0] },
-                { s:'cyl', d:[0.15,0.12,1.3], p:[ 0.62,2.9,0.6], m:'body', role:'arm', r:[-1.25,0,0] },
-                { s:'sph', d:[0.55], p:[0,3.75,0], m:'body', role:'head' },
-                { s:'sph', d:[0.09], p:[-0.2,3.82,0.5], m:'eye', role:'eye' },
-                { s:'sph', d:[0.09], p:[ 0.2,3.82,0.5], m:'eye', role:'eye' },
-            ],
-            simple: [ { s:'cyl', d:[0.5,0.55,2.5], p:[0,1.85,0] }, { s:'sph', d:[0.52], p:[0,3.45,0] } ] },
-        // On all fours: long body, head out front, a tail, four legs that trot.
-        beast: { height: 2.6,
-            anchors: { top:[0,2.38,1.35,0.9], head:[0,1.95,1.35,0.9], face:[0,2.02,1.8,0.85], body:[0,1.55,0],
-                       chest:[0,1.45,1.05], back:[0,2.2,-0.1], handR:[0.42,0.7,1.35], handL:[-0.42,0.7,1.35],
-                       shoulderR:[0.5,1.95,0.55], shoulderL:[-0.5,1.95,0.55], base:[0,0.12,0], tail:[0,1.95,-1.25] },
-            parts: [
-                { s:'sph', d:[0.75], p:[0,1.55,0], sc:[1,0.85,1.6], m:'body', role:'torso' },
-                { s:'sph', d:[0.5], p:[0,1.95,1.35], sc:[1,0.9,1.3], m:'body', role:'head' },
-                { s:'cyl', d:[0.17,0.13,1.05], p:[ 0.42,0.52,0.65], m:'body', role:'leg', pv:[ 0.42,1.05,0.65], side: 1 },
-                { s:'cyl', d:[0.17,0.13,1.05], p:[-0.42,0.52,0.65], m:'body', role:'leg', pv:[-0.42,1.05,0.65], side:-1 },
-                { s:'cyl', d:[0.17,0.13,1.05], p:[ 0.42,0.52,-0.7], m:'body', role:'leg', pv:[ 0.42,1.05,-0.7], side:-1 },
-                { s:'cyl', d:[0.17,0.13,1.05], p:[-0.42,0.52,-0.7], m:'body', role:'leg', pv:[-0.42,1.05,-0.7], side: 1 },
-                { s:'cone', d:[0.13,0.9], p:[0,1.85,-1.45], m:'body', role:'tail', r:[-2.2,0,0] },
-                { s:'sph', d:[0.09], p:[-0.2,2.08,1.78], m:'eye', role:'eye' },
-                { s:'sph', d:[0.09], p:[ 0.2,2.08,1.78], m:'eye', role:'eye' },
-            ],
-            simple: [ { s:'box', d:[1.2,1.0,2.4], p:[0,1.4,0] }, { s:'sph', d:[0.5], p:[0,1.95,1.4] } ] },
-        // A wobbling mound: the whole body is the face.
-        blob: { height: 2.2,
-            anchors: { top:[0,2.15,0,1.2], head:[0,1.1,0,2.2], face:[0,1.45,1.12,1.6], body:[0,1.1,0],
-                       chest:[0,0.95,1.15], back:[0,1.4,-1.05], handR:[1.15,1.0,0.45], handL:[-1.15,1.0,0.45],
-                       shoulderR:[0.95,1.6,0], shoulderL:[-0.95,1.6,0], base:[0,0.08,0], tail:[0,0.7,-1.2] },
-            parts: [
-                { s:'sph', d:[1.25], p:[0,1.1,0], sc:[1,0.85,1], m:'body', role:'head' },
-                { s:'cyl', d:[1.15,1.3,0.3], p:[0,0.15,0], m:'body', role:'torso' },
-                { s:'box', d:[0.6,0.12,0.1], p:[0,0.88,1.18], m:'#1e1e24', role:'mouth' },
-                { s:'sph', d:[0.2], p:[-0.38,1.45,1.02], m:'eye', role:'eye' },
-                { s:'sph', d:[0.2], p:[ 0.38,1.45,1.02], m:'eye', role:'eye' },
-            ],
-            simple: [ { s:'sph', d:[1.25], p:[0,1.1,0], sc:[1,0.85,1] }, { s:'cyl', d:[1.15,1.3,0.3], p:[0,0.15,0] } ] },
-        // Floats: a tapering robe instead of legs, wispy arms.
-        spirit: { height: 4.25,
-            anchors: { top:[0,4.22,0], head:[0,3.75,0,0.9], face:[0,3.8,0.46,0.9], body:[0,2.7,0],
-                       chest:[0,2.95,0.55], back:[0,3.0,-0.55], handR:[0.68,2.45,1.05], handL:[-0.68,2.45,1.05],
-                       shoulderR:[0.6,3.2,0], shoulderL:[-0.6,3.2,0], base:[0,0.75,0], tail:[0,0.85,-0.3] },
-            parts: [
-                { s:'cone', d:[0.75,2.4], p:[0,1.9,0], m:'body', role:'torso', r:[Math.PI,0,0] },
-                { s:'sph', d:[0.62], p:[0,2.95,0], sc:[1,0.9,0.85], m:'body', role:'chest' },
-                { s:'sph', d:[0.5], p:[0,3.75,0], m:'body', role:'head' },
-                { s:'cone', d:[0.16,1.0], p:[-0.66,2.7,0.55], m:'body', role:'arm', r:[1.98,0,0] },
-                { s:'cone', d:[0.16,1.0], p:[ 0.66,2.7,0.55], m:'body', role:'arm', r:[1.98,0,0] },
-                { s:'sph', d:[0.11], p:[-0.18,3.8,0.43], sc:[1,1.4,0.6], m:'eye', role:'eye' },
-                { s:'sph', d:[0.11], p:[ 0.18,3.8,0.43], sc:[1,1.4,0.6], m:'eye', role:'eye' },
-            ],
-            simple: [ { s:'cone', d:[0.75,2.4], p:[0,1.9,0], r:[Math.PI,0,0] }, { s:'sph', d:[0.55], p:[0,3.5,0] } ] },
-        // Blocky robot or golem: box limbs, box head, a visor of eyes.
-        construct: { height: 3.75,
-            anchors: { top:[0,3.75,0,0.95], head:[0,3.4,0,0.85], face:[0,3.45,0.4,0.85], body:[0,2.3,0],
-                       chest:[0,2.4,0.47], back:[0,2.5,-0.47], handR:[0.95,1.45,0.35], handL:[-0.95,1.45,0.35],
-                       shoulderR:[0.85,3.0,0], shoulderL:[-0.85,3.0,0], base:[0,0.1,0], tail:[0,1.7,-0.47] },
-            parts: [
-                { s:'box', d:[0.42,1.55,0.5], p:[-0.35,0.78,0], m:'body', role:'leg', pv:[-0.35,1.55,0], side:-1 },
-                { s:'box', d:[0.42,1.55,0.5], p:[ 0.35,0.78,0], m:'body', role:'leg', pv:[ 0.35,1.55,0], side: 1 },
-                { s:'box', d:[1.3,1.4,0.9], p:[0,2.3,0], m:'body', role:'torso' },
-                { s:'box', d:[0.36,1.4,0.42], p:[-0.9,2.2,0.12], m:'bodyDk', role:'arm', r:[-0.25,0,0] },
-                { s:'box', d:[0.36,1.4,0.42], p:[ 0.9,2.2,0.12], m:'bodyDk', role:'arm', r:[-0.25,0,0] },
-                { s:'box', d:[0.8,0.7,0.75], p:[0,3.4,0], m:'body', role:'head' },
-                { s:'sph', d:[0.1], p:[-0.18,3.45,0.38], m:'eye', role:'eye' },
-                { s:'sph', d:[0.1], p:[ 0.18,3.45,0.38], m:'eye', role:'eye' },
-            ],
-            simple: [ { s:'box', d:[1.3,2.9,0.9], p:[0,1.45,0] }, { s:'box', d:[0.8,0.7,0.75], p:[0,3.4,0] } ] },
-        // Hovers on flapping wings.
-        flier: { height: 3.7,
-            anchors: { top:[0,3.68,0.75,0.82], head:[0,3.25,0.75,0.82], face:[0,3.32,1.15,0.8], body:[0,2.7,0],
-                       chest:[0,2.5,0.78], back:[0,3.25,-0.4], handR:[0.45,1.95,0.5], handL:[-0.45,1.95,0.5],
-                       shoulderR:[0.6,3.1,0], shoulderL:[-0.6,3.1,0], base:[0,1.9,0], tail:[0,2.6,-1.15] },
-            parts: [
-                { s:'sph', d:[0.7], p:[0,2.7,0], sc:[1,0.9,1.15], m:'body', role:'torso' },
-                { s:'sph', d:[0.45], p:[0,3.25,0.75], m:'body', role:'head' },
-                { s:'box', d:[1.5,0.06,0.8], p:[ 1.3,2.95,-0.1], m:'bodyDk', role:'wing', pv:[ 0.55,2.95,-0.1], side: 1 },
-                { s:'box', d:[1.5,0.06,0.8], p:[-1.3,2.95,-0.1], m:'bodyDk', role:'wing', pv:[-0.55,2.95,-0.1], side:-1 },
-                { s:'cone', d:[0.22,0.7], p:[0,2.6,-0.95], m:'bodyDk', role:'tail', r:[-_MH,0,0] },
-                { s:'sph', d:[0.08], p:[-0.17,3.35,1.12], m:'eye', role:'eye' },
-                { s:'sph', d:[0.08], p:[ 0.17,3.35,1.12], m:'eye', role:'eye' },
-            ],
-            simple: [ { s:'sph', d:[0.75], p:[0,2.75,0.2] }, { s:'box', d:[3.2,0.08,0.8], p:[0,2.95,-0.1] } ] },
-    };
-
-    // What it is made of. `mix`/`mixT` pull the monster's own colour toward the material; `eye` and
-    // `acc` colour its eyes and trim; `deco` is at most two extra pieces that sell the material.
-    // Each deco entry: [anchor, shape, dims, offset, material, rotation?, scale?].
-    const MONSTER_SURFACES = {
-        flesh:   { mix:'#6a7a55', mixT:0.55, rough:0.9,  eye:'#fff200', acc:'#6a0d0d',
-                   deco:[ ['chest','box',[0.5,0.06,0.04],[0,0.15,0.03],'acc',[0,0,0.3]] ] },
-        icy:     { mix:'#dff7ff', mixT:0.45, rough:0.2, metal:0.3, glow:'#74b9ff', gi:0.25, eye:'#e0ffff', acc:'!#bff0ff',
-                   deco:[ ['shoulderR','cone',[0.12,0.55],[0,0.2,-0.1],'acc',[-0.3,0,-0.5]],
-                          ['shoulderL','cone',[0.12,0.55],[0,0.2,-0.1],'acc',[-0.3,0,0.5]] ] },
-        fiery:   { mix:'#3a1206', mixT:0.35, rough:0.8, glow:'#ff4500', gi:0.45, eye:'#ffee55', acc:'!#ff6b35',
-                   deco:[ ['shoulderR','cone',[0.14,0.45],[0,0.2,0],'acc'],
-                          ['shoulderL','cone',[0.14,0.45],[0,0.2,0],'!#feca57'] ] },
-        rocky:   { mix:'#6f6a62', mixT:0.5, rough:1, eye:'#ff7a00', acc:'#4a4540',
-                   deco:[ ['shoulderR','dod',[0.3],[0,0.05,0],'acc'], ['back','dod',[0.35],[0,0,0],'acc'] ] },
-        metal:   { mix:'#9aa5b1', mixT:0.3, rough:0.3, metal:0.85, eye:'#ff2d55', acc:'*#2d3436',
-                   deco:[ ['chest','box',[0.7,0.5,0.06],[0,0,0.02],'acc'] ] },
-        ghostly: { mix:'#ffffff', mixT:0.35, rough:0.4, glowSelf:true, gi:0.35, opacity:0.55, eye:'#0b0b12', acc:'#ffffff',
-                   deco:[] },
-        slimy:   { mix:'#9be15d', mixT:0.15, rough:0.12, metal:0.1, opacity:0.85, eye:'#ffffff', acc:'body',
-                   deco:[ ['base','sph',[0.3],[0.45,0,0.35],'body',null,[1,0.35,1]],
-                          ['shoulderR','sph',[0.14],[0,-0.3,0.15],'body',null,[0.8,1.4,0.8]] ] },
-        plant:   { mix:'#4f7a3a', mixT:0.35, rough:0.85, eye:'#ffd32a', acc:'#3c8d2f',
-                   deco:[ ['shoulderR','sph',[0.22],[0,0.05,0],'acc',null,[1.2,0.5,0.8]],
-                          ['shoulderL','sph',[0.22],[0,0.05,0],'acc',null,[1.2,0.5,0.8]] ] },
-        wood:    { mix:'#6b4a2b', mixT:0.5, rough:0.95, eye:'#a3ff6b', acc:'#3e2a17',
-                   deco:[ ['chest','sph',[0.13],[0.18,0.1,0],'acc'] ] },
-        cosmic:  { mix:'#1b1440', mixT:0.4, rough:0.3, glowSelf:true, gi:0.5, eye:'#ffffff', acc:'!#fff6c8',
-                   deco:[ ['chest','oct',[0.09],[0.2,0.25,0.02],'acc'], ['shoulderL','oct',[0.08],[0,0.1,0.1],'acc'] ] },
-        bony:    { mix:'#e9e3d0', mixT:0.75, rough:0.7, eye:'#ff3b30', acc:'#2d2a26',
-                   deco:[ ['chest','box',[0.6,0.06,0.05],[0,0.25,0.02],'acc'], ['chest','box',[0.5,0.06,0.05],[0,0.05,0.02],'acc'] ] },
-        shell:   { mix:'#3a2a1a', mixT:0.15, rough:0.25, metal:0.35, eye:'#111111', acc:'bodyDk',
-                   deco:[ ['back','hemi',[0.7],[0,-0.1,0],'acc',null,[1,0.6,1]] ] },
-        furry:   { mix:'#5a3d2b', mixT:0.35, rough:1, eye:'#ffe082', acc:'#3b2a1e',
-                   deco:[ ['top','cone',[0.15,0.3],[0,-0.05,0],'acc'] ] },
-        feathery:{ mix:'#ffffff', mixT:0.25, rough:0.9, eye:'#111111', acc:'#ecf0f1',
-                   deco:[ ['tail','cone',[0.25,0.6],[0,0.15,0],'acc',[-0.8,0,0]] ] },
-        crystal: { mix:'#ffffff', mixT:0.25, rough:0.05, metal:0.4, glowSelf:true, gi:0.3, opacity:0.8, eye:'#ffffff', acc:'!#e8f8ff',
-                   deco:[ ['shoulderR','oct',[0.25],[0,0.15,0],'acc'], ['shoulderL','oct',[0.2],[0,0.12,0],'acc'] ] },
-        candy:   { mix:'#ffffff', mixT:0.2, rough:0.25, eye:'#2d3436', acc:'#ffffff',
-                   deco:[ ['chest','tor',[0.3,0.06],[0,0,0.02],'acc'] ] },
-        cloud:   { mix:'#ffffff', mixT:0.6, rough:1, eye:'#2d3436', acc:'#ffffff',
-                   deco:[ ['shoulderR','sph',[0.4],[0,0,0],'body'], ['shoulderL','sph',[0.35],[0,0,0],'body'] ] },
-        paper:   { mix:'#f5ecd7', mixT:0.6, rough:0.95, eye:'#111111', acc:'#3a3a3a',
-                   deco:[ ['chest','box',[0.6,0.05,0.04],[0,0.2,0.02],'acc'], ['chest','box',[0.45,0.05,0.04],[0,0.05,0.02],'acc'] ] },
-        bandaged:{ mix:'#e8dcc0', mixT:0.75, rough:1, eye:'#7cfc00', acc:'#b8a888',
-                   deco:[ ['body','tor',[0.52,0.05],[0,0.3,0],'acc',[_MH,0,0.25]], ['body','tor',[0.52,0.05],[0,-0.2,0],'acc',[_MH,0,-0.25]] ] },
-        plastic: { mix:'#ffffff', mixT:0.1, rough:0.3, eye:'#111111', acc:'!#feca57',
-                   deco:[ ['chest','sph',[0.12],[0,0.2,0.02],'acc'] ] },
-    };
-
-    // The props. Same entry format as surface deco.
-    const MONSTER_PROPS = {
-        crystals:   [ ['top','cone',[0.12,0.55],[0.15,0,0],'!#bff0ff',[0,0,-0.35]], ['top','cone',[0.1,0.45],[-0.18,-0.05,0.05],'!#bff0ff',[0,0,0.4]] ],
-        torch:      [ ['handR','cyl',[0.06,0.05,0.9],[0,0.2,0],'#6b4226'], ['handR','cone',[0.17,0.45],[0,0.85,0],'!#ff8c00'] ],
-        riotHelmet: [ ['head','hemi',[0.62],[0,0.05,0],'*#2d3436'], ['face','box',[0.9,0.2,0.06],[0,0.02,0.06],'~#9fd3ff'] ],
-        riotShield: [ ['chest','box',[1.0,1.5,0.08],[0.05,-0.35,0.85],'~#bcd7e8'], ['chest','box',[1.0,0.14,0.1],[0.05,0.05,0.86],'#feca57'] ],
-        shield:     [ ['handL','cyl',[0.55,0.55,0.1],[0,0.1,0.15],'*#8395a7',[_MH,0,0]], ['handL','sph',[0.13],[0,0.1,0.22],'#feca57'] ],
-        helmet:     [ ['head','hemi',[0.62],[0,0.08,0],'*#95a5a6'], ['face','box',[0.08,0.4,0.06],[0,-0.05,0.08],'*#7f8c8d'] ],
-        plume:      [ ['top','cone',[0.12,0.6],[0,0.1,-0.1],'#c0392b',[-0.5,0,0]] ],
-        handbag:    [ ['handL','box',[0.45,0.38,0.18],[0,-0.3,0],'#8e44ad'], ['handL','tor',[0.16,0.03],[0,-0.05,0],'#2d3436'] ],
-        bobHair:    [ ['head','hemi',[0.64],[0,0,-0.04],'#f6d365',null,[1.05,1.15,1.1]] ],
-        wildHair:   [ ['top','cone',[0.14,0.5],[0.2,-0.1,0],'#8b0000',[0,0,-0.6]], ['top','cone',[0.14,0.5],[-0.2,-0.1,0],'#8b0000',[0,0,0.6]] ],
-        twintails:  [ ['head','cyl',[0.13,0.05,1.4],[0.55,-0.5,-0.15],'!#39c5bb',[0,0,0.25]], ['head','cyl',[0.13,0.05,1.4],[-0.55,-0.5,-0.15],'!#39c5bb',[0,0,-0.25]] ],
-        hood:       [ ['head','hemi',[0.68],[0,0,-0.05],'#2f3640',null,[1,1.15,1.1]] ],
-        cap:        [ ['head','hemi',[0.58],[0,0.1,0],'#c0392b'], ['head','box',[0.55,0.05,0.4],[0,0.15,0.6],'#c0392b'] ],
-        hardhat:    [ ['head','hemi',[0.6],[0,0.12,0],'#feca57'], ['head','cyl',[0.75,0.75,0.05],[0,0.12,0],'#feca57'] ],
-        strawHat:   [ ['head','cyl',[0.95,0.95,0.05],[0,0.35,0],'#e1c16e'], ['head','cyl',[0.45,0.5,0.35],[0,0.5,0],'#e1c16e'] ],
-        jesterHat:  [ ['top','cone',[0.2,0.6],[0.25,0,0],'#e84393',[0,0,-0.7]], ['top','cone',[0.2,0.6],[-0.25,0,0],'#0984e3',[0,0,0.7]] ],
-        nightcap:   [ ['top','cone',[0.4,0.9],[0,0.15,-0.1],'#6c5ce7',[-0.5,0,0]], ['top','sph',[0.12],[0,0.45,-0.55],'#ffffff'] ],
-        shako:      [ ['head','cyl',[0.45,0.5,0.75],[0,0.6,0],'#c0392b'], ['head','box',[0.5,0.06,0.3],[0,0.3,0.5],'#2d3436'] ],
-        headband:   [ ['head','tor',[0.56,0.06],[0,0.15,0],'#c0392b',[_MH,0,0]], ['head','box',[0.06,0.4,0.06],[0,0.05,-0.6],'#c0392b'] ],
-        mushroomCap:[ ['top','hemi',[0.95],[0,-0.15,0],'#e74c3c',null,[1,0.6,1]], ['top','sph',[0.13],[0.35,0.15,0.3],'#ffffff'] ],
-        clownHair:  [ ['head','sph',[0.32],[0.5,0.1,-0.1],'#ff6b6b'], ['head','sph',[0.32],[-0.5,0.1,-0.1],'#ff6b6b'], ['face','sph',[0.13],[0,-0.1,0.08],'!#ff2d55'] ],
-        mustache:   [ ['face','box',[0.45,0.1,0.08],[0,-0.2,0.05],'#2d1b0e'] ],
-        dumbbell:   [ ['handR','cyl',[0.05,0.05,1.2],[0,0,0],'#2d3436',[0,0,_MH]], ['handR','sph',[0.22],[0.6,0,0],'#2d3436'], ['handR','sph',[0.22],[-0.6,0,0],'#2d3436'] ],
-        blowpipe:   [ ['face','cyl',[0.05,0.05,1.1],[0,-0.15,0.55],'#8d6e63',[_MH,0,0]] ],
-        beard:      [ ['face','cone',[0.3,0.7],[0,-0.5,0],'#dfe6e9',[Math.PI,0,0]] ],
-        sunglasses: [ ['face','box',[0.75,0.16,0.06],[0,0.02,0.05],'*#111111'] ],
-        goggles:    [ ['face','box',[0.8,0.2,0.06],[0,0.05,0.04],'~#74b9ff'], ['head','tor',[0.56,0.04],[0,0.05,0],'#2d3436',[_MH,0,0]] ],
-        veil:       [ ['head','hemi',[0.72],[0,0.05,0],'~#2d3436',null,[1,1.6,1]] ],
-        longHair:   [ ['head','hemi',[0.62],[0,0,-0.08],'#16a085',null,[1.05,1.5,1.1]] ],
-        horns:      [ ['top','cone',[0.11,0.5],[0.25,-0.1,0],'#2d3436',[0,0,-0.5]], ['top','cone',[0.11,0.5],[-0.25,-0.1,0],'#2d3436',[0,0,0.5]] ],
-        horn:       [ ['top','cone',[0.13,0.65],[0,0,0.1],'#2d3436',[0.5,0,0]] ],
-        mandibles:  [ ['face','cone',[0.08,0.4],[0.18,-0.12,0.1],'#2d3436',[_MH,0,0.4]], ['face','cone',[0.08,0.4],[-0.18,-0.12,0.1],'#2d3436',[_MH,0,-0.4]] ],
-        bigEars:    [ ['top','cone',[0.22,0.6],[0.3,-0.05,0],'bodyDk',[0,0,-0.4]], ['top','cone',[0.22,0.6],[-0.3,-0.05,0],'bodyDk',[0,0,0.4]] ],
-        comb:       [ ['top','box',[0.08,0.3,0.45],[0,0.05,0],'#e74c3c'] ],
-        beak:       [ ['face','cone',[0.14,0.4],[0,-0.08,0.15],'#f39c12',[_MH,0,0]] ],
-        frogEyes:   [ ['top','sph',[0.22],[0.3,0,0.2],'body'], ['top','sph',[0.22],[-0.3,0,0.2],'body'] ],
-        claws:      [ ['handR','sph',[0.28],[0.15,0,0.1],'bodyDk',null,[1,0.6,1.4]], ['handL','sph',[0.28],[-0.15,0,0.1],'bodyDk',null,[1,0.6,1.4]] ],
-        turtleShell:[ ['back','hemi',[0.95],[0,-0.25,0],'#556b2f',null,[1,0.6,1.3]] ],
-        clamShell:  [ ['body','hemi',[1.32],[0,0.05,0],'#dfe6e9',null,[1,0.75,1]] ],
-        spines:     [ ['chest','cone',[0.05,0.3],[0.3,0.2,0],'#f5f6fa',[_MH,0,0]], ['chest','cone',[0.05,0.3],[-0.3,-0.2,0],'#f5f6fa',[_MH,0,0]] ],
-        flower:     [ ['top','sph',[0.18],[0,0.05,0],'#ff6b81'] ],
-        sunrays:    [ ['head','tor',[0.95,0.07],[0,0,-0.15],'!#feca57'], ['head','tor',[1.2,0.04],[0,0,-0.2],'!#ff9f43'] ],
-        flamecrown: [ ['top','cone',[0.2,0.6],[0,0.15,0],'!#ff6b35'], ['top','cone',[0.12,0.4],[0.18,0.05,0.05],'!#feca57',[0,0,-0.3]] ],
-        leaves:     [ ['top','sph',[0.55],[0,0.1,0],'#27ae60',null,[1.2,0.6,1.2]], ['top','sph',[0.35],[0.3,0.25,0],'#2ecc71'] ],
-        soundRings: [ ['face','tor',[0.3,0.04],[0,-0.25,0.3],'!#ffffff'], ['face','tor',[0.5,0.03],[0,-0.25,0.6],'~#ffffff'] ],
-        steam:      [ ['top','sph',[0.3],[0,0.3,0],'~#dfe6e9'], ['top','sph',[0.22],[0.2,0.6,0],'~#dfe6e9'] ],
-        fin:        [ ['back','box',[0.08,0.7,0.6],[0,0.3,0],'bodyDk',[-0.4,0,0]] ],
-        antenna:    [ ['top','cyl',[0.03,0.03,0.6],[0,0.3,0],'*#2d3436'], ['top','sph',[0.09],[0,0.62,0],'!#ff3838'] ],
-        dish:       [ ['top','cyl',[0.45,0.1,0.15],[0.15,0.25,0],'*#dfe6e9',[-0.6,0,0]] ],
-        sparks:     [ ['top','oct',[0.1],[0.35,0.15,0.2],'!#feca57'], ['chest','oct',[0.09],[-0.45,0.2,0.1],'!#48dbfb'] ],
-        lightning:  [ ['top','box',[0.08,0.5,0.08],[0.1,0.25,0],'!#feca57',[0,0,0.5]], ['top','box',[0.08,0.5,0.08],[0.05,0.65,0],'!#feca57',[0,0,-0.5]] ],
-        cherry:     [ ['top','sph',[0.2],[0,0.15,0],'#e3342f'], ['top','cyl',[0.02,0.02,0.35],[0.05,0.4,0],'#2d6a4f',[0,0,-0.3]] ],
-        stem:       [ ['top','cyl',[0.07,0.1,0.4],[0,0.15,0],'#2d6a4f',[0,0,0.3]], ['top','sph',[0.2],[0.15,0.05,0],'#27ae60',null,[1.3,0.4,0.8]] ],
-        swirl:      [ ['face','tor',[0.45,0.06],[0,-0.1,0.02],'#ffffff'], ['face','tor',[0.22,0.06],[0,-0.1,0.04],'#ff6b81'] ],
-        lilypad:    [ ['top','cyl',[0.6,0.6,0.04],[0,0.05,0],'#2ecc71'], ['top','sph',[0.15],[0.2,0.12,0.1],'#fd79a8'] ],
-        boulders:   [ ['shoulderR','dod',[0.38],[0.1,0.15,0],'acc'], ['shoulderL','dod',[0.32],[-0.1,0.12,0],'acc'] ],
-        siren:      [ ['top','cyl',[0.25,0.3,0.3],[0,0.15,0],'!#ff3838'], ['top','cyl',[0.32,0.32,0.06],[0,0,0],'*#2d3436'] ],
-        bolts:      [ ['chest','sph',[0.1],[0.35,0.3,0.02],'*#dfe6e9'], ['chest','sph',[0.1],[-0.35,0.3,0.02],'*#dfe6e9'] ],
-        gear:       [ ['back','tor',[0.5,0.12],[0,0.2,-0.05],'*#d4af37'], ['back','sph',[0.15],[0,0.2,-0.05],'*#d4af37'] ],
-        windKey:    [ ['back','cyl',[0.05,0.05,0.5],[0,0.1,-0.25],'*#d4af37',[_MH,0,0]], ['back','box',[0.6,0.3,0.06],[0,0.1,-0.5],'*#d4af37'] ],
-        bell:       [ ['top','hemi',[0.35],[0,0.05,0],'*#e0c068',null,[1,1.3,1]], ['top','sph',[0.09],[0,0.02,0],'#2d3436'] ],
-        frame:      [ ['chest','box',[1.1,1.3,0.08],[0,0.2,0.3],'*#c9a227'], ['chest','box',[0.85,1.05,0.1],[0,0.2,0.32],'#5d4157'] ],
-        tentacles:  [ ['base','cyl',[0.06,0.02,1.0],[0.3,-0.3,0],'~#ffffff'], ['base','cyl',[0.06,0.02,1.0],[-0.3,-0.3,0.1],'~#ffffff'] ],
-        candle:     [ ['top','cyl',[0.15,0.15,0.5],[0,0.2,0],'#fdf6e3'], ['top','cone',[0.09,0.25],[0,0.6,0],'!#feca57'] ],
-        scroll:     [ ['handR','cyl',[0.15,0.15,0.9],[0,0,0],'#f5e6c8',[0,0,_MH]] ],
-        waterGun:   [ ['handR','box',[0.18,0.25,0.6],[0,0,0.2],'#00a8ff'], ['handR','box',[0.12,0.3,0.12],[0,-0.2,0],'#fbc531'] ],
-        pickaxe:    [ ['handR','cyl',[0.05,0.05,1.1],[0,0.3,0],'#6b4226'], ['handR','box',[0.9,0.1,0.1],[0,0.85,0],'*#7f8fa6'] ],
-        pitchfork:  [ ['handR','cyl',[0.04,0.04,1.6],[0,0.3,0],'#8d6e63'], ['handR','box',[0.45,0.25,0.06],[0,1.15,0],'*#7f8c8d'] ],
-        dome:       [ ['head','sph',[0.85],[0,0,0],'~#c7ecee'] ],
-        cards:      [ ['handR','box',[0.35,0.5,0.03],[0,0.1,0],'#ffffff'], ['handR','box',[0.35,0.5,0.03],[0.12,0.12,0.02],'#ff4757',[0,0,-0.4]] ],
-        dice:       [ ['handR','box',[0.35,0.35,0.35],[0,0.15,0],'#ffffff'], ['handR','box',[0.3,0.3,0.3],[0.4,0.2,0],'#ff4757'] ],
-        tail:       [ ['tail','cone',[0.08,0.9],[0,0,-0.2],'bodyDk',[-2.3,0,0]] ],
-        petals:     [ ['top','tor',[0.45,0.2],[0,0,0],'#fd79a8',[_MH,0,0]], ['top','sph',[0.22],[0,0.05,0],'#feca57'] ],
-        vortex:     [ ['body','tor',[1.0,0.07],[0,0,0],'!#a29bfe',[_MH,0,0]], ['body','tor',[0.75,0.05],[0,0.3,0],'!#6c5ce7',[_MH+0.3,0,0]] ],
-        mirror:     [ ['handR','cyl',[0.3,0.3,0.05],[0,0.3,0],'~#ecf0f1',[_MH,0,0]], ['handR','cyl',[0.04,0.04,0.4],[0,-0.05,0],'#c9a227'] ],
-        quill:      [ ['handR','cone',[0.1,1.0],[0,0.4,0],'#ffffff',[0,0,-0.3]] ],
-        book:       [ ['chest','box',[1.0,1.3,0.25],[0,0,0.2],'#8e2b2b'], ['chest','box',[0.9,1.2,0.26],[0.05,0,0.2],'#f5ecd7'] ],
-        cometTail:  [ ['tail','cone',[0.6,3.0],[0,0.3,-1.4],'!#d1c4e9',[-_MH,0,0]], ['tail','cone',[0.35,2.2],[0,0.4,-1.1],'!#ffffff',[-_MH,0,0]] ],
-        rune:       [ ['chest','tor',[0.45,0.05],[0,0.1,0.08],'!#b388ff'], ['chest','box',[0.08,0.6,0.05],[0,0.1,0.1],'!#b388ff'], ['chest','box',[0.5,0.08,0.05],[0,0.15,0.1],'!#b388ff'] ],
-        orb:        [ ['handR','sph',[0.35],[0,0.3,0],'~#b388ff'], ['handR','sph',[0.15],[0,0.3,0],'!#ffffff'] ],
-        urn:        [ ['handR','sph',[0.35],[0,0.1,0],'#c0703c',null,[1,1.2,1]], ['handR','cyl',[0.15,0.2,0.2],[0,0.5,0],'#c0703c'] ],
-    };
-
-    // The base ability still twists the body, on top of whatever it is dressed as (the old zombie's
-    // ABILITY MUTATIONS, in two pieces each): the freezer grows ice spikes, the burner walks on a
-    // ring of fire, the shield-bearer wears a badge, the screamer frowns, the singer has a speaker.
-    const MONSTER_MUTATIONS = {
-        'Frost':   [ ['back','cone',[0.14,0.8],[0.2,0.1,0],'!#74b9ff',[-0.5,0,-0.3]], ['back','cone',[0.14,0.8],[-0.2,0.1,0],'!#74b9ff',[-0.5,0,0.3]] ],
-        'Flame':   [ ['base','tor',[0.8,0.08],[0,0,0],'!#ff6b35',[_MH,0,0]], ['back','cone',[0.16,0.6],[0,0.1,-0.05],'!#ff9f43'] ],
-        'Shield':  [ ['chest','cyl',[0.28,0.28,0.06],[0,0.25,0.08],'*#dfe6e9',[_MH,0,0]], ['chest','sph',[0.1],[0,0.25,0.12],'!#ff2d55'] ],
-        'Mad Mom': [ ['face','box',[0.32,0.07,0.05],[0.16,0.2,0.05],'#8b0000',[0,0,-0.45]], ['face','box',[0.32,0.07,0.05],[-0.16,0.2,0.05],'#8b0000',[0,0,0.45]] ],
-        'Miku':    [ ['chest','cyl',[0.25,0.3,0.2],[0,0.1,0.08],'!#00cec9',[_MH,0,0]], ['chest','tor',[0.45,0.04],[0,0.1,0.15],'~#00cec9'] ],
-    };
-
-    // Every name a wave can field → 'plan surface prop prop'. Grouped by world, in slot order
-    // (freezer, burner, shield, screamer).
-    const MONSTER_LOOKS = {
-        'Frost':'humanoid icy crystals', 'Flame':'humanoid fiery flamecrown', 'Shield':'humanoid metal helmet shield',
-        'Mad Mom':'humanoid flesh wildHair handbag', 'Miku':'humanoid flesh twintails',
-        // city
-        'Sewer Lurker':'humanoid slimy hood', 'Torch Thug':'humanoid flesh cap torch',
-        'Riot Husk':'humanoid metal riotHelmet riotShield', 'Screaming Karen':'humanoid flesh bobHair handbag',
-        // desert
-        'Sand Spitter':'humanoid plant spines flower', 'Sunstroke':'spirit fiery sunrays',
-        'Scarab Shell':'beast shell horn mandibles', 'Wailing Widow':'spirit ghostly veil',
-        // circus
-        'Ice Juggler':'humanoid icy jesterHat', 'Fire Eater':'humanoid fiery torch',
-        'Strongman':'humanoid flesh mustache dumbbell', 'Shrieking Clown':'humanoid flesh clownHair',
-        // jungle
-        'Blowdart Ape':'humanoid furry blowpipe', 'Ember Vine':'blob plant leaves flamecrown',
-        'Bark Hulk':'construct wood leaves', 'Howler':'humanoid furry soundRings',
-        // arctic
-        'Ice Crawler':'beast icy crystals', 'Frostbite':'spirit icy crystals',
-        'Glacier Guard':'construct icy shield', 'Banshee of the Floe':'spirit ghostly longHair soundRings',
-        // volcano
-        'Cinder Spitter':'construct rocky flamecrown', 'Magma Hound':'beast rocky flamecrown',
-        'Obsidian Shell':'beast rocky turtleShell', 'Screaming Vent':'blob rocky steam',
-        // ocean
-        'Brine Spitter':'blob slimy fin', 'Vent Crawler':'beast shell claws',
-        'Clam Guard':'blob shell clamShell', 'Siren':'spirit slimy longHair',
-        // space
-        'Cryo Drone':'flier metal antenna crystals', 'Plasma Drone':'flier metal antenna sparks',
-        'Hull Sentry':'construct metal shield antenna', 'Comms Screamer':'construct metal dish',
-        // boneyard
-        'Grave Chill':'humanoid bony crystals', 'Pyre Wretch':'humanoid bony flamecrown',
-        'Crypt Guard':'humanoid bony helmet shield',
-        // candy
-        'Slush Gob':'blob icy cherry', 'Hot Cinnamon':'blob fiery stem',
-        'Gobstopper':'blob candy swirl', 'Sour Screamer':'blob candy stem soundRings',
-        // swamp
-        'Bog Spitter':'blob slimy lilypad', 'Marsh Gas':'spirit ghostly flamecrown',
-        'Shell Lurker':'beast shell turtleShell', 'Croaker':'beast slimy frogEyes',
-        // mountain
-        'Snowcap':'construct icy crystals', 'Rockslide':'construct rocky boulders',
-        'Cliff Guard':'humanoid metal helmet shield', 'Echo Howler':'beast furry soundRings',
-        // factory
-        'Coolant Leak':'blob slimy steam', 'Slag Worker':'humanoid fiery hardhat',
-        'Rivet Hulk':'construct metal bolts', 'Klaxon':'construct metal siren',
-        // cyber
-        'Ice Daemon':'spirit icy horns', 'Overclock':'construct metal sparks antenna',
-        'Firewall':'construct metal shield flamecrown', 'Feedback':'construct metal dish soundRings',
-        // farm
-        'Frost Scarecrow':'humanoid plant strawHat', 'Barn Burner':'humanoid fiery pitchfork',
-        'Bull Hulk':'beast furry horns', 'Rooster Shriek':'flier feathery comb beak',
-        // cave
-        'Drip Lurker':'blob slimy frogEyes', 'Torchbearer':'humanoid flesh hood torch',
-        'Rock Shell':'blob rocky boulders', 'Echo Wraith':'flier furry bigEars',
-        // sky
-        'Hailstone':'blob icy crystals', 'Sunflare':'spirit fiery sunrays',
-        'Cloud Guard':'blob cloud shield', 'Thunderclap':'blob cloud lightning',
-        // ruins
-        'Dust Spitter':'humanoid bandaged urn', 'Brazier Shade':'spirit ghostly torch',
-        'Stone Sentinel':'construct rocky shield', 'Oracle Scream':'spirit ghostly scroll soundRings',
-        // toystore
-        'Water Pistol':'construct plastic waterGun', 'Sparkler':'spirit fiery sparks',
-        'Tin Soldier':'humanoid metal shako', 'Jack-in-a-Box':'construct plastic clownHair',
-        // mansion
-        'Cold Spot':'spirit ghostly crystals', 'Candle Wraith':'spirit ghostly candle',
-        'Suit of Armour':'humanoid metal helmet plume', 'Portrait Shriek':'spirit ghostly frame',
-        // beach
-        'Jellyfish':'spirit ghostly tentacles', 'Sunburn':'humanoid flesh sunglasses strawHat',
-        'Crab Shell':'beast shell claws', 'Gull Screamer':'flier feathery beak soundRings',
-        // mine
-        'Damp Crawler':'beast slimy fin', 'Firedamp':'spirit fiery steam',
-        'Ore Shell':'construct rocky pickaxe', 'Cave-in Howl':'humanoid flesh hardhat soundRings',
-        // lab
-        'Cryo Subject':'humanoid icy goggles', 'Burn Subject':'humanoid fiery goggles',
-        'Containment':'construct metal dome', 'Test Scream':'blob slimy goggles soundRings',
-        // casino
-        'Ice Dealer':'humanoid icy cards', 'Hot Streak':'humanoid fiery dice',
-        'Bouncer':'humanoid flesh sunglasses', 'Jackpot Siren':'construct metal siren cherry',
-        // dojo
-        'Frost Student':'humanoid icy headband', 'Fire Student':'humanoid fiery headband',
-        'Iron Student':'humanoid metal headband', 'Kiai Master':'humanoid flesh headband beard',
-        // underworld
-        'Soul Chill':'spirit bony crystals', 'Hellhound':'beast fiery horns',
-        'Damned Guard':'humanoid rocky horns shield', 'Tormented':'humanoid fiery horns tail',
-        // crystal
-        'Prism Shard':'construct crystal crystals', 'Refraction':'spirit crystal sparks',
-        'Facet Guard':'construct crystal shield', 'Resonance':'construct crystal bell',
-        // storm
-        'Sleet':'blob cloud crystals', 'Lightning Husk':'humanoid flesh lightning',
-        'Stormwall':'construct rocky shield lightning', 'Thunder Howl':'beast cloud lightning',
-        // mushroom
-        'Spore Chill':'humanoid plant mushroomCap', 'Blight Cap':'blob plant mushroomCap',
-        'Shield Cap':'humanoid plant mushroomCap shield', 'Screaming Bloom':'blob plant petals',
-        // void
-        'Null Spitter':'spirit cosmic vortex', 'Entropy':'blob cosmic flamecrown',
-        'Nothing Guard':'construct cosmic shield', 'The Wail':'spirit ghostly soundRings',
-        // dream
-        'Sleepwalker':'humanoid flesh nightcap', 'Bad Dream':'spirit cosmic horns',
-        'Pillow Fort':'construct cloud shield', 'Screaming Alarm':'construct metal bell',
-        // clockwork
-        'Tick Spitter':'construct metal gear', 'Overwound':'construct metal windKey',
-        'Brass Guard':'humanoid metal windKey shield', 'Chiming Horror':'spirit metal bell gear',
-        // mirror
-        'Cold Reflection':'humanoid crystal mirror', 'Glare':'spirit crystal sunrays',
-        'Silvered Guard':'humanoid crystal helmet shield', 'Shrieking Pane':'construct crystal frame',
-        // grove
-        'Dewcap':'blob slimy mushroomCap', 'Wisp':'spirit ghostly sparks',
-        'Bark Warden':'construct wood leaves shield', 'Screeching Pixie':'flier ghostly sparks',
-        // storybook
-        'Inkling':'blob slimy quill', 'Burnt Page':'spirit paper flamecrown',
-        'Bookend':'construct paper book', 'Shouting Quote':'spirit paper soundRings',
-        // astral
-        'Starchill':'spirit cosmic crystals', 'Comet':'spirit cosmic cometTail',
-        'Warden Rune':'construct cosmic rune', 'Wailing Oracle':'spirit cosmic orb',
-    };
-
-    // For a name not in the table (a future world, a custom monster): each part is guessed from
-    // keywords in the name and emoji, the surface falling back to what the world is made of.
-    const LOOK_KEYWORDS = {
-        plan: [
-            [/drone|bat|gull|pixie|wing|bird|fly|🦇|🐦|🛰️/i, 'flier'],
-            [/hound|wolf|dog|crawler|bull|crab|beetle|scarab|cat|lizard|🐂|🦀|🪲|🐺/i, 'beast'],
-            [/blob|slime|gob|ooze|jelly|puddle|bloom|🍬|💧/i, 'blob'],
-            [/ghost|wraith|spirit|wisp|banshee|shade|wail|phantom|spectre|👻/i, 'spirit'],
-            [/golem|sentry|robot|bot\b|hulk|clock|gear|machine|wall\b|⚙️|🤖/i, 'construct'],
-        ],
-        surface: [
-            [/frost|ice|cryo|chill|snow|sleet|hail|glacier|❄️|🧊/i, 'icy'],
-            [/fire|flame|burn|ember|cinder|magma|pyre|blaze|sun|🔥|☀️/i, 'fiery'],
-            [/rock|stone|boulder|obsidian|ore\b|🪨|🗿/i, 'rocky'],
-            [/iron|steel|metal|brass|rivet|tin\b|chrome|🔩/i, 'metal'],
-            [/ghost|wraith|wail|spirit|shade|phantom|👻/i, 'ghostly'],
-            [/slime|bog|ooze|drip|brine|goo/i, 'slimy'],
-            [/vine|bark|leaf|spore|bloom|cactus|thorn|🌿|🌳|🍄/i, 'plant'],
-            [/star|comet|astral|void|cosmic|null|☄️|🌀/i, 'cosmic'],
-            [/bone|skull|grave|crypt|skeleton|💀|🦴/i, 'bony'],
-        ],
-        props: [
-            [/riot/i, 'riotHelmet riotShield'], [/torch|🔦/i, 'torch'], [/rune|🔯/i, 'rune'],
-            [/comet|☄️/i, 'cometTail'], [/frost|chill|ice|❄️|🧊/i, 'crystals'],
-            [/shield|guard|🛡️/i, 'shield'], [/scream|shriek|howl|wail|shout|📣|📢/i, 'soundRings'],
-            [/horn|devil|demon|hell|😈/i, 'horns'], [/flame|fire|burn|🔥/i, 'flamecrown'],
-        ],
-    };
-    // What a world's monsters are made of when nothing in the name says otherwise.
-    const WORLD_SURFACE = {
-        arctic:'icy', volcano:'rocky', space:'metal', boneyard:'bony', candy:'candy', swamp:'slimy',
-        factory:'metal', cyber:'metal', cave:'rocky', sky:'cloud', ruins:'rocky', toystore:'plastic',
-        mansion:'ghostly', mine:'rocky', lab:'metal', underworld:'fiery', crystal:'crystal',
-        mushroom:'plant', void:'cosmic', clockwork:'metal', mirror:'crystal', grove:'plant',
-        storybook:'paper', astral:'cosmic', jungle:'furry', ocean:'slimy', dream:'cloud',
-    };
-
-    // The re-skinned name → the base class it plays (Frost / Flame / Shield / Mad Mom). Built from
-    // WORLD_MONSTERS, so a guest that only got the NAME over the wire still knows which ability
-    // mutation to grow.
-    const _MON_BASE_BY_NAME = (() => {
-        const out = { 'Frost':'Frost', 'Flame':'Flame', 'Shield':'Shield', 'Mad Mom':'Mad Mom', 'Miku':'Miku' };
-        for (const wid in WORLD_MONSTERS) WORLD_MONSTERS[wid].forEach((row, i) => { out[row[0]] = MONSTER_BASES[i]; });
-        return out;
-    })();
-    function _monBareName(name) { return String(name || '').replace(/^(BOSS|Mini)\s+/, ''); }
-    function monsterBaseName(name) { return _MON_BASE_BY_NAME[_monBareName(name)] || null; }
-
-    // name (+ emoji) + world → { plan, surface, props, src } where src says how it was decided:
-    // 'table', 'keyword' or 'fallback' (a humanoid zombie in the world's colour).
-    const _themeCache = new Map();
-    function monsterTheme(name, world, emoji) {
-        const wid = (world && world.id) || world || 'city';
-        const bare = _monBareName(name);
-        const key = bare + '|' + wid + '|' + (emoji || '');
-        let t = _themeCache.get(key);
-        if (t) return t;
-        const row = MONSTER_LOOKS[bare];
-        if (row) {
-            const w = row.split(/\s+/);
-            t = { plan: w[0], surface: w[1], props: w.slice(2), src: 'table' };
-        } else {
-            const txt = bare + ' ' + (emoji || '');
-            const pick = (list) => { for (const [re, v] of list) if (re.test(txt)) return v; return null; };
-            const plan = pick(LOOK_KEYWORDS.plan), surface = pick(LOOK_KEYWORDS.surface);
-            const props = [];
-            for (const [re, v] of LOOK_KEYWORDS.props) if (re.test(txt)) for (const p of v.split(' ')) if (props.length < 2 && props.indexOf(p) < 0) props.push(p);
-            const any = plan || surface || props.length;
-            t = { plan: plan || 'humanoid', surface: surface || WORLD_SURFACE[wid] || 'flesh', props,
-                  src: any ? 'keyword' : 'fallback' };
-        }
-        if (!MONSTER_PLANS[t.plan]) t.plan = 'humanoid';
-        if (!MONSTER_SURFACES[t.surface]) t.surface = 'flesh';
-        t.props = t.props.filter(p => MONSTER_PROPS[p]);
-        t.key = t.plan + ' ' + t.surface + ' ' + t.props.join(' ');
-        _themeCache.set(key, t);
-        return t;
-    }
-
-    function _mixHex(a, b, t) {
-        const pa = parseInt(String(a).slice(1).padEnd(6, '0').slice(0, 6), 16), pb = parseInt(String(b).slice(1).padEnd(6, '0').slice(0, 6), 16);
-        if (!isFinite(pa) || !isFinite(pb)) return a;
-        const ch = (p, s) => (p >> s) & 255;
-        const c = (s) => Math.round(ch(pa, s) + (ch(pb, s) - ch(pa, s)) * t);
-        return '#' + ((1 << 24) | (c(16) << 16) | (c(8) << 8) | c(0)).toString(16).slice(1);
-    }
-
-    // The full list of primitives for one look: the plan's body, the surface trim, the props, then
-    // the base ability's mutation. Cached by (look, base) — it is the same for every monster that
-    // shares it. Each primitive: { s, d, p, m, r, sc, role, pv, side, src }.
-    const _lookPartsCache = new Map();
-    function monsterLookParts(theme, base) {
-        const key = theme.key + '|' + (base || '');
-        let out = _lookPartsCache.get(key);
-        if (out) return out;
-        const plan = MONSTER_PLANS[theme.plan];
-        out = plan.parts.map(q => Object.assign({ src: 'plan' }, q));
-        const place = (list, src) => {
-            for (const e of list || []) {
-                const [an, s, d, off, m, r, sc] = e;
-                const A = plan.anchors[an] || plan.anchors.body;
-                const k = A[3] || 1;
-                out.push({ s, d: d.map(v => v * k), p: [A[0] + off[0]*k, A[1] + off[1]*k, A[2] + off[2]*k],
-                           m, r: r || null, sc: sc || null, role: src === 'prop' ? 'prop:' + e._prop : src, src });
-            }
-        };
-        place(MONSTER_SURFACES[theme.surface].deco, 'surface');
-        for (const pn of theme.props) { place(MONSTER_PROPS[pn].map(e => Object.assign(e.slice(), { _prop: pn })), 'prop'); }
-        if (base && MONSTER_MUTATIONS[base]) place(MONSTER_MUTATIONS[base], 'mutation');
-        _lookPartsCache.set(key, out);
-        return out;
-    }
-    // Everything a renderer needs for one monster object, from what every peer already has.
-    function monsterLook(m) {
-        const theme = monsterTheme(m.name, currentWorld, m.emoji);
-        const base = m.mut || monsterBaseName(m.name);
-        return { theme, base, parts: monsterLookParts(theme, base), plan: MONSTER_PLANS[theme.plan],
-                 surf: MONSTER_SURFACES[theme.surface] };
-    }
-
     // ======================== GAME STATE ========================
     // Seeded as empty arrays, not left undefined — ptInBld/isInShade and friends iterate these before
     // the first world is generated, and `for (const b of undefined)` throws.
@@ -14433,129 +13929,6 @@ const col = b.color || BLDG_COLORS[0];
             ctx.restore();
         });
     }
-    // ===== Themed wave monsters (2D) =====
-    // The flat views draw the SAME primitive lists the 3D builder uses, projected once per look and
-    // cached: from above for top-down / third-person ('top'), from the front for the raycast
-    // first-person sprite ('front'). So a beast is long with four legs and a tail in every camera, a
-    // riot husk carries its shield in every camera, and nothing can drift between renderers.
-    function _eulerXYZ(r) {
-        if (!r) return null;
-        const a = Math.cos(r[0]), b = Math.sin(r[0]), c = Math.cos(r[1]), d = Math.sin(r[1]), e = Math.cos(r[2]), f = Math.sin(r[2]);
-        const ae = a*e, af = a*f, be = b*e, bf = b*f;
-        return [ c*e, -c*f, d,  af + be*d, ae - bf*d, -b*c,  bf - ae*d, be + af*d, a*c ];
-    }
-    function _mvec(M, v) {
-        if (!M) return v;
-        return [ M[0]*v[0] + M[1]*v[1] + M[2]*v[2], M[3]*v[0] + M[4]*v[1] + M[5]*v[2], M[6]*v[0] + M[7]*v[1] + M[8]*v[2] ];
-    }
-    // view: 'top' → screen (u, v) = (-x, z), depth y;  'front' → (u, v) = (-x, -y), depth z.
-    function _projectLook(parts, view) {
-        const out = [];
-        const U = (w) => -w[0], V = view === 'top' ? (w) => w[2] : (w) => -w[1];
-        const D = view === 'top' ? 1 : 2, ui = 0, vi = view === 'top' ? 2 : 1;
-        for (const q of parts) {
-            const M = _eulerXYZ(q.r), S = q.sc || [1, 1, 1], d = q.d;
-            const absM = M || [1,0,0, 0,1,0, 0,0,1];
-            const ext = (e) => [0, 1, 2].map(i => Math.abs(absM[i*3])*e[0]*S[0] + Math.abs(absM[i*3+1])*e[1]*S[1] + Math.abs(absM[i*3+2])*e[2]*S[2]);
-            let c = q.p.slice(), E, sh;
-            if (q.s === 'cyl' || q.s === 'cone') {
-                const rt = (q.s === 'cone' ? 0 : d[0]) * S[0], rb = (q.s === 'cone' ? d[0] : d[1]) * S[0];
-                const ax = _mvec(M, [0, d[q.s === 'cone' ? 1 : 2] * S[1] / 2, 0]);
-                E = ext([Math.max(d[0], q.s === 'cone' ? 0 : d[1]), d[q.s === 'cone' ? 1 : 2] / 2, Math.max(d[0], q.s === 'cone' ? 0 : d[1])]);
-                const au = U(ax), av = V(ax), al = Math.hypot(au, av), rMax = Math.max(rt, rb);
-                if (al < rMax * 0.6) sh = { k: 'ell', cx: U(c), cy: V(c), rx: Math.max(E[ui], 0.02), ry: Math.max(E[vi], 0.02) };
-                else {
-                    const nu = -av / al, nv = au / al, bu = U(c) - au, bv = V(c) - av, tu = U(c) + au, tv = V(c) + av;
-                    sh = { k: 'poly', pts: rt > 0.001
-                        ? [bu + nu*rb, bv + nv*rb, tu + nu*rt, tv + nv*rt, tu - nu*rt, tv - nv*rt, bu - nu*rb, bv - nv*rb]
-                        : [bu + nu*rb, bv + nv*rb, tu, tv, bu - nu*rb, bv - nv*rb] };
-                }
-            } else if (q.s === 'box') {
-                E = ext([d[0]/2, d[1]/2, d[2]/2]);
-                sh = { k: 'rect', cx: U(c), cy: V(c), hw: E[ui], hh: E[vi] };
-            } else if (q.s === 'tor') {
-                const n = _mvec(M, [0, 0, 1]);
-                const R = d[0] * S[0];
-                E = ext([d[0] + d[1], d[0] + d[1], d[1]]);
-                const rx = R * Math.sqrt(Math.max(0, 1 - n[ui]*n[ui])), ry = R * Math.sqrt(Math.max(0, 1 - n[vi]*n[vi]));
-                sh = { k: 'ring', cx: U(c), cy: V(c), rx: Math.max(rx, d[1]), ry: Math.max(ry, d[1]), lw: d[1] * 2 };
-            } else {
-                // sphere-ish: sph / oct / dod / hemi (a dome sitting on its centre)
-                const rr = d[0];
-                if (q.s === 'hemi') { const o = _mvec(M, [0, rr * S[1] / 2, 0]); c = [c[0] + o[0], c[1] + o[1], c[2] + o[2]]; }
-                E = ext([rr, q.s === 'hemi' ? rr / 2 : rr, rr]);
-                if (q.s === 'hemi' && view === 'front') sh = { k: 'dome', cx: U(c), cy: V(c) + E[1], rx: E[0], ry: E[1] * 2 };
-                else sh = { k: 'ell', cx: U(c), cy: V(c), rx: E[ui], ry: E[vi] };
-            }
-            sh.m = q.m; sh.eye = q.m === 'eye';
-            sh.order = sh.eye ? 1e6 : (view === 'top' ? c[1] + E[1] : c[2] + E[2]);
-            out.push(sh);
-        }
-        out.sort((a, b) => a.order - b.order);
-        return out;
-    }
-    function _lookProj(parts, view) {
-        const k = view === 'top' ? '_projTop' : '_projFront';
-        return parts[k] || (parts[k] = _projectLook(parts, view));
-    }
-    // Draws one look with its origin at the current transform. `col` is the body colour to use
-    // (already tinted for a hit flash / freeze / stun), `s` pixels per r-unit.
-    function _drawLookShapes(c2, shapes, s, look, col, baseAlpha) {
-        const S = look.surf;
-        const dk = shade(col, -28);
-        const resolve = (key) => {
-            if (key === 'acc') key = S.acc;
-            if (key === 'body') return [col, S.opacity || 1];
-            if (key === 'bodyDk') return [dk, S.opacity ? Math.min(1, S.opacity + 0.15) : 1];
-            if (key === 'eye') return [S.eye, 1];
-            const hex = key.replace(/^[!~*]+/, '');
-            return [hex, key.indexOf('~') >= 0 ? 0.5 : 1];
-        };
-        c2.lineJoin = 'round';
-        const outline = s >= 4;          // a far, tiny figure skips its outlines
-        for (const sh of shapes) {
-            const [fill, a] = resolve(sh.m);
-            c2.globalAlpha = baseAlpha * a;
-            if (sh.k === 'ring') {
-                c2.strokeStyle = fill; c2.lineWidth = Math.max(1, sh.lw * s);
-                c2.beginPath(); c2.ellipse(sh.cx * s, sh.cy * s, sh.rx * s, sh.ry * s, 0, 0, Math.PI * 2); c2.stroke();
-                continue;
-            }
-            c2.fillStyle = fill;
-            c2.beginPath();
-            if (sh.k === 'ell') c2.ellipse(sh.cx * s, sh.cy * s, Math.max(0.5, sh.rx * s), Math.max(0.5, sh.ry * s), 0, 0, Math.PI * 2);
-            else if (sh.k === 'dome') c2.ellipse(sh.cx * s, sh.cy * s, Math.max(0.5, sh.rx * s), Math.max(0.5, sh.ry * s), 0, Math.PI, Math.PI * 2);
-            else if (sh.k === 'rect') c2.rect((sh.cx - sh.hw) * s, (sh.cy - sh.hh) * s, sh.hw * 2 * s, sh.hh * 2 * s);
-            else { const p = sh.pts; c2.moveTo(p[0] * s, p[1] * s); for (let i = 2; i < p.length; i += 2) c2.lineTo(p[i] * s, p[i+1] * s); }
-            c2.closePath();
-            c2.fill();
-            if (outline && !sh.eye) { c2.strokeStyle = 'rgba(0,0,0,0.35)'; c2.lineWidth = 1; c2.stroke(); }
-        }
-        c2.globalAlpha = baseAlpha;
-    }
-    // Top-down / third-person: the figure seen from above, facing the player.
-    function drawMonsterTop2D(m, x, y, col) {
-        const look = monsterLook(m);
-        const tinted = col !== m.color;
-        const bodyCol = tinted ? col : monsterSurfaceColor(m.color, look.theme.surface);
-        const ang = player ? Math.atan2(player.y - m.y, player.x - m.x) : 0;
-        const s = (m.r || 14) * 0.85;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(ang - Math.PI / 2);
-        _drawLookShapes(ctx, _lookProj(look.parts, 'top'), s, look, bodyCol, ctx.globalAlpha);
-        ctx.restore();
-    }
-    // Raycast first person: the figure from the front, feet on (x, baseY), `s` px per r-unit.
-    function drawMonsterFront2D(c2, m, x, baseY, s, col) {
-        const look = monsterLook(m);
-        const bodyCol = (col && col !== m.color) ? col : monsterSurfaceColor(m.color, look.theme.surface);
-        c2.save();
-        c2.translate(x, baseY);
-        _drawLookShapes(c2, _lookProj(look.parts, 'front'), s, look, bodyCol, c2.globalAlpha);
-        c2.restore();
-        return look.plan.height * s;     // how tall it stood, so the caller can put the emoji on top
-    }
     function drawSummon2D(a) {
         const kind = summonKind(a);
         const ang = _summonFacing(a);
@@ -14975,7 +14348,7 @@ const col = b.color || BLDG_COLORS[0];
         // Collect billboards (sprites) — monsters, bullets, pickups, traps, allies, turrets, remote players
         // `size` is a WORLD-space height; `hover` is how far off the ground it floats (world units).
         const sprites = [];
-        for (const m of monsters)     sprites.push({ x:m.x, y:m.y, size: m.r*2.4, emoji: m.emoji, color: m.color, hpBar: m.hp/m.maxHp, mon: m.isBoss ? null : m });
+        for (const m of monsters)     sprites.push({ x:m.x, y:m.y, size: m.r*2.4, emoji: m.emoji, color: m.color, hpBar: m.hp/m.maxHp });
         for (const pk of pickups) {
             // Emoji comes from the backpack item table so a new item only has to be defined once.
             const e = pk.type==='sikunaFinger' ? '🖐️' : (BP_ITEM[pk.type] ? BP_ITEM[pk.type].emoji : '🪙');
@@ -15018,21 +14391,9 @@ const col = b.color || BLDG_COLORS[0];
             // Occlusion check (use depth buffer at center column)
             const cx = Math.floor(screenX);
             if (cx >= 0 && cx < W && depth[cx] < corrected - 5) continue;
-            if (s.mon) {
-                // A wave monster stands as its own figure, its emoji worn above it like a badge.
-                const _mc = s.mon.hitFlash > 0 ? '#ffffff' : s.mon.frozen > 0 ? '#48dbfb' : s.mon.stunned > 0 ? '#ff6b6b' : s.mon.color;
-                if (s.mon.phasing) ctx.globalAlpha = 0.5;
-                const _tall = drawMonsterFront2D(ctx, s.mon, screenX, baseY, sz * 0.3, _mc);
-                ctx.globalAlpha = 1;
-                const _es = Math.max(8, Math.round(sz * 0.32));
-                ctx.font = `${_es}px serif`; ctx.textAlign='center'; ctx.textBaseline='bottom';
-                ctx.fillStyle = '#fff';
-                if (s.emoji) ctx.fillText(s.emoji, screenX, baseY - _tall - 2);
-            } else {
             ctx.font = `${Math.round(sz)}px serif`; ctx.textAlign='center'; ctx.textBaseline='bottom';
             ctx.fillStyle = s.color || '#fff';
             ctx.fillText(s.emoji, screenX, baseY);
-            }
             if (s.hpBar !== undefined && s.hpBar < 1) {
                 // Capped — an up-close monster projects hundreds of px tall and an
                 // sz-proportional bar would stretch right across the screen.
@@ -15811,119 +15172,8 @@ const col = b.color || BLDG_COLORS[0];
         return _groundPat;
     }
     function makeMonsterMesh(m) {
-        // Bosses are NOT zombies wearing a costume — each gets its own real creature body. The few
-        // bosses without a body plan keep the old zombie figure, exactly as before.
-        if (m.isBoss) { const bm = makeBossMesh(m); return bm || _makeZombieMesh(m); }
-        // Every wave monster is built as what its name says (see MONSTER LOOKS).
-        return makeThemedMonsterMesh(m);
-    }
-    // ===== Themed wave monsters (3D) =====
-    // One builder for every look: the plan, surface, props and ability mutation are all primitive
-    // lists, so this only has to know how to turn a primitive into a mesh. Built at a FIXED radius so
-    // the geometry is shared by every monster (render3D scales the group to the monster's real r);
-    // trim materials come from the `_pf` pool. Only the body material is per monster, because the
-    // hit flash lights it up. About 8–15 meshes, against the old zombie's ~130, and no lights.
-    const MON_R = 14;
-    function _monGeo(s, d) {
-        const a = d.map(v => Math.round(v * MON_R * 100) / 100);
-        switch (s) {
-            case 'sph':  return TG.Sphere(a[0], 10, 8);
-            case 'hemi': return TG.Sphere(a[0], 10, 6, 0, Math.PI * 2, 0, Math.PI / 2);
-            case 'box':  return TG.Box(a[0], a[1], a[2]);
-            case 'cyl':  return TG.Cylinder(a[0], a[1], a[2], 8);
-            case 'cone': return TG.Cone(a[0], a[1], 6);
-            case 'tor':  return TG.Torus(a[0], a[1], 6, 14);
-            case 'oct':  return TG.Octahedron(a[0]);
-            case 'dod':  return TG.Dodecahedron(a[0]);
-        }
-        return TG.Sphere(a[0] || 3, 8, 6);
-    }
-    // The monster's own colour pulled toward what it is made of — shared by the 3D and 2D renderers.
-    const _surfColCache = new Map();
-    function monsterSurfaceColor(col, surfName) {
-        const k = col + '|' + surfName;
-        let c = _surfColCache.get(k);
-        if (!c) {
-            const S = MONSTER_SURFACES[surfName] || MONSTER_SURFACES.flesh;
-            c = _mixHex(typeof col === 'string' && col[0] === '#' ? col : '#ff3838', S.mix, S.mixT);
-            _surfColCache.set(k, c);
-        }
-        return c;
-    }
-    function _monMat(key, col, surfName) {
-        const S = MONSTER_SURFACES[surfName];
-        if (key === 'acc') key = S.acc;
-        if (key === 'bodyDk') {
-            const c = shade(monsterSurfaceColor(col, surfName), -28);
-            return _pf('mon|dk|' + c + '|' + surfName, () => new THREE.MeshStandardMaterial({ color: _hex(c), roughness: S.rough, metalness: S.metal || 0 }));
-        }
-        if (key === 'eye') {
-            const c = _hex(S.eye);
-            return _pf('mon|eye|' + S.eye, () => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.9, roughness: 0.3 }));
-        }
-        const hex = key.replace(/^[!~*]+/, ''), mod = key.slice(0, key.length - hex.length);
-        return _pf('mon|' + key, () => {
-            const o = { color: _hex(hex), roughness: 0.75, metalness: 0.05 };
-            if (mod.indexOf('!') >= 0) { o.emissive = _hex(hex); o.emissiveIntensity = 0.9; o.roughness = 0.4; }
-            if (mod.indexOf('~') >= 0) { o.transparent = true; o.opacity = 0.5; o.roughness = 0.1; o.depthWrite = false; }
-            if (mod.indexOf('*') >= 0) { o.metalness = 0.85; o.roughness = 0.25; }
-            return new THREE.MeshStandardMaterial(o);
-        });
-    }
-    function makeThemedMonsterMesh(m) {
-        const L = monsterLook(m), R = MON_R, surfName = L.theme.surface, S = L.surf;
-        const g = new THREE.Group();
-        const bc = _hex(monsterSurfaceColor(m.color, surfName));
-        const glow = S.glowSelf ? bc : (S.glow ? _hex(S.glow) : bc);
-        const gi = S.gi || 0.08;
-        const bodyOpts = { color: bc, roughness: S.rough, metalness: S.metal || 0, emissive: glow, emissiveIntensity: gi };
-        if (S.opacity) { bodyOpts.transparent = true; bodyOpts.opacity = S.opacity; }
-        const bodyMat = new THREE.MeshStandardMaterial(bodyOpts);
-        const parts = {}, legs = [], wings = [];
-        for (const q of L.parts) {
-            const isBody = q.m === 'body' || (q.m === 'acc' && S.acc === 'body');
-            const mesh = new THREE.Mesh(_monGeo(q.s, q.d), isBody ? bodyMat : _monMat(q.m, m.color, surfName));
-            if (q.r) mesh.rotation.set(q.r[0], q.r[1], q.r[2]);
-            if (q.sc) mesh.scale.set(q.sc[0], q.sc[1], q.sc[2]);
-            if (q.pv) {
-                // A limb that moves hangs from a pivot at the hip / shoulder, so it swings, not spins.
-                const piv = new THREE.Group();
-                piv.position.set(q.pv[0] * R, q.pv[1] * R, q.pv[2] * R);
-                mesh.position.set((q.p[0] - q.pv[0]) * R, (q.p[1] - q.pv[1]) * R, (q.p[2] - q.pv[2]) * R);
-                piv.userData.side = q.side || 1;
-                piv.add(mesh); g.add(piv);
-                (q.role === 'wing' ? wings : legs).push(piv);
-            } else {
-                mesh.position.set(q.p[0] * R, q.p[1] * R, q.p[2] * R);
-                g.add(mesh);
-            }
-            if (q.role === 'torso' || q.role === 'head' || q.role === 'leg') mesh.castShadow = true;
-            mesh.name = q.role;
-            (parts[q.role] = parts[q.role] || []).push(mesh);
-            if (q.role === 'head') g.userData.head = mesh;
-        }
-        if (legs.length) g.userData.legs = legs;      // render3D walks these, as it does the Reaper's
-        if (wings.length) g.userData.wings = wings;   // and flaps these
-        g.userData.flashBase = { hex: glow, ei: gi }; // what the hit flash returns the body to
-        // HP bar — billboard above the head, same as before
-        const hpGroup = new THREE.Group();
-        const hpBg = new THREE.Mesh(TG.Plane(R*2.2, R*0.32), _pf('mon|hpbg', () => new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.65, depthTest: false })));
-        const hpFill = new THREE.Mesh(TG.Plane(R*2.0, R*0.22), new THREE.MeshBasicMaterial({ color: 0x26de81, depthTest: false }));
-        hpFill.position.z = 0.1;
-        hpGroup.add(hpBg); hpGroup.add(hpFill);
-        hpGroup.position.set(0, R * (L.plan.height + 0.35), 0);
-        hpGroup.userData.fill = hpFill;
-        g.add(hpGroup);
-        g.userData.hpBar = hpGroup;
-        g.userData.baseR = R;
-        g.userData.parts = parts;
-        g.userData.look = L.theme.key;
-        g.userData.plan = L.theme.plan;
-        g.userData.bodyHex = monsterSurfaceColor(m.color, surfName);
-        return g;
-    }
-    // The old ~130-mesh zombie. Only reached by a boss with no boss body.
-    function _makeZombieMesh(m) {
+        // Bosses are NOT zombies wearing a costume — each gets its own real creature body.
+        if (m.isBoss) { const bm = makeBossMesh(m); if (bm) return bm; }
         const r = m.r || 14;
         const group = new THREE.Group();
         const baseCol = _hex(m.color || '#ff3838');
@@ -16272,28 +15522,9 @@ const col = b.color || BLDG_COLORS[0];
         const hp = g.userData.hpBar;
         for (const child of [...g.children]) { if (child === hp) continue; g.remove(child); detail.add(child); }
         g.add(detail);
-        const simple = new THREE.Group();
-        const plan = g.userData.plan && MONSTER_PLANS[g.userData.plan];
-        if (plan) {
-            // A themed monster's stand-in keeps its body plan's silhouette (a blob stays round, a beast
-            // long and low) in two meshes, from one pooled material per colour.
-            const hex = g.userData.bodyHex || m.color || '#ff3838';
-            const smat = _pf('mon|simple|' + hex, () => new THREE.MeshStandardMaterial({ color: _hex(hex), roughness: 0.9, metalness: 0.05 }));
-            for (const q of plan.simple) {
-                const sm = new THREE.Mesh(_monGeo(q.s, q.d), smat);
-                sm.position.set(q.p[0]*MON_R, q.p[1]*MON_R, q.p[2]*MON_R);
-                if (q.r) sm.rotation.set(q.r[0], q.r[1], q.r[2]);
-                if (q.sc) sm.scale.set(q.sc[0], q.sc[1], q.sc[2]);
-                sm.castShadow = true; simple.add(sm);
-            }
-            simple.visible = false;
-            g.add(simple);
-            g.userData.detail = detail;
-            g.userData.simple = simple;
-            return g;
-        }
         const r = m.r || 14;
         const mat = new THREE.MeshStandardMaterial({ color: _hex(m.color || '#ff3838'), roughness: 0.9, metalness: 0.05 });
+        const simple = new THREE.Group();
         const body = new THREE.Mesh(TG.Cylinder(r*0.5, r*0.58, r*2.5, 7), mat);
         body.position.y = r*1.85; body.castShadow = true; simple.add(body);
         const head = new THREE.Mesh(TG.Sphere(r*0.52, 8, 6), mat);
@@ -19079,25 +18310,9 @@ const col = b.color || BLDG_COLORS[0];
                 mesh.scale.setScalar((m.r||14) / baseR);
                 // Hit flash
                 const body = mesh.userData.head || mesh.children[0];
-                const _fb = mesh.userData.flashBase;
-                if (_fb) {
-                    // Themed body: its glow belongs to its surface (ice, fire, starlight) — only touch the
-                    // material when the flash starts or ends, not every frame.
-                    const fl = m.hitFlash > 0;
-                    if (mesh.userData._flashing !== fl && body && body.material && body.material.emissive) {
-                        mesh.userData._flashing = fl;
-                        body.material.emissive.setHex(fl ? 0xffffff : _fb.hex);
-                        body.material.emissiveIntensity = fl ? 1.2 : _fb.ei;
-                    }
-                } else if (body && body.material) {
+                if (body && body.material) {
                     if (m.hitFlash > 0) { body.material.emissive.setHex(0xffffff); body.material.emissiveIntensity = 1.2; }
                     else { body.material.emissive.setHex(_hex(m.color || '#ff3838')); body.material.emissiveIntensity = 0.08; }
-                }
-                // Fliers flap (only while the detailed body is the one showing).
-                const _wings = mesh.userData.wings;
-                if (_wings && (!mesh.userData.detail || mesh.userData.detail.visible)) {
-                    const fa = 0.25 + Math.sin(Date.now() / 110 + m.x * 0.05) * 0.45;
-                    for (let k = 0; k < _wings.length; k++) _wings[k].rotation.z = _wings[k].userData.side * fa;
                 }
                 // HP bar — face camera and scale fill by HP ratio
                 const hp = mesh.userData.hpBar;
@@ -19738,11 +18953,8 @@ const col = b.color || BLDG_COLORS[0];
                 _upright(m.x, m.y + bounce, () => drawReaper2D(m.x, m.y + bounce, m.r, col !== m.color ? col : null, m.color));
                 if (m.phasing) ctx.globalAlpha = 1;
             }
-            // Wave monsters are drawn as what their name says (see MONSTER LOOKS); bosses keep their art.
-            const _themed = !_reaper && !m.isBoss;
-            // Rarity aura — find the monster class to get rarityColor (a re-skin goes by the class it plays)
-            const _mBase = _themed ? monsterBaseName(m.name) : null;
-            const mcDef = _reaper ? null : MONSTER_CLASSES.find(c=>c.name===m.name || (_mBase && c.name===_mBase) || c.name==='Dragon' && m.name && m.name.indexOf('Dragon')>=0);
+            // Rarity aura — find the monster class to get rarityColor
+            const mcDef = _reaper ? null : MONSTER_CLASSES.find(c=>c.name===m.name || c.name==='Dragon' && m.name && m.name.indexOf('Dragon')>=0);
             const mRc = (mcDef && mcDef.rarityColor) || '#888';
             if (!_reaper) {
             if (m.isBoss || (mcDef && (mcDef.rarity==='legendary' || mcDef.rarity==='epic'))) {
@@ -19751,9 +18963,6 @@ const col = b.color || BLDG_COLORS[0];
                 ctx.fillStyle=aura;
                 ctx.beginPath(); ctx.arc(m.x, m.y+bounce, m.r*2, 0, Math.PI*2); ctx.fill();
             }
-            if (_themed) {
-                drawMonsterTop2D(m, m.x, m.y + bounce, col);
-            } else {
             // Body with gradient
             const mGrad = ctx.createRadialGradient(m.x-m.r*0.3, m.y+bounce-m.r*0.3, 2, m.x, m.y+bounce, m.r);
             mGrad.addColorStop(0, '#ffffffcc'); mGrad.addColorStop(0.35, col); mGrad.addColorStop(1, shade(col, -30));
@@ -19765,7 +18974,6 @@ const col = b.color || BLDG_COLORS[0];
             ctx.beginPath(); ctx.arc(m.x, m.y + bounce, m.r, 0, Math.PI*2); ctx.stroke();
             // Armor (chest plate, per-monster)
             if (mcDef) drawArmor(m.x, m.y + bounce, m.r, mcDef.armorColor, mcDef.rarityColor, mcDef.name);
-            }
             if (m.phasing) ctx.globalAlpha = 1;
             }
 
@@ -19779,9 +18987,8 @@ const col = b.color || BLDG_COLORS[0];
                 ctx.strokeStyle='rgba(255,107,107,0.7)';ctx.lineWidth=3;
                 ctx.beginPath();ctx.arc(m.x,m.y+bounce,m.r+3,0,Math.PI*2);ctx.stroke();
             }
-            // Big cartoon eyes (white with black pupil) — the Reaper's are in its skull, a themed
-            // monster's are on its own face
-            if (!_reaper && !_themed) {
+            // Big cartoon eyes (white with black pupil) — the Reaper's are in its skull instead
+            if (!_reaper) {
             const ea=Math.atan2(player.y-m.y,player.x-m.x);
             const ex1=m.x+Math.cos(ea-0.4)*m.r*0.35, ey1=m.y+bounce+Math.sin(ea-0.4)*m.r*0.35;
             const ex2=m.x+Math.cos(ea+0.4)*m.r*0.35, ey2=m.y+bounce+Math.sin(ea+0.4)*m.r*0.35;

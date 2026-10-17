@@ -116,7 +116,6 @@ node tools/test-multiplayer.js index.html   # movement, prediction, interpolatio
 node tools/test-ultimates.js index.html     # ultimate forms: enter, transform, revert cleanly
 node tools/test-world-styles.js index.html  # per-world architecture across all 30 worlds
 node tools/test-summons-look.js index.html  # summons: one 2D+3D look per kind, mechanics unchanged
-node tools/test-monster-looks.js index.html # wave monsters: a look per name in 3D + every 2D camera, mechanics unchanged
 ```
 
 ### Saves
@@ -458,16 +457,3 @@ Allies carry a `kind` stamped where they are created (skeleton, wolf, clone, dec
 them; all stand on a green friendly ring. A summon with no kind falls back to the skeleton. New
 summon? Give it a kind, a 2D case and a 3D builder — `test-summons-look.js` checks all three and
 compares mechanics against a recorded baseline.
-
-### Monster looks
-Wave monsters (not bosses) are built from their NAME: `MONSTER_LOOKS` maps every name to
-`'plan surface prop prop'` (plans: humanoid, beast, blob, spirit, construct, flier; 20 surfaces; ~75
-props). Unknown names go through `LOOK_KEYWORDS`, then `WORLD_SURFACE`, then the humanoid zombie —
-`monsterTheme(name, world, emoji)` resolves it. Plans, surface trim, props and the base-ability
-`MONSTER_MUTATIONS` are all primitive lists; `makeThemedMonsterMesh` builds them in 3D (shared
-geometry at a fixed radius, trim from `_pf`, one body material per monster for the hit flash, no
-lights, ~13 meshes) and `drawMonsterTop2D` / `drawMonsterFront2D` project the SAME lists for the flat
-views. Multiplayer needs nothing new: the look comes from name + world, and `monsterBaseName()` finds
-the base class from a re-skinned name. New name in `WORLD_MONSTERS`? Add it to `MONSTER_LOOKS` —
-`test-monster-looks.js` fails on any name that falls back. Bosses without a `body` still use
-`_makeZombieMesh`.
