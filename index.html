@@ -1405,10 +1405,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         try { document.querySelectorAll('.arcade-skins-btn').forEach(b => { b.style.display = 'none'; }); } catch (e) {}
     }
     _hideSkinBtnsIfNoShop();
-    // Play coins (earned in the arcade) → rotten flesh. 1 coin = 500 🍖 = five rolls.
+    // Play coins (earned in the arcade) → rotten flesh: 150 🍖 per coin here, 143 after the shop's +5% prices.
     if (window.ArcadeShop && window.ArcadeShop.registerCurrency) {
         window.ArcadeShop.registerCurrency({
-            name: 'Rotten Flesh', emoji: '🍖', rate: 500,
+            name: 'Rotten Flesh', emoji: '🍖', rate: 150,   // was 500: flesh costs more now (the shop shows 143 after its +5%)
             grant(amount) {
                 addCoins(amount);
                 const txt = coinStr();
@@ -4227,13 +4227,33 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         else if (_mpHiddenSince) { _mpHiddenLast = Date.now(); _mpHiddenSince = 0; }
     });
 
-    // Timers in a hidden tab are clamped to about once a second, which is nowhere near smooth — but it
-    // beats a dead stop, and it keeps the host's connection and simulation alive rather than stranding
-    // every guest until the window is looked at again.
-    setInterval(() => {
-        if (!gameRunning || gamePaused || !document.hidden) return;
-        if (NET.mode === 'host' && NET.started) update();
-    }, 250);
+    // A hidden HOST used to stall every guest: main-thread timers in a hidden tab are clamped to about
+    // once a second, and the old fallback advanced ONE step per tick — about 1/60 of real speed, which
+    // reads as frozen. A Web Worker's timer is not clamped like that, so the hidden host keeps a ~60Hz
+    // clock, and each tick catches the simulation up to real time in fixed steps, exactly like
+    // gameLoop does. update() broadcasts state to the guests, so they keep playing at normal speed.
+    // Nothing changes while the window is visible: requestAnimationFrame drives the game then.
+    let _bgLast = 0, _bgAcc = 0;
+    const BG_MAX_STEPS = 30;          // at most half a second of catch-up per tick
+    function hiddenHostTick() {
+        if (!gameRunning || gamePaused || !document.hidden || NET.mode !== 'host' || !NET.started) { _bgLast = 0; _bgAcc = 0; return; }
+        const now = performance.now();
+        if (!_bgLast) { _bgLast = now; return; }
+        _bgAcc += Math.min(now - _bgLast, 1000);
+        _bgLast = now;
+        let steps = 0;
+        while (_bgAcc >= SIM_STEP_MS && steps < BG_MAX_STEPS) { update(); _bgAcc -= SIM_STEP_MS; steps++; }
+        if (steps === BG_MAX_STEPS) _bgAcc = 0;
+        _simLast = 0; _simAcc = 0;   // when the window comes back, gameLoop starts fresh instead of double-stepping
+    }
+    let _bgWorker = null;
+    try {
+        const src = 'setInterval(function(){ postMessage(0); }, 16);';
+        _bgWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+        _bgWorker.onmessage = hiddenHostTick;
+    } catch (e) {
+        setInterval(hiddenHostTick, 250); // no workers (very old browser): the clamped timer still catches up in time
+    }
 
     function _mpAge(t) { return t ? ((Date.now() - t) / 1000) : Infinity; }
     function _mpAgeStr(t) { const a = _mpAge(t); return a === Infinity ? 'never' : a.toFixed(1) + 's ago'; }
