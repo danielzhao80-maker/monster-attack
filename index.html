@@ -1856,6 +1856,17 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             // Unlimited Void: nothing at all for a moment… then one clear chime that rings out.
             this._tone('sine',1568,1560,0.9,1.8,0.1); this._tone('sine',2349,2340,0.9,1.4,0.05); this._tone('sine',784,780,0.92,1.6,0.06);
         },
+        // ---- Sikuna: World Cutting Slash ----
+        wcsChant() {
+            // A low growl that builds under the chant.
+            this._tone('sawtooth',50,75,0,0.8,0.12); this._tone('triangle',220,330,0.2,0.6,0.04);
+        },
+        worldCut() {
+            // A sharp air-cut "SHING" over a deep CRACK.
+            this._tone('triangle',3200,6200,0,0.18,0.12); this._tone('sine',5200,2600,0.02,0.35,0.06);
+            this._tone('square',900,60,0.01,0.22,0.1); this._tone('sine',95,22,0.03,0.9,0.32);
+            this._tone('sawtooth',160,35,0.04,0.6,0.12);
+        },
         revenge() {
             const t=audioCtx.currentTime;
             [[392,0],[523,0.12],[659,0.24],[784,0.36],[1047,0.52]].forEach(([f,d]) => {
@@ -3562,6 +3573,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (d.type==='kill') { applyKillRewards(!!d.boss); if (d.boss && d.name) revengeOnKill({ isBoss: true, name: d.name }); return; }
         if (d.type==='wave') { applyWaveRewards(d.wave); return; }
         if (d.type==='status') showStatus(d.text, d.color);
+        else if (d.type==='wcs') mpClientWorldCut(d);   // Sikuna's World Cutting Slash, seen by guests
         else if (d.type==='sfx' && SFX[d.name]) SFX[d.name]();
         else if (d.type==='pause') { document.getElementById('pause-screen').style.display = d.paused ? 'flex' : 'none'; }
         else if (d.type==='gameOver') {
@@ -8918,6 +8930,31 @@ const col = b.color || BLDG_COLORS[0];
                 ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(0.5, 1.5 * (1 - p));
                 ctx.beginPath(); ctx.moveTo(e.x - ca * 0.7, e.y - sa * 0.7); ctx.lineTo(e.x + ca * 0.7, e.y + sa * 0.7); ctx.stroke();
                 ctx.lineCap = 'butt';
+            } else if (e.type === 'worldcut') {
+                // World Cutting Slash: a white-hot line flashes across the world, then the world looks
+                // SPLIT — a dark seam with a red glow — that fades out.
+                const L = e.maxR, ca = Math.cos(e.angle) * L, sa = Math.sin(e.angle) * L;
+                const flash = Math.max(0, 1 - p / 0.25);
+                ctx.globalAlpha = 1 - p; ctx.lineCap = 'butt';
+                ctx.strokeStyle = '#ff2d55'; ctx.lineWidth = 34 + 24 * flash;
+                ctx.globalAlpha = (1 - p) * 0.45;
+                ctx.beginPath(); ctx.moveTo(e.x - ca, e.y - sa); ctx.lineTo(e.x + ca, e.y + sa); ctx.stroke();
+                ctx.globalAlpha = 1 - p;
+                ctx.strokeStyle = flash > 0 ? '#ffffff' : '#120006'; ctx.lineWidth = flash > 0 ? 6 + 10 * flash : 7;
+                ctx.beginPath(); ctx.moveTo(e.x - ca, e.y - sa); ctx.lineTo(e.x + ca, e.y + sa); ctx.stroke();
+                ctx.strokeStyle = '#ff6b81'; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.moveTo(e.x - ca, e.y - sa); ctx.lineTo(e.x + ca, e.y + sa); ctx.stroke();
+            } else if (e.type === 'halves') {
+                // A monster cut clean in two: its halves slide apart on either side of the cut.
+                const r = e.maxR, nx = -Math.sin(e.angle), ny = Math.cos(e.angle), off = 3 + p * r * 1.4;
+                ctx.fillStyle = e.color;
+                for (const s of [1, -1]) {
+                    ctx.beginPath();
+                    ctx.arc(e.x + nx * off * s, e.y + ny * off * s, r, e.angle + (s > 0 ? 0 : Math.PI), e.angle + (s > 0 ? Math.PI : Math.PI * 2));
+                    ctx.closePath(); ctx.fill();
+                }
+                ctx.strokeStyle = '#ff2d55'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(e.x - Math.cos(e.angle) * r, e.y - Math.sin(e.angle) * r); ctx.lineTo(e.x + Math.cos(e.angle) * r, e.y + Math.sin(e.angle) * r); ctx.stroke();
             } else if (e.type === 'slash') {
                 const a = e.angle, sweep = 1.2, rad = 70 + p * 20;
                 ctx.strokeStyle = e.color; ctx.lineWidth = Math.max(3, 16 * (1 - p)); ctx.lineCap = 'round';
@@ -9059,6 +9096,26 @@ const col = b.color || BLDG_COLORS[0];
                     // A thin red blade-line across the monster's body, tilted like a diagonal slash.
                     mesh = new THREE.Mesh(TG.Box(e.maxR * 2, 1.6, 1.6), new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true, opacity: 1 }));
                     mesh.position.set(e.x, 16, e.y); mesh.rotation.y = -e.angle; mesh.rotation.z = 0.6;
+                } else if (e.type === 'worldcut') {
+                    // World Cutting Slash: a white-hot blade of light across the world over a red-glowing
+                    // dark seam in the ground. Fades with the generic opacity pass below.
+                    mesh = new THREE.Group();
+                    const L = e.maxR * 2;
+                    const glow = new THREE.Mesh(TG.Box(L, 0.6, 44), new THREE.MeshBasicMaterial({ color: 0xff2d55, transparent: true, opacity: 0.5, depthWrite: false }));
+                    glow.position.y = 1.2; mesh.add(glow);
+                    const seam = new THREE.Mesh(TG.Box(L, 0.8, 8), new THREE.MeshBasicMaterial({ color: 0x120006, transparent: true }));
+                    seam.position.y = 1.6; mesh.add(seam);
+                    const blade = new THREE.Mesh(TG.Box(L, 3, 3), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true }));
+                    blade.position.y = 16; mesh.add(blade);
+                    mesh.position.set(e.x, 0, e.y); mesh.rotation.y = -e.angle;
+                } else if (e.type === 'halves') {
+                    // A monster cut in two: two half-spheres in its colour that slide apart.
+                    mesh = new THREE.Group();
+                    const mat = new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true });
+                    const a = new THREE.Mesh(TG.Sphere(e.maxR, 12, 8, 0, Math.PI), mat);
+                    const b = new THREE.Mesh(TG.Sphere(e.maxR, 12, 8, Math.PI, Math.PI), mat);
+                    mesh.add(a); mesh.add(b); mesh.userData = { a, b };
+                    mesh.position.set(e.x, e.maxR, e.y); mesh.rotation.y = -e.angle;
                 } else if (e.type === 'lightning') {
                     mesh = new THREE.Group();
                     for (let i = 0; i < 6; i++) {
@@ -9240,6 +9297,14 @@ const col = b.color || BLDG_COLORS[0];
                     const q = (e.t * 0.03 + k * 0.37) % 1, ang = k * 0.628 + q * 1.4, rr = R + (e.reach - R) * (1 - q);
                     ud.streams[k].position.set(Math.cos(ang) * rr, (8 - h) * (1 - q), Math.sin(ang) * rr);
                 }
+                continue;
+            }
+            if (e.type === 'halves') {
+                // Sphere phi runs around the vertical axis; the cut runs along local x, so the halves part along z.
+                const off = 3 + p * e.maxR * 1.4, ud = e._mesh.userData;
+                if (ud.a) ud.a.position.z = off; if (ud.b) ud.b.position.z = -off;
+                e._mesh.position.y = Math.max(2, e.maxR * (1 - p * 0.6));
+                e._mesh.traverse(o => { if (o.material) o.material.opacity = 1 - p; });
                 continue;
             }
             if (e.type === 'ripple') {
@@ -10059,6 +10124,90 @@ const col = b.color || BLDG_COLORS[0];
         for (const pl of all) if (pl && pl.hp>0 && Math.hypot(pl.x-p.x,pl.y-p.y)<radius) pl.hp = Math.min(pl.maxHp, pl.hp + amt);
     }
 
+    // ---- Sikuna [Z]: WORLD CUTTING SLASH ----
+    // A short chant, then one straight cut through Sikuna along his aim that cuts the space itself:
+    // it runs right across the play area. Every ordinary monster touching the line is cut in two;
+    // a boss takes a heavy chunk of its max HP but lives; enemy shots on the line stop existing.
+    const WCS_HALF = 2400;      // the line runs this far both ways from Sikuna (the whole visible world)
+    const WCS_BAND = 46;        // and is this wide
+    const WCS_CHANT_MS = 800;   // the chant before the cut
+    const WCS_BOSS_FRAC = 0.28; // a boss loses this much of its max HP
+    function _wcsBroadcast(d) {
+        if (typeof NET !== 'undefined' && NET.mode === 'host' && NET.started) mpBroadcast(Object.assign({ t:'event', type:'wcs' }, d));
+    }
+    // Everything you SEE of the cut — shared by the host and by guests (who get it as an event).
+    function _wcsVisual(x, y, ang, cuts) {
+        spawnGameEffect('worldcut', x, y, '#ff2d55', { angle: ang, maxR: WCS_HALF, maxT: 36 });
+        spawnGameEffect('burst', x, y, '#ffffff', { maxR: 90, maxT: 16 });
+        for (const c of (cuts || []).slice(0, 40)) {
+            spawnGameEffect('halves', c.x, c.y, c.color || '#7bed9f', { angle: ang, maxR: c.r || 14, maxT: 30 });
+            spawnGameEffect('cut', c.x, c.y, '#ffffff', { angle: ang, maxR: (c.r || 14) * 1.8 + 10, maxT: 14 });
+        }
+        addShake(18);
+        try { SFX.worldCut(); } catch (e) {}
+    }
+    function _sikunaWorldCut(p, mx, my) {
+        let ang = Math.atan2(my - p.y, mx - p.x); if (!isFinite(ang)) ang = p.angle || 0;
+        const dmg = p.damage, local = (p === player), who = local ? 0 : p.idx;
+        p.invincible = Math.max(p.invincible || 0, 50);   // he is not touched while he chants
+        spawnGameEffect('ring', p.x, p.y, '#ff2d55', { maxR: 70, maxT: 48 });
+        if (local) showStatus('🐉 Dragon scales… Recoil… Twin meteors…', '#ff6b81');
+        try { SFX.wcsChant(); } catch (e) {}
+        _wcsBroadcast({ phase: 'chant', who, x: p.x, y: p.y });
+        setTimeout(() => {
+            if (typeof gameRunning !== 'undefined' && !gameRunning) return;
+            if (!p || p.hp <= 0) return;
+            _sikunaWorldCutFire(p, ang, dmg, local, who);
+        }, WCS_CHANT_MS);
+    }
+    function _sikunaWorldCutFire(p, ang, dmg, local, who) {
+        const x = p.x, y = p.y, ux = Math.cos(ang), uy = Math.sin(ang);
+        // How far a point is from the line (across it), and along it.
+        const across = (qx, qy) => Math.abs((qx - x) * uy - (qy - y) * ux);
+        const along  = (qx, qy) => Math.abs((qx - x) * ux + (qy - y) * uy);
+        const cuts = [];
+        let killed = 0, bossHit = 0;
+        _asLocalDamage(local, () => {
+            for (let i = monsters.length - 1; i >= 0; i--) {
+                const m = monsters[i]; if (!m) continue;
+                const r = m.r || 12;
+                if (across(m.x, m.y) > WCS_BAND / 2 + r || along(m.x, m.y) > WCS_HALF + r) continue;
+                m.shieldUp = false;   // space itself is cut — a shield does not stop it
+                if (m.isBoss) {
+                    bossHit++;
+                    hitMonster(m, i, Math.max(1, Math.floor((m.maxHp || m.hp) * WCS_BOSS_FRAC)), false, local);
+                    if (cuts.length < 40) cuts.push({ x: m.x, y: m.y, r: r * 0.6, color: '#ff2d55' });
+                } else {
+                    if (cuts.length < 40) cuts.push({ x: Math.round(m.x), y: Math.round(m.y), r, color: m.color });
+                    hitMonster(m, i, Math.max(Math.floor(dmg * 10), Math.ceil(m.hp) + 1), false, local);
+                    killed++;
+                }
+            }
+        });
+        // Enemy shots on the line simply stop existing.
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            const b = bullets[i];
+            if (b.owner !== 'monster' || across(b.x, b.y) > WCS_BAND / 2 + 4 || along(b.x, b.y) > WCS_HALF) continue;
+            bullets.splice(i, 1);
+        }
+        _wcsVisual(x, y, ang, cuts);
+        if (local) showStatus('🌍 WORLD CUTTING SLASH!', '#ff2d55');
+        _wcsBroadcast({ phase: 'cut', who, x: Math.round(x), y: Math.round(y), ang, cuts });
+        return { killed, bossHit };
+    }
+    // Guest side: draw what the host cut (the host already applied the kills).
+    function mpClientWorldCut(d) {
+        const mine = typeof NET !== 'undefined' && d.who === NET.myIdx;
+        if (d.phase === 'chant') {
+            if (mine) showStatus('🐉 Dragon scales… Recoil… Twin meteors…', '#ff6b81');
+            spawnGameEffect('ring', d.x, d.y, '#ff2d55', { maxR: 70, maxT: 48 });
+            try { SFX.wcsChant(); } catch (e) {}
+        } else if (d.phase === 'cut') {
+            _wcsVisual(d.x, d.y, d.ang, d.cuts);
+            if (mine) showStatus('🌍 WORLD CUTTING SLASH!', '#ff2d55');
+        }
+    }
+
     const MOVES = {
         // ====== COMMON ======
         'Physico': {
@@ -10183,7 +10332,8 @@ const col = b.color || BLDG_COLORS[0];
             z:{ cd:270, name:'Maul', color:'#a0522d', run:(p,mx,my)=>{ const a=Math.atan2(my-p.y,mx-p.x); for(let i=0;i<3;i++) _mvSpray(p,1,a+(i-1)*0.3,0,Math.floor(p.damage*1.8),'#a0522d',13); for(const m of monsters) if(Math.hypot(m.x-p.x,m.y-p.y)<140) m.slow=Math.max(m.slow||0,150); SFX.shout67(); } },
             x:{ cd:900, name:'ALPHA', color:'#a0522d', emoji:'🐺', cs:true, form:'alpha', run:(p,mx,my)=>{ enterForm(p,'alpha'); _mvRing(p.x,p.y,'#a0522d',18,52); SFX.shout67(); } } },
         'Sikuna': {
-            z:{ cd:180, name:'Demon Slash', color:'#e84118', run:(p,mx,my)=>{ const ang=Math.atan2(my-p.y,mx-p.x); for(let i=0;i<3;i++){const a=ang+(i-1)*0.45; _mvSpray(p,1,a,0,Math.floor(p.damage*2),'#e84118',14);} SFX.shoot(); } },
+            // 30 s: it wipes out every ordinary monster on a line across the whole world.
+            z:{ cd:1800, name:'World Cutting Slash', color:'#ff2d55', ownBanner:true, run:(p,mx,my)=>{ _sikunaWorldCut(p,mx,my); } },
             x:{ cd:900, name:'DEMON FORM', color:'#e84118', emoji:'👹', cs:true, form:'demon', run:(p,mx,my)=>{ enterForm(p,'demon'); _mvDmgRadius(p,260,Math.floor(p.damage*2)); addShake(15); SFX.shoot(); } } },
         'Gojo': {
             z:{ cd:240, name:'Blue Lapse', color:'#3fa9ff', run:(p,mx,my)=>{ _gojoBlue(p,mx,my); } },
@@ -10225,7 +10375,7 @@ const col = b.color || BLDG_COLORS[0];
         const _aimPt = _abilityAim(p, mx, my); const aimX = _aimPt.x, aimY = _aimPt.y;
         const m = (MOVES[p.cls.name] && MOVES[p.cls.name].z) || { cd:180, name:'Dash', color:'#0abde3', run:(p,mx,my)=>{ _mvDash(p,120,'#0abde3',mx,my); SFX.teleport(); } };
         p.moveQCooldown = m.cd;
-        if (p === player && !p.cls.infinity) {   // Gojo announces "Lapse: BLUE!" himself
+        if (p === player && !p.cls.infinity && !m.ownBanner) {   // Gojo (and World Cutting Slash) announce themselves
             showStatus(m.name.toUpperCase()+'!', m.color);
             spawnGameEffect(_abilityArchetype(m.name, 'z'), p.x, p.y, m.color || '#0abde3', { angle: p.angle, maxR: 140 });
         }

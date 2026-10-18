@@ -676,7 +676,7 @@ const sCombo = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 
       xcd: player.moveFCooldown, form: !!player.form,
       dome: gameEffects.some(function(e){ return e.type === 'dome' && e.maxR >= 300; }) }); })()`));
 check(sCombo.r[2] === 'domain' && sCombo.domain && sCombo.cd === 3600, 'E + Z + X inside the window opens Malevolent Shrine', JSON.stringify(sCombo.r));
-check(sCombo.ecd === 0 && sCombo.zcd === 0 && sCombo.xcd === 0 && !sCombo.form, 'and Finger / Demon Slash / Demon Form do NOT also fire',
+check(sCombo.ecd === 0 && sCombo.zcd === 0 && sCombo.xcd === 0 && !sCombo.form, 'and Finger / World Cutting Slash / Demon Form do NOT also fire',
       'E ' + sCombo.ecd + ' / Z ' + sCombo.zcd + ' / X ' + sCombo.xcd);
 check(sCombo.dome, 'the Shrine draws a big dome through spawnGameEffect (2D and 3D)');
 const sDot = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 0; openDomain(player);
@@ -699,7 +699,7 @@ const sTwo = JSON.parse(q(`(function(){ ${SIK_SETUP}(3);
    var r = [abilityKeyPress('x', 1000), abilityKeyPress('z', 1100)];
    ${flush}
    return JSON.stringify({ r:r, domain: !!player._domain, cd: player._domainCd, zcd: player.moveQCooldown, xcd: player.moveFCooldown }); })()`));
-check(!sTwo.domain && sTwo.cd === 0 && sTwo.zcd > 0 && sTwo.xcd > 0, 'only two keys: Demon Slash and Demon Form fire normally, no Domain', JSON.stringify(sTwo));
+check(!sTwo.domain && sTwo.cd === 0 && sTwo.zcd > 0 && sTwo.xcd > 0, 'only two keys: World Cutting Slash and Demon Form fire normally, no Domain', JSON.stringify(sTwo));
 const sLock = JSON.parse(q(`(function(){ ${SIK_SETUP}(2);
    var r = [abilityKeyPress('e', 1000), abilityKeyPress('z', 1050), abilityKeyPress('x', 1100)];
    ${flush}
@@ -720,6 +720,73 @@ check(/👹 Domain \d+s/.test(sCool.hud) && /👹 E\+Z\+X Domain/.test(sCool.hud
 check(sCool.ready, 'and it is ready again once the cooldown runs out');
 check(q(`(function(){ ${SIK_SETUP}(3); return gojoDomainReady(player) === false && domainReady(player) === true; })()`) === true,
       "Sikuna's Domain is his own, not Gojo's");
+// ---- Sikuna [Z]: World Cutting Slash ----
+console.log('\nSikuna World Cutting Slash:');
+const wcs = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 0; document.getElementById('status-overlay').textContent = '';
+   // Five monsters on the line (some far away), two off it, a boss on it, enemy shots on and off it.
+   monsters.forEach(function(m, i){ m.hp = 5000; m.maxHp = 5000; });
+   monsters[0].x = 4600; monsters[1].x = 3200; monsters[2].x = 6100; monsters[3].x = 4300; monsters[3].y = 2765;
+   monsters[4].x = 4560; monsters[4].y = 2750 + 30;   // body (r 14) still touches the 46-wide band
+   monsters.push({ x:4600, y:2900, r:14, hp:500, maxHp:500, name:'OFF1', emoji:'Z', color:'#7bed9f', speed:1, score:1, damage:5 });
+   monsters.push({ x:5200, y:2600, r:14, hp:500, maxHp:500, name:'OFF2', emoji:'Z', color:'#7bed9f', speed:1, score:1, damage:5 });
+   var boss = monsters[5]; boss.y = 2750; boss.x = 4800;
+   bullets.push({ x:4900, y:2752, vx:-3, vy:0, owner:'monster', color:'#f00' });
+   bullets.push({ x:3000, y:2748, vx:3, vy:0, owner:'monster', color:'#f00' });
+   bullets.push({ x:4900, y:2950, vx:-3, vy:0, owner:'monster', color:'#f00' });
+   var sc0 = score;
+   useMoveQ(player, 4700, 2750);
+   var chant = { banner: String(document.getElementById('status-overlay').textContent || ''), n: monsters.length, cd: player.moveQCooldown, queued: __deferred.length };
+   ${flush}
+   var names = monsters.map(function(m){ return m.name; });
+   var drew = 'ok'; try { draw2DEffects(-1e9, -1e9, 1e9, 1e9); } catch (e) { drew = e.message; }
+   var types = {}; gameEffects.forEach(function(e){ types[e.type] = (types[e.type] || 0) + 1; });
+   var wc = gameEffects.filter(function(e){ return e.type === 'worldcut'; })[0];
+   return JSON.stringify({ chant: chant, banner: String(document.getElementById('status-overlay').textContent || ''), names: names, boss: boss.hp, bossMax: boss.maxHp,
+      bossAlive: monsters.indexOf(boss) >= 0, off: monsters.filter(function(m){ return /OFF/.test(m.name); }).length,
+      bullets: bullets.filter(function(b){ return b.owner === 'monster'; }).map(function(b){ return b.x + ',' + b.y; }),
+      types: types, len: wc ? wc.maxR : 0, life: wc ? wc.maxT : 0, drew: drew, scored: score > sc0, cd: player.moveQCooldown }); })()`));
+check(wcs.chant.n === 8 && wcs.chant.queued > 0 && /Dragon scales/.test(wcs.chant.banner),
+      'Z starts the chant first: "Dragon scales… Recoil… Twin meteors…", nothing cut yet', wcs.chant.banner);
+check(/WORLD CUTTING SLASH/.test(wcs.banner), 'then the slash lands with its banner', wcs.banner);
+check(wcs.names.filter(function(n){ return n === 'Z'; }).length === 0, 'every ordinary monster touching the line is wiped out, near or far',
+      'left: ' + wcs.names.join(','));
+check(wcs.off === 2, 'monsters off the line survive', wcs.off + ' of 2');
+check(wcs.bossAlive && wcs.boss < wcs.bossMax * 0.8 && wcs.boss > 0, 'a boss on the line takes heavy damage (~28%) but survives',
+      wcs.boss + ' / ' + wcs.bossMax);
+check(wcs.bullets.length === 1 && wcs.bullets[0] === '4900,2950', 'enemy shots on the line are erased, others are not', wcs.bullets.join(' '));
+check(wcs.types.worldcut === 1 && wcs.len >= 2000 && wcs.types.halves >= 5 && wcs.drew === 'ok',
+      'a world-spanning cut and split-in-two monsters, through spawnGameEffect (2D + 3D)', JSON.stringify(wcs.types) + ' len ' + wcs.len);
+check(wcs.scored, 'kills award score as usual');
+check(wcs.chant.cd >= 1800, 'a long cooldown (30 s)', wcs.chant.cd + ' frames');
+const wcsCool = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 0;
+   player.moveQCooldown = 600; var n0 = monsters.length;
+   useMoveQ(player, 4700, 2750); var queued = __deferred.length; ${flush}
+   updateHUD(); var hud = document.getElementById('ability-display').textContent || '';
+   player.moveQCooldown = 0; updateHUD(); var hudReady = document.getElementById('ability-display').textContent || '';
+   return JSON.stringify({ queued: queued, n: monsters.length, n0: n0, hud: hud, hudReady: hudReady,
+      cut: gameEffects.some(function(e){ return e.type === 'worldcut'; }) }); })()`));
+check(wcsCool.queued === 0 && wcsCool.n === wcsCool.n0 && !wcsCool.cut, 'on cooldown Z does nothing');
+check(/\[Z\] World Cutting Slash 10s/.test(wcsCool.hud) && /\[Z\] World Cutting Slash( |$)/.test(wcsCool.hudReady),
+      'the HUD line shows "[Z] World Cutting Slash" and its countdown', wcsCool.hud.match(/\[Z\][^|]*/) + ' / ' + wcsCool.hudReady.match(/\[Z\][^|]*/));
+const wcsDom = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 0;
+   var r = [abilityKeyPress('e', 9000), abilityKeyPress('z', 9100), abilityKeyPress('x', 9200)];
+   ${flush}
+   return JSON.stringify({ r: r, domain: !!player._domain, zcd: player.moveQCooldown,
+      cut: gameEffects.some(function(e){ return e.type === 'worldcut'; }) }); })()`));
+check(wcsDom.r[2] === 'domain' && wcsDom.domain && wcsDom.zcd === 0 && !wcsDom.cut,
+      'E + Z + X still opens Malevolent Shrine, and the slash does not fire', JSON.stringify(wcsDom));
+const wcsNet = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 0;
+   var sent = [], realB = mpBroadcast, realMode = NET.mode, realStarted = NET.started;
+   mpBroadcast = function(m){ sent.push(m); }; NET.mode = 'host'; NET.started = true;
+   try { useMoveQ(player, 4700, 2750); ${flush} } finally { mpBroadcast = realB; NET.mode = realMode; NET.started = realStarted; }
+   var ev = sent.filter(function(m){ return m.t === 'event' && m.type === 'wcs'; });
+   var cut = ev.filter(function(m){ return m.phase === 'cut'; })[0];
+   gameEffects.length = 0;
+   if (cut) mpHandleEvent(JSON.parse(JSON.stringify(cut)));
+   return JSON.stringify({ phases: ev.map(function(m){ return m.phase; }), cuts: cut ? cut.cuts.length : 0,
+      guestSees: gameEffects.some(function(e){ return e.type === 'worldcut'; }) }); })()`));
+check(wcsNet.phases.join(',') === 'chant,cut' && wcsNet.cuts > 0 && wcsNet.guestSees,
+      'multiplayer: the host broadcasts the chant and the cut, and a guest draws it', JSON.stringify(wcsNet));
 q(`gameRunning = false; NET.mode = 'single';`);
 
 console.log('\n' + (ok ? 'ULTIMATES PASS' : 'ULTIMATES FAIL'));
