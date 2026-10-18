@@ -674,24 +674,38 @@ const sCombo = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 
    ${flush}
    return JSON.stringify({ r:r, domain: !!player._domain, cd: player._domainCd, ecd: player._eCd, zcd: player.moveQCooldown,
       xcd: player.moveFCooldown, form: !!player.form,
-      dome: gameEffects.some(function(e){ return e.type === 'dome' && e.maxR >= 300; }) }); })()`));
+      dome: gameEffects.some(function(e){ return e.type === 'dome'; }),
+      shrine: gameEffects.some(function(e){ return e.type === 'shrine'; }),
+      zone: (gameEffects.filter(function(e){ return e.type === 'redzone'; })[0] || {}).maxR || 0 }); })()`));
 check(sCombo.r[2] === 'domain' && sCombo.domain && sCombo.cd === 3600, 'E + Z + X inside the window opens Malevolent Shrine', JSON.stringify(sCombo.r));
-check(sCombo.ecd === 0 && sCombo.zcd === 0 && sCombo.xcd === 0 && !sCombo.form, 'and Finger / World Cutting Slash / Demon Form do NOT also fire',
+check(sCombo.ecd === 0 && sCombo.zcd === 0 && sCombo.xcd === 0 && !sCombo.form, 'and Dismantle / World Cutting Slash / Fuga do NOT also fire',
       'E ' + sCombo.ecd + ' / Z ' + sCombo.zcd + ' / X ' + sCombo.xcd);
-check(sCombo.dome, 'the Shrine draws a big dome through spawnGameEffect (2D and 3D)');
-const sDot = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 0; openDomain(player);
+check(sCombo.shrine && !sCombo.dome, 'like the anime: a shrine rises, and there is NO barrier dome');
+check(sCombo.zone >= 550, 'the red ground marks a bigger reach (550, up from 400)', 'r ' + sCombo.zone);
+const sDot = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 0; document.getElementById('status-overlay').textContent = '';
+   // one more monster, 500 away: outside the old 400 reach, inside the new one
+   monsters.push({ x:4500, y:3250, r:14, hp:5000, maxHp:5000, name:'FAR', emoji:'Z', color:'#7bed9f', speed:1, frozen:0, stunned:0, slow:0, score:1, damage:5 });
+   var far = monsters[6];
+   openDomain(player);
+   var b1 = String(document.getElementById('status-overlay').textContent || '');
+   ${flush}
+   var b2 = String(document.getElementById('status-overlay').textContent || '');
    var m0 = monsters[0].hp, b0 = monsters[5].hp, hits = 0, last = monsters[0].hp, slowed = true, frozen = false;
-   for (var f = 0; f < 300; f++) { tickPlayerTimers(player);
+   var cutsSeen = 0, linesSeen = 0, n0 = gameEffects.length;
+   for (var f = 0; f < 300; f++) { var g0 = gameEffects.length; tickPlayerTimers(player);
+      for (var k = g0; k < gameEffects.length; k++) { if (gameEffects[k].type === 'cut') cutsSeen++; if (gameEffects[k].type === 'dismantle') linesSeen++; }
       if (monsters[0].hp < last) { hits++; last = monsters[0].hp; }
       if (f < 290) monsters.forEach(function(m){ if (!(m.slow > 0)) slowed = false; if (m.frozen > 0) frozen = true; }); }
-   var cuts = 0; gameEffects.forEach(function(e){ if (e.type === 'cut') cuts++; });
    var drew = 'ok'; try { draw2DEffects(-1e9, -1e9, 1e9, 1e9); } catch (e) { drew = e.message; }
-   return JSON.stringify({ small: m0 - monsters[0].hp, boss: b0 - monsters[5].hp, hits: hits, slowed: slowed, frozen: frozen,
-      cuts: cuts, drew: drew, over: player._domain === null }); })()`));
+   return JSON.stringify({ small: m0 - monsters[0].hp, boss: b0 - monsters[5].hp, far: 5000 - far.hp, hits: hits, slowed: slowed, frozen: frozen,
+      cuts: cutsSeen, lines: linesSeen, drew: drew, over: player._domain === null, b1: b1, b2: b2 }); })()`));
+check(/Domain Expansion/.test(sDot.b1) && /MALEVOLENT SHRINE/.test(sDot.b2), 'the chant: "Domain Expansion…" then "MALEVOLENT SHRINE"', sDot.b1 + ' / ' + sDot.b2);
 check(sDot.hits >= 20 && sDot.small > 0 && sDot.over, 'monsters inside are slashed over and over, then it closes', sDot.hits + ' hits, -' + sDot.small);
+check(sDot.far > 0, 'a monster 500 away is inside the bigger reach', '-' + sDot.far);
 check(sDot.slowed && !sDot.frozen, 'they are slowed the whole time, never frozen');
 check(sDot.boss > 0 && sDot.boss < sDot.small, 'bosses take reduced but real damage', 'monster -' + sDot.small + ', boss -' + sDot.boss);
-check(sDot.cuts > 0 && sDot.drew === 'ok', 'red cut marks land on the monsters and draw in 2D', sDot.cuts + ' cuts / ' + sDot.drew);
+check(sDot.cuts >= 60 && sDot.lines >= 40 && sDot.drew === 'ok', 'Cleave and Dismantle keep striking: cut lines across monsters and the ground, drawn in 2D',
+      sDot.cuts + ' cuts, ' + sDot.lines + ' lines / ' + sDot.drew);
 const gDot = JSON.parse(q(`(function(){ ${GOJO_SETUP}(3); gojoDomain(player); var m0 = monsters[0].hp;
    for (var f = 0; f < 360; f++) tickPlayerTimers(player); return JSON.stringify({ d: m0 - monsters[0].hp, dmg: player.damage }); })()`));
 check(sDot.small >= gDot.d * 0.75 && sDot.small <= gDot.d * 1.25, 'total damage is in line with Unlimited Void', 'shrine -' + sDot.small + ' vs void -' + gDot.d);
@@ -699,13 +713,13 @@ const sTwo = JSON.parse(q(`(function(){ ${SIK_SETUP}(3);
    var r = [abilityKeyPress('x', 1000), abilityKeyPress('z', 1100)];
    ${flush}
    return JSON.stringify({ r:r, domain: !!player._domain, cd: player._domainCd, zcd: player.moveQCooldown, xcd: player.moveFCooldown }); })()`));
-check(!sTwo.domain && sTwo.cd === 0 && sTwo.zcd > 0 && sTwo.xcd > 0, 'only two keys: World Cutting Slash and Demon Form fire normally, no Domain', JSON.stringify(sTwo));
+check(!sTwo.domain && sTwo.cd === 0 && sTwo.zcd > 0 && sTwo.xcd > 0, 'only two keys: World Cutting Slash and Fuga fire normally, no Domain', JSON.stringify(sTwo));
 const sLock = JSON.parse(q(`(function(){ ${SIK_SETUP}(2);
    var r = [abilityKeyPress('e', 1000), abilityKeyPress('z', 1050), abilityKeyPress('x', 1100)];
    ${flush}
    return JSON.stringify({ r:r, domain: !!player._domain, cd: player._domainCd, zcd: player.moveQCooldown }); })()`));
 check(!sLock.domain && sLock.cd === 0 && sLock.r.every(function(x){ return x === 'fired'; }) && sLock.zcd > 0,
-      'at Lv.2 (Demon Form locked) there is no Domain, and keys are not held back', JSON.stringify(sLock.r));
+      'at Lv.2 (Fuga locked) there is no Domain, and keys are not held back', JSON.stringify(sLock.r));
 const sCool = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); openDomain(player); player._domain = null;
    player._eCd = 0; player.moveQCooldown = 0; player.moveFCooldown = 0;
    var r = [abilityKeyPress('e', 5000), abilityKeyPress('z', 5050), abilityKeyPress('x', 5100)];
@@ -787,6 +801,139 @@ const wcsNet = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 
       guestSees: gameEffects.some(function(e){ return e.type === 'worldcut'; }) }); })()`));
 check(wcsNet.phases.join(',') === 'chant,cut' && wcsNet.cuts > 0 && wcsNet.guestSees,
       'multiplayer: the host broadcasts the chant and the cut, and a guest draws it', JSON.stringify(wcsNet));
+// ---- Sikuna [E]: Dismantle ----
+console.log('\nSikuna Dismantle:');
+const dis = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); monsters = []; gameEffects.length = 0; clearGojoOrbs();
+   document.getElementById('status-overlay').textContent = '';
+   var ahead = ${mon(4600, 2750, '{ speed: 0 }')}, edge = ${mon(4865, 2913, '{ speed: 0 }')};
+   var side = ${mon(4500, 2960, '{ speed: 0 }')}, behind = ${mon(4280, 2750, '{ speed: 0 }')}, far = ${mon(5160, 2750, '{ speed: 0 }')};
+   var boss = ${mon(4700, 2770, '{ speed: 0, r: 32, hp: 50000, maxHp: 50000, isBoss: true, name: "BOSS" }')};
+   monsters.push(ahead, edge, side, behind, far, boss);
+   useAbility(player, 4800, 2750);
+   var banner = String(document.getElementById('status-overlay').textContent || '');
+   var lines = gameEffects.filter(function(e){ return e.type === 'dismantle'; });
+   var cuts = gameEffects.filter(function(e){ return e.type === 'cut'; }).length;
+   var drew = 'ok'; try { draw2DEffects(-1e9, -1e9, 1e9, 1e9); } catch (e) { drew = e.message; }
+   var cd = player._eCd, n0 = gameEffects.length, hp0 = ahead.hp;
+   useAbility(player, 4800, 2750);
+   var again = { n: gameEffects.length - n0, hurt: hp0 - ahead.hp };
+   updateHUD(); var hud = document.getElementById('ability-display').textContent || '';
+   player._eCd = 0; updateHUD(); var hudReady = document.getElementById('ability-display').textContent || '';
+   function h(m){ return 5000 - m.hp; }
+   return JSON.stringify({ banner: banner, n: lines.length, len: lines.length ? Math.min.apply(null, lines.map(function(e){ return e.maxR; })) : 0,
+      cuts: cuts, drew: drew, cd: cd, again: again, hud: hud, hudReady: hudReady,
+      ahead: h(ahead), edge: h(edge), side: h(side), behind: h(behind), far: h(far), boss: 50000 - boss.hp,
+      slowed: ahead.slow > 0 && edge.slow > 0, sideSlow: side.slow > 0 || behind.slow > 0 || far.slow > 0 }); })()`));
+check(/✂️ Dismantle!/.test(dis.banner), 'E shouts "✂️ Dismantle!"', dis.banner);
+check(dis.n >= 5 && dis.n <= 7 && dis.len >= 450, 'it fires a fan of 5-7 slash lines about 500 long', dis.n + ' lines, ' + dis.len + ' long');
+check(dis.ahead > 0 && dis.edge > 0 && dis.slowed, 'monsters in the cone are cut and slowed, down the middle and at the edge', '-' + dis.ahead + ', -' + dis.edge);
+check(dis.side === 0 && dis.behind === 0 && dis.far === 0 && !dis.sideSlow, 'beside, behind and beyond its reach: untouched');
+check(dis.boss > 0 && dis.boss < dis.ahead, 'a boss in the cone takes reduced damage', 'boss -' + dis.boss + ' vs -' + dis.ahead);
+check(dis.cuts >= 3 && dis.drew === 'ok', 'white-red cut flashes on what it hit, through spawnGameEffect (2D + 3D)', dis.cuts + ' cuts');
+check(dis.cd === 300 && dis.again.n === 0 && dis.again.hurt === 0, 'a short cooldown like Red (5 s), and it does nothing until then', dis.cd + ' frames');
+check(/✂️ Dismantle 5s/.test(dis.hud) && /✂️ \[E\] Dismantle/.test(dis.hudReady), 'the HUD line shows "[E] Dismantle" and its countdown', dis.hud.split(' | ')[0] + ' / ' + dis.hudReady.split(' | ')[0]);
+const disRed = JSON.parse(q(`(function(){ ${GOJO_SETUP}(3); monsters = []; clearGojoOrbs(); var m = ${mon(4600, 2750, '{ speed: 0 }')}; monsters.push(m);
+   useAbility(player, 4800, 2750); for (var f = 0; f < 60 && gojoOrbs.length; f++) updateGojoOrbs(); clearGojoOrbs();
+   return JSON.stringify({ d: 5000 - m.hp }); })()`));
+check(dis.ahead >= disRed.d * 0.5 && dis.ahead <= disRed.d * 1.5, 'its damage is in line with Gojo\'s Red', 'Dismantle -' + dis.ahead + ' vs Red -' + disRed.d);
+check(q(`(function(){ ${SIK_SETUP}(3); monsters = []; player.sikunaBuff = 0; useAbility(player, 4800, 2750);
+   return player.sikunaBuff === 0; })()`) === true && /type:'sikunaFinger'/.test(code) && /picker\.sikunaBuff = 600/.test(code),
+   'E no longer spends a finger; his fingers stay a passive (they still drop and buff him)');
+
+// ---- Sikuna [X]: Open… FUGA ----
+console.log('\nSikuna Fuga:');
+const fuga = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); monsters = []; gameEffects.length = 0; clearGojoOrbs();
+   document.getElementById('status-overlay').textContent = '';
+   var near = ${mon(4900, 2750, '{ speed: 0 }')}, inR = ${mon(4950, 2900, '{ speed: 0 }')}, out = ${mon(4900, 3150, '{ speed: 0 }')};
+   var boss = ${mon(5020, 2750, '{ speed: 0, r: 32, hp: 50000, maxHp: 50000, isBoss: true, name: "BOSS" }')};
+   monsters.push(near, inR, out, boss);
+   useMoveF(player, 5200, 2750);
+   ${flush}
+   var o = gojoOrbs[0];
+   var b1 = String(document.getElementById('status-overlay').textContent || '');
+   var charging = !!o && o.k === 'fuga' && o.phase === 'charge' && !!o.fxA && o.fxA.kind === 'fbow' && !player.form;
+   var untouched = near.hp === 5000;
+   for (var f = 0; f < FUGA_CHARGE; f++) updateGojoOrbs();
+   var launched = o.phase === 'fly' && !o.fxA && !!player.form && player.form.key === 'demon';
+   var b2 = String(document.getElementById('status-overlay').textContent || '');
+   var x0 = o.x; updateGojoOrbs(); var speed = o.x - x0;
+   for (var f2 = 0; f2 < 60 && o.k === 'fuga'; f2++) updateGojoOrbs();
+   var exploded = o.k === 'storm', at = Math.round(o.x);
+   var storm = gameEffects.filter(function(e){ return e.type === 'gorb' && e.kind === 'storm'; })[0];
+   var hurt = { near: 5000 - near.hp, inR: 5000 - inR.hp, out: 5000 - out.hp, boss: 50000 - boss.hp };
+   var burn = { near: near._burn > 0, inR: inR._burn > 0, out: !!(out._burn > 0), boss: boss._burn > 0, nd: near._burnDmg, bd: boss._burnDmg };
+   var drew = 'ok'; try { draw2DEffects(-1e9, -1e9, 1e9, 1e9); } catch (e) { drew = e.message; }
+   // burn ticks in the real update loop; the storm keeps topping it up while they stand in it
+   near._burn = 1; for (var f3 = 0; f3 < 40; f3++) updateGojoOrbs(); var refreshed = near._burn > 1;
+   for (var f4 = 0; f4 < 200 && gojoOrbs.length; f4++) updateGojoOrbs();
+   return JSON.stringify({ b1: b1, b2: b2, charging: charging, untouched: untouched, launched: launched, speed: speed, exploded: exploded, at: at,
+      stormR: storm ? storm.maxR : 0, hurt: hurt, burn: burn, drew: drew, refreshed: refreshed, over: gojoOrbs.length === 0, xcd: player.moveFCooldown }); })()`));
+check(/Open/.test(fuga.b1) && fuga.charging && fuga.untouched, 'X: "🔥 Open…" — flames gather into a bow and arrow in his hands first', fuga.b1);
+check(fuga.launched && /FUGA/.test(fuga.b2) && fuga.speed >= 12, 'then "FUGA!": the fire arrow flies forward fast', fuga.b2 + ', ' + fuga.speed + '/frame');
+check(fuga.launched, 'and his DEMON FORM triggers as it is loosed (like Hollow Purple and Six Eyes)');
+check(fuga.exploded && fuga.at < 4900 && fuga.stormR >= 200, 'it bursts on the first monster it touches, into a big firestorm', 'burst at x=' + fuga.at + ', r ' + fuga.stormR);
+check(fuga.hurt.near > 0 && fuga.hurt.inR > 0 && fuga.burn.near && fuga.burn.inR, 'everything in the radius takes heavy damage and is set burning (the burn DoT)',
+      '-' + fuga.hurt.near + ', -' + fuga.hurt.inR);
+check(fuga.hurt.out === 0 && !fuga.burn.out, 'outside the radius: untouched');
+check(fuga.hurt.boss > 0 && fuga.hurt.boss < fuga.hurt.near && fuga.burn.boss && fuga.burn.bd < fuga.burn.nd, 'bosses take reduced but strong damage, and burn less',
+      'boss -' + fuga.hurt.boss + ' vs -' + fuga.hurt.near);
+check(fuga.refreshed && fuga.over, 'the firestorm keeps burning what stands in it for a few seconds, then ends');
+check(fuga.drew === 'ok', 'bow, arrow and firestorm draw in 2D (and are spawnGameEffect orbs, so 3D too)');
+check(fuga.xcd >= 1200, 'a long cooldown (20 s)', fuga.xcd + ' frames');
+const fugaRange = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); monsters = []; clearGojoOrbs(); buildings = [];
+   _sikunaFuga(player, 5200, 2750); var o = gojoOrbs[0];
+   for (var f = 0; f < 200 && o.k !== 'storm'; f++) updateGojoOrbs(); var range = Math.round(o.x - 4500);
+   clearGojoOrbs(); buildings = [{ x: 4800, y: 2600, w: 80, h: 300 }];
+   _sikunaFuga(player, 5200, 2750); o = gojoOrbs[0];
+   for (var f2 = 0; f2 < 200 && o.k !== 'storm'; f2++) updateGojoOrbs(); var wall = Math.round(o.x);
+   clearGojoOrbs(); buildings = [];
+   return JSON.stringify({ range: range, wall: wall }); })()`));
+check(fugaRange.range >= 690 && fugaRange.range <= 760, 'with nothing in the way it bursts at its maximum range (~700)', fugaRange.range);
+check(fugaRange.wall >= 4790 && fugaRange.wall < 4830, 'and it bursts on a wall', 'x=' + fugaRange.wall);
+const fugaBal = JSON.parse(q(`(function(){ var out = {};
+   ${GOJO_SETUP}(3); monsters = []; clearGojoOrbs(); var b = ${mon(4700, 2750, '{ speed: 0, r: 32, hp: 50000, maxHp: 50000, isBoss: true }')}; monsters.push(b);
+   _gojoHollowPurple(player, 5000, 2750); for (var f = 0; f < 400 && gojoOrbs.length; f++) updateGojoOrbs(); out.purple = 50000 - b.hp;
+   if (player.form) exitForm(player, true);
+   ${SIK_SETUP}(3); monsters = []; clearGojoOrbs(); b = ${mon(4700, 2750, '{ speed: 0, r: 32, hp: 50000, maxHp: 50000, isBoss: true }')}; monsters.push(b);
+   _sikunaFuga(player, 5000, 2750); for (var f2 = 0; f2 < 400 && gojoOrbs.length; f2++) updateGojoOrbs();
+   out.fuga = 50000 - b.hp + Math.floor((b._burn || 0) / 20) * (b._burnDmg || 0);   // what the burn will still do
+   if (player.form) exitForm(player, true); clearGojoOrbs();
+   return JSON.stringify(out); })()`));
+check(fugaBal.fuga > 0 && fugaBal.fuga <= fugaBal.purple * 2.5 && fugaBal.fuga >= fugaBal.purple * 0.4, 'on a boss it is in line with Hollow Purple',
+      'Fuga -' + fugaBal.fuga + ' vs Purple -' + fugaBal.purple);
+const fugaNet = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); monsters = []; gameEffects.length = 0; clearGojoOrbs();
+   _sikunaFuga(player, 5200, 2750); for (var f = 0; f < FUGA_CHARGE + 3; f++) updateGojoOrbs();
+   var fly = JSON.parse(JSON.stringify(mpSerializeGojoOrbs()));
+   for (var f2 = 0; f2 < 60 && gojoOrbs[0].k !== 'storm'; f2++) updateGojoOrbs();
+   var boom = JSON.parse(JSON.stringify(mpSerializeGojoOrbs()));
+   clearGojoOrbs(); gameEffects.length = 0;
+   mpClientGojoOrbs(fly); var a = gameEffects.filter(function(e){ return e.kind === 'fuga'; })[0];
+   var arrow = !!a && Math.abs(a.angle) < 0.05;
+   mpClientGojoOrbs(boom);
+   var st = gameEffects.some(function(e){ return e.kind === 'storm'; }) && !gameEffects.some(function(e){ return e.kind === 'fuga'; });
+   clearGojoOrbs(); gameEffects.length = 0;
+   return JSON.stringify({ arrow: arrow, storm: st }); })()`));
+check(fugaNet.arrow && fugaNet.storm, 'multiplayer: guests see the arrow (with its heading) and then the firestorm', JSON.stringify(fugaNet));
+
+// ---- multiplayer: Dismantle and the Shrine reach guests ----
+const skNet = JSON.parse(q(`(function(){ ${SIK_SETUP}(3); gameEffects.length = 0;
+   var sent = [], realB = mpBroadcast, realMode = NET.mode, realStarted = NET.started;
+   mpBroadcast = function(m){ sent.push(m); }; NET.mode = 'host'; NET.started = true;
+   try { useAbility(player, 4800, 2750); openDomain(player); } finally { mpBroadcast = realB; NET.mode = realMode; NET.started = realStarted; }
+   var ev = sent.filter(function(m){ return m.t === 'event' && m.type === 'skfx'; });
+   gameEffects.length = 0;
+   ev.forEach(function(m){ mpHandleEvent(JSON.parse(JSON.stringify(m))); });
+   var types = {}; gameEffects.forEach(function(e){ types[e.type] = (types[e.type] || 0) + 1; });
+   var n0 = gameEffects.filter(function(e){ return e.type === 'cut'; }).length;
+   for (var f = 0; f < 30; f++) mpClientTickEffects();
+   var later = gameEffects.filter(function(e){ return e.type === 'cut' || e.type === 'dismantle'; }).length;
+   for (var f2 = 0; f2 < 320; f2++) mpClientTickEffects();
+   var gone = !gameEffects.some(function(e){ return e.type === 'shrine' || e.type === 'redzone'; });
+   return JSON.stringify({ kinds: ev.map(function(m){ return m.k; }), types: types, later: later, gone: gone }); })()`));
+check(skNet.kinds.join(',') === 'dis,shrine' && skNet.types.dismantle >= 5 && skNet.types.shrine === 1 && skNet.types.redzone === 1,
+      'multiplayer: guests see the Dismantle lines and the Shrine', JSON.stringify(skNet.types));
+check(skNet.later > 0 && skNet.gone, 'and keep seeing cuts inside the Shrine until it closes', skNet.later + ' cuts mid-way');
+q(`clearGojoOrbs(); gameEffects.length = 0; if (player.form) exitForm(player, true);`);
 q(`gameRunning = false; NET.mode = 'single';`);
 
 console.log('\n' + (ok ? 'ULTIMATES PASS' : 'ULTIMATES FAIL'));

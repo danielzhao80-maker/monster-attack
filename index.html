@@ -1867,6 +1867,28 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             this._tone('square',900,60,0.01,0.22,0.1); this._tone('sine',95,22,0.03,0.9,0.32);
             this._tone('sawtooth',160,35,0.04,0.6,0.12);
         },
+        // ---- Sikuna: Dismantle, Fuga, and the Shrine's cuts ----
+        dismantle() {
+            // A quick flurry of thin "shing"s, one per slash.
+            for (let i=0;i<5;i++) this._tone('triangle',4200-i*280,1700,i*0.03,0.08,0.06);
+            this._tone('sine',900,220,0,0.14,0.05);
+        },
+        fugaOpen() {
+            // Flames gathering: a low crackling roar that rises.
+            this._tone('sawtooth',70,210,0,0.75,0.1); this._tone('triangle',280,900,0.12,0.55,0.04);
+        },
+        fugaShot() {
+            // The arrow leaves: a fast whoosh.
+            this._tone('sawtooth',1500,180,0,0.32,0.08); this._tone('sine',650,110,0,0.4,0.09);
+        },
+        fugaBoom() {
+            // The firestorm: a deep roaring explosion that keeps rumbling.
+            this._tone('sine',110,24,0,1.2,0.34); this._tone('sawtooth',230,40,0,0.9,0.14);
+            this._tone('square',520,60,0.02,0.4,0.08); this._tone('triangle',160,45,0.15,1.4,0.1);
+        },
+        shrineCut() {
+            this._tone('triangle',3800,1500,0,0.07,0.04);
+        },
         revenge() {
             const t=audioCtx.currentTime;
             [[392,0],[523,0.12],[659,0.24],[784,0.36],[1047,0.52]].forEach(([f,d]) => {
@@ -2214,7 +2236,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         { name:'Mind Swapper', emoji:'🧠', accessory:'🌀', armorColor:'#5f27cd', rarity:'secret', rarityColor:'#00ffe0', speed:3.5, hp:90, damage:10, fireRate:8, ammo:25, type:'ranged', mindSwap:true, desc:'[E] Possess enemy! Extra life if body dies' },
         { name:'Ghost', emoji:'👻', accessory:'🔗', armorColor:'#dfe6e9', rarity:'mythical', rarityColor:'#ff2d55', speed:4.0, hp:80, damage:12, fireRate:7, ammo:30, type:'ranged', ghostMode:true, desc:'[E] Turn invisible — enemies ignore you!' },
         { name:'Machine', emoji:'🤖', accessory:'🔧', armorColor:'#95a5a6', rarity:'mythical', rarityColor:'#ff2d55', speed:3.0, hp:100, damage:10, fireRate:8, ammo:30, type:'ranged', canSpawnTurret:true, desc:'Auto-spawns a turret every 60s' },
-        { name:'Sikuna', emoji:'👹', accessory:'🔥', armorColor:'#e84118', rarity:'mythical', rarityColor:'#ff2d55', speed:3.5, hp:110, damage:12, fireRate:7, ammo:30, type:'ranged', sikunaPower:true, desc:'Eat Sikuna fingers for +50% speed & damage (10s)!' },
+        { name:'Sikuna', emoji:'👹', accessory:'🔥', armorColor:'#e84118', rarity:'mythical', rarityColor:'#ff2d55', speed:3.5, hp:110, damage:12, fireRate:7, ammo:30, type:'ranged', sikunaPower:true, desc:'Fingers buff • [E] Dismantle • [Z] World Cut • [X] Fuga' },
         { name:'Gojo', emoji:'🕶️', accessory:'♾️', armorColor:'#1b2440', rarity:'mythical', rarityColor:'#ff2d55', speed:3.4, hp:105, damage:12, fireRate:7, ammo:30, type:'ranged', infinity:true, desc:'Infinity barrier • [E] Red • [Z] Blue • [X] Hollow Purple' },
         { name:'Calm Kid', emoji:'😌', accessory:'☮️', armorColor:'#74b9ff', rarity:'secret', rarityColor:'#00ffe0', speed:4.0, hp:200, damage:30, fireRate:5, ammo:60, type:'ranged', dodgeChance:0.7, desc:'70% dodge bullets & melee — super strong gun!' },
         { name:'Supporter', emoji:'💖', accessory:'⚕️', armorColor:'#26de81', rarity:'secret', rarityColor:'#00ffe0', speed:3.2, hp:130, damage:6, fireRate:8, ammo:30, type:'ranged', isSupporter:true, desc:'[E] Open Buff Panel — strongest, longest buffs!' },
@@ -3388,6 +3410,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             if (Math.abs(_recErr.y) < 0.05) _recErr.y = 0;
         }
         mpClientTickGojoFx();                // animate Gojo's orbs between packets
+        mpClientTickEffects();               // age one-shot effects (cuts, slashes, the shrine)
         mpPredictLocal();
         refreshChunks();                     // buildings/traps are generated here, not received
         if (wave !== _cliTodWave) { _cliTodWave = wave; setTimeOfDayForWave(wave); }
@@ -3574,6 +3597,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (d.type==='wave') { applyWaveRewards(d.wave); return; }
         if (d.type==='status') showStatus(d.text, d.color);
         else if (d.type==='wcs') mpClientWorldCut(d);   // Sikuna's World Cutting Slash, seen by guests
+        else if (d.type==='skfx') mpClientSikunaFx(d);  // Sikuna's Dismantle and Malevolent Shrine
         else if (d.type==='sfx' && SFX[d.name]) SFX[d.name]();
         else if (d.type==='pause') { document.getElementById('pause-screen').style.display = d.paused ? 'flex' : 'none'; }
         else if (d.type==='gameOver') {
@@ -8140,7 +8164,7 @@ const col = b.color || BLDG_COLORS[0];
         'Mind Swapper':    { name:'Possess',       emoji:'🧠', color:'#a29bfe', desc:'Wear a monster for a while' },
         'Ghost':           { name:'Vanish',        emoji:'👻', color:'#dfe6e9', desc:'Step out of the world' },
         'Machine':         { name:'Deploy Turret', emoji:'🤖', color:'#95a5a6', desc:'It shoots so you do not have to' },
-        'Sikuna':          { name:'Finger Sacrifice', emoji:'👹', color:'#e84118', desc:'Spend a finger for raw power' },
+        'Sikuna':          { name:'Dismantle',     emoji:'✂️', color:'#ff2d55', desc:'A fan of unseen slashes that cut and slow' },
         'Gojo':            { name:'Red Reversal',  emoji:'🔴', color:'#ff4757', desc:'A red orb that blasts everything off its path' },
         'Calm Kid':        { name:'Zen Burst',     emoji:'🧘', color:'#74b9ff', desc:'Full health, briefly untouchable' },
         'Supporter':       { name:'Buff Panel',    emoji:'💖', color:'#fd79a8', desc:'Hand a teammate a boost' },
@@ -8691,7 +8715,7 @@ const col = b.color || BLDG_COLORS[0];
             'OVERCLOCK':      { shape:'book',      mount:'float', mark:'grid',   n:7,  r:20, spin:0.09,  bob:3 },
             'CORRUPTED':      { shape:'gear',      mount:'float', mark:'grid',   n:9,  r:23, spin:0.28,  bob:2 },
             'LEGION':         { shape:'ghost',     mount:'float', mark:'runes',  n:9,  r:24, spin:0.06,  bob:5 },
-            'DEMON FORM':     { shape:'flame',     mount:'slam',  mark:'spikes', n:8,  r:26, spin:0,     bob:0 },
+            'FUGA':           { shape:'flame',     mount:'slam',  mark:'spikes', n:8,  r:26, spin:0,     bob:0 },
             'HOLLOW PURPLE':  { shape:'orb',       mount:'float', mark:'ring',   n:3,  r:27, spin:0.35,  bob:3 },
             'ZEN':            { shape:'lantern',   mount:'float', mark:'petals', n:5,  r:21, spin:0.02,  bob:4 },
             'BEACON':         { shape:'cross',     mount:'float', mark:'petals', n:7,  r:22, spin:0.05,  bob:5 },
@@ -8984,12 +9008,108 @@ const col = b.color || BLDG_COLORS[0];
                     ctx.fillStyle = e.color;
                     ctx.beginPath(); ctx.arc(sx, sy, 8 * (1 - p), 0, Math.PI*2); ctx.fill();
                 }
+            } else if (e.type === 'dismantle') {
+                // Dismantle: a slash you barely see — a thin white line with a faint red edge.
+                const L = e.maxR, ex = e.x + Math.cos(e.angle) * L, ey = e.y + Math.sin(e.angle) * L;
+                ctx.lineCap = 'round';
+                ctx.globalAlpha = 0.35 * (1 - p); ctx.strokeStyle = e.color; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+                ctx.globalAlpha = 0.9 * (1 - p); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2;
+                ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+                ctx.lineCap = 'butt';
+            } else if (e.type === 'redzone') {
+                // Malevolent Shrine's reach: no dome, just the ground going faintly red with a clear edge.
+                const grow = Math.min(1, p / 0.1), fade = p > 0.85 ? (p - 0.85) / 0.15 : 0, a = 1 - fade;
+                const R = e.maxR * (0.15 + 0.85 * grow);
+                ctx.globalAlpha = 0.13 * a; ctx.fillStyle = e.color;
+                ctx.beginPath(); ctx.arc(e.x, e.y, R, 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = 0.6 * a; ctx.strokeStyle = e.rim || '#ff2d55'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(e.x, e.y, R, 0, Math.PI * 2); ctx.stroke();
+                ctx.globalAlpha = 0.3 * a; ctx.lineWidth = 1.5;
+                for (let k = 0; k < 6; k++) {
+                    const s0 = e.t * 0.01 + k * 1.047;
+                    ctx.beginPath(); ctx.arc(e.x, e.y, R * 0.94, s0, s0 + 0.5); ctx.stroke();
+                }
+            } else if (e.type === 'shrine') {
+                // The shrine, from the front: a dark-red glow, a stone base lined with skulls, red
+                // pillars and a two-tier curved roof with upturned eaves.
+                const grow = Math.min(1, p / 0.1), fade = p > 0.85 ? (p - 0.85) / 0.15 : 0, a = 1 - fade;
+                const S = e.maxR * (0.4 + 0.6 * grow), x = e.x, y = e.y;
+                ctx.globalAlpha = 0.25 * a * (0.8 + 0.2 * Math.sin(e.t * 0.1)); ctx.fillStyle = '#ff2d55';
+                ctx.beginPath(); ctx.arc(x, y - S * 0.5, S * 1.25, 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = a;
+                ctx.fillStyle = '#2a1215'; ctx.fillRect(x - S * 0.9, y + S * 0.15, S * 1.8, S * 0.22);          // base
+                ctx.fillStyle = '#e9e3d0';                                                                      // skulls
+                for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(x - S * 0.7 + k * S * 0.35, y + S * 0.26, S * 0.07, 0, Math.PI * 2); ctx.fill(); }
+                ctx.fillStyle = '#7a0010';                                                                      // pillars
+                for (let k = 0; k < 4; k++) { const px = k < 2 ? -0.6 + k * 0.35 : 0.25 + (k - 2) * 0.35; ctx.fillRect(x + px * S - S * 0.05, y - S * 0.6, S * 0.1, S * 0.76); }
+                ctx.fillStyle = '#ff2d55'; ctx.globalAlpha = 0.55 * a;                                          // the glowing mouth
+                ctx.fillRect(x - S * 0.2, y - S * 0.45, S * 0.4, S * 0.6);
+                ctx.globalAlpha = a; ctx.fillStyle = '#1a0a0c';
+                _shrineRoof2D(x, y - S * 0.6, S * 1.15, S * 0.32);
+                _shrineRoof2D(x, y - S * 0.95, S * 0.75, S * 0.28);
+                ctx.strokeStyle = '#ff2d55'; ctx.lineWidth = 2; ctx.globalAlpha = 0.8 * a;
+                ctx.beginPath(); ctx.moveTo(x - S * 0.95, y - S * 0.6); ctx.lineTo(x + S * 0.95, y - S * 0.6); ctx.stroke();
             } else if (e.type === 'gorb') {
                 // Gojo's orbs. Moved every frame by their owner; `fade` 0..1 dims them in and out.
                 const a = 1 - (e.fade || 0);
                 if (a > 0.01) {
                     const R = Math.max(2, e.maxR), ph = e.t, TAU = Math.PI * 2;
-                    if (e.kind === 'blue') {
+                    if (e.kind === 'fbow' || e.kind === 'fuga' || e.kind === 'storm') {
+                        const ca = Math.cos(e.angle), sa = Math.sin(e.angle), nx = -sa, ny = ca;
+                        const fl = 0.8 + 0.2 * Math.sin(ph * 0.7);
+                        if (e.kind === 'fbow') {
+                            // Open… flames gathering into a bow, with a burning arrow nocked on it.
+                            const cx = e.x - ca * R * 0.6, cy = e.y - sa * R * 0.6;
+                            ctx.globalAlpha = 0.3 * a * fl; ctx.fillStyle = '#ff4500';
+                            ctx.beginPath(); ctx.arc(e.x, e.y, R * 1.3, 0, TAU); ctx.fill();
+                            ctx.globalAlpha = a; ctx.lineCap = 'round';
+                            ctx.strokeStyle = '#ff7f11'; ctx.lineWidth = 5;
+                            ctx.beginPath(); ctx.arc(cx, cy, R, e.angle - 1.1, e.angle + 1.1); ctx.stroke();
+                            ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+                            ctx.beginPath(); ctx.arc(cx, cy, R, e.angle - 1.1, e.angle + 1.1); ctx.stroke();
+                            const k1 = Math.cos(e.angle - 1.1) * R, k2 = Math.sin(e.angle - 1.1) * R, k3 = Math.cos(e.angle + 1.1) * R, k4 = Math.sin(e.angle + 1.1) * R;
+                            const nkx = e.x - ca * R * 0.85, nky = e.y - sa * R * 0.85;   // the string, drawn back
+                            ctx.strokeStyle = '#ffe8a3'; ctx.lineWidth = 1;
+                            ctx.beginPath(); ctx.moveTo(cx + k1, cy + k2); ctx.lineTo(nkx, nky); ctx.lineTo(cx + k3, cy + k4); ctx.stroke();
+                            ctx.strokeStyle = '#ffb142'; ctx.lineWidth = 3;                // the arrow
+                            ctx.beginPath(); ctx.moveTo(nkx, nky); ctx.lineTo(e.x + ca * R * 0.9, e.y + sa * R * 0.9); ctx.stroke();
+                            ctx.lineCap = 'butt';
+                        } else if (e.kind === 'fuga') {
+                            // The fire arrow in flight: a long flame trail, a bright shaft and a head.
+                            ctx.lineCap = 'round';
+                            ctx.globalAlpha = 0.35 * a * fl; ctx.strokeStyle = '#ff4500'; ctx.lineWidth = R * 1.6;
+                            ctx.beginPath(); ctx.moveTo(e.x - ca * 70, e.y - sa * 70); ctx.lineTo(e.x, e.y); ctx.stroke();
+                            ctx.globalAlpha = a; ctx.strokeStyle = '#ffb142'; ctx.lineWidth = 4;
+                            ctx.beginPath(); ctx.moveTo(e.x - ca * 36, e.y - sa * 36); ctx.lineTo(e.x, e.y); ctx.stroke();
+                            ctx.lineCap = 'butt';
+                            ctx.fillStyle = '#fff3c4';
+                            ctx.beginPath(); ctx.moveTo(e.x + ca * 14, e.y + sa * 14);
+                            ctx.lineTo(e.x - ca * 4 + nx * 7, e.y - sa * 4 + ny * 7); ctx.lineTo(e.x - ca * 4 - nx * 7, e.y - sa * 4 - ny * 7);
+                            ctx.closePath(); ctx.fill();
+                        } else {
+                            // The firestorm: a burning disc full of flickering flames, a white flash first.
+                            const flash = Math.max(0, 1 - ph / 14);
+                            ctx.globalAlpha = 0.22 * a; ctx.fillStyle = '#ff4500';
+                            ctx.beginPath(); ctx.arc(e.x, e.y, R, 0, TAU); ctx.fill();
+                            ctx.globalAlpha = 0.22 * a * fl; ctx.fillStyle = '#ffb142';
+                            ctx.beginPath(); ctx.arc(e.x, e.y, R * 0.55, 0, TAU); ctx.fill();
+                            for (let k = 0; k < 18; k++) {
+                                const fa = k * 2.399963, fr = R * Math.sqrt((k + 0.5) / 18) * 0.9;
+                                const fx = e.x + Math.cos(fa) * fr, fy = e.y + Math.sin(fa) * fr;
+                                const fh = 16 + 10 * Math.sin(ph * 0.3 + k * 1.3), fw = 7;
+                                ctx.globalAlpha = 0.75 * a; ctx.fillStyle = k % 3 ? '#ff7f11' : '#ffd166';
+                                ctx.beginPath(); ctx.moveTo(fx - fw, fy); ctx.quadraticCurveTo(fx, fy - fh * 1.4, fx + fw, fy); ctx.closePath(); ctx.fill();
+                            }
+                            ctx.globalAlpha = 0.6 * a; ctx.strokeStyle = '#ff6b1a'; ctx.lineWidth = 3;
+                            ctx.beginPath(); ctx.arc(e.x, e.y, R, 0, TAU); ctx.stroke();
+                            if (flash > 0) {
+                                ctx.globalAlpha = 0.8 * flash; ctx.fillStyle = '#ffffff';
+                                ctx.beginPath(); ctx.arc(e.x, e.y, R * (0.3 + 0.7 * (1 - flash)), 0, TAU); ctx.fill();
+                            }
+                        }
+                    } else if (e.kind === 'blue') {
+
                         if (e.reach) {
                             // The pull: a faint edge, a ring that keeps bending inward, and streaks of
                             // everything nearby streaming into the middle.
@@ -9131,6 +9251,14 @@ const col = b.color || BLDG_COLORS[0];
                 } else if (e.type === 'pillar') {
                     mesh = new THREE.Mesh(TG.Cylinder(8, 14, 100, 16, 1, true), new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true, opacity: 1, side: THREE.DoubleSide }));
                     mesh.position.set(e.x, 50, e.y);
+                } else if (e.type === 'gorb' && (e.kind === 'fuga' || e.kind === 'fbow' || e.kind === 'storm')) {
+                    mesh = _buildFireOrb3D(e);            // Sikuna's Fuga: bow, arrow, firestorm
+                } else if (e.type === 'dismantle') {
+                    mesh = _buildDismantle3D(e);
+                } else if (e.type === 'redzone') {
+                    mesh = _buildRedzone3D(e);
+                } else if (e.type === 'shrine') {
+                    mesh = _buildShrine3D(e);
                 } else if (e.type === 'gorb') {
                     // A Gojo orb: a core and a glowing shell (Blue adds its inward-bending swirl and
                     // streamers). Unit-sized and scaled each frame; built once, moved every frame.
@@ -9278,6 +9406,17 @@ const col = b.color || BLDG_COLORS[0];
                 if (ring) { const rs = 1 + Math.max(0, p-0.35)/0.65*5; ring.scale.set(rs,rs,1); ring.material.opacity = Math.max(0, 1 - (p-0.35)/0.65); }
                 const fade = p > 0.82 ? (p-0.82)/0.18 : 0;
                 e._mesh.traverse(o => { if (o.material && 'opacity' in o.material) { o.material.transparent = true; o.material.opacity = 1 - fade; } });
+                continue;
+            }
+            if (e._mesh.userData && e._mesh.userData.fireOrb) { _updateFireOrb3D(e); continue; }
+            if (e.type === 'dismantle') { _skFade(e._mesh.userData, 1 - p); continue; }
+            if (e.type === 'redzone' || e.type === 'shrine') {
+                const grow = Math.min(1, p / 0.1), fade = p > 0.85 ? (p - 0.85) / 0.15 : 0;
+                _skFade(e._mesh.userData, 1 - fade);
+                if (e.type === 'redzone') {
+                    const r = e.maxR * (0.15 + 0.85 * grow), ud = e._mesh.userData;
+                    ud.disc.scale.setScalar(r); ud.edge.scale.setScalar(r);
+                } else e._mesh.position.y = -170 * (1 - grow);   // the shrine rises out of the ground
                 continue;
             }
             if (e.type === 'gorb') {
@@ -9789,6 +9928,20 @@ const col = b.color || BLDG_COLORS[0];
                     o.end = 15;
                     spawnGameEffect('burst', o.x, o.y, '#a55eea', { maxR: 120, maxT: 24 });
                 }
+            } else if (o.k === 'fuga') {
+                // Sikuna's fire arrow: drawn, loosed, and it bursts on whatever it meets first.
+                if (o.phase === 'charge') {
+                    if (!o.p || o.p.hp <= 0) { _gojoEndOrb(i); continue; }
+                    _fugaCharge(o);
+                    if (o.t >= FUGA_CHARGE) { _fugaLaunch(o); o.t = 0; }
+                    continue;
+                }
+                o.x += o.ux * FUGA_SPEED; o.y += o.uy * FUGA_SPEED; o.dist += FUGA_SPEED;
+                o.fx.x = o.x; o.fx.y = o.y;
+                if (o.dist >= FUGA_RANGE || ptInBld(o.x, o.y, 4) || _fugaTouch(o)) _fugaExplode(o);
+            } else if (o.k === 'storm') {
+                _fugaStormStep(o);
+                if (o.t >= FUGA_STORM_T) _gojoEndOrb(i);
             }
         }
     }
@@ -9800,26 +9953,31 @@ const col = b.color || BLDG_COLORS[0];
             const e = o.fx;
             let s = _gorbOut[n]; if (!s) s = _gorbOut[n] = {};
             s.i = o.id; s.k = o.k; s.x = _r1(e.x); s.y = _r1(e.y); s.r = Math.round(e.maxR); s.f = Math.round(e.fade * 100) / 100;
+            s.a = Math.round((e.angle || 0) * 100) / 100;
             n++;
-            if (o.fxA) { let a = _gorbOut[n]; if (!a) a = _gorbOut[n] = {}; a.i = -o.id; a.k = 'red'; a.x = _r1(o.fxA.x); a.y = _r1(o.fxA.y); a.r = 13; a.f = 0; n++; }
-            if (o.fxB) { let b = _gorbOut[n]; if (!b) b = _gorbOut[n] = {}; b.i = -o.id - 0.5; b.k = 'blue'; b.x = _r1(o.fxB.x); b.y = _r1(o.fxB.y); b.r = 13; b.f = 0; n++; }
+            // fxA is Purple's red orb, or Fuga's flaming bow.
+            if (o.fxA) { let a = _gorbOut[n]; if (!a) a = _gorbOut[n] = {}; a.i = -o.id; a.k = o.fxA.kind || 'red'; a.x = _r1(o.fxA.x); a.y = _r1(o.fxA.y); a.r = Math.round(o.fxA.maxR); a.f = 0; a.a = Math.round((o.fxA.angle || 0) * 100) / 100; n++; }
+            if (o.fxB) { let b = _gorbOut[n]; if (!b) b = _gorbOut[n] = {}; b.i = -o.id - 0.5; b.k = 'blue'; b.x = _r1(o.fxB.x); b.y = _r1(o.fxB.y); b.r = 13; b.f = 0; b.a = 0; n++; }
         }
         _gorbOut.length = n;
         return _gorbOut;
     }
     // Guest: keep one effect per orb the host says exists, move it, drop the ones that have gone.
     const _gorbFx = new Map();
+    const _GORB_COL = { red: '#ff4757', blue: '#3fa9ff', purple: '#a55eea', fuga: '#ff7f11', fbow: '#ff9f1a', storm: '#ff4500' };
     function mpClientGojoOrbs(list) {
         const seen = mpClientGojoOrbs._seen || (mpClientGojoOrbs._seen = new Set());
         seen.clear();
         for (const s of (list || [])) {
             let e = _gorbFx.get(s.i);
+            // An orb can change what it is (Fuga's arrow bursting into a firestorm): rebuild it.
+            if (e && e.kind !== s.k) { removeGameEffect(e); _gorbFx.delete(s.i); e = null; }
             if (!e) {
-                e = spawnGameEffect('gorb', s.x, s.y, s.k === 'red' ? '#ff4757' : s.k === 'blue' ? '#3fa9ff' : '#a55eea',
+                e = spawnGameEffect('gorb', s.x, s.y, _GORB_COL[s.k] || '#a55eea',
                     { maxR: s.r, maxT: 1e9, kind: s.k, reach: s.k === 'blue' && s.i > 0 ? BLUE_PULL_R : 0 });
                 _gorbFx.set(s.i, e);
             }
-            e.x = s.x; e.y = s.y; e.maxR = s.r; e.fade = s.f || 0;
+            e.x = s.x; e.y = s.y; e.maxR = s.r; e.fade = s.f || 0; e.angle = s.a || 0;
             seen.add(s.i);
         }
         for (const [id, e] of _gorbFx) if (!seen.has(id)) { removeGameEffect(e); _gorbFx.delete(id); }
@@ -9833,6 +9991,7 @@ const col = b.color || BLDG_COLORS[0];
         while (gojoOrbs.length) _gojoEndOrb(gojoOrbs.length - 1);
         for (const e of _gorbFx.values()) removeGameEffect(e);
         _gorbFx.clear();
+        _skGuestDoms.length = 0;   // and no Malevolent Shrine left cutting on a guest
     }
     // The Infinity ring in 3D: one long-lived effect per Gojo, following him. In 2D the same ring is
     // drawn by drawClassBodyBehind. It shimmers, flickers when the meter is low and is gone while down.
@@ -9886,6 +10045,8 @@ const col = b.color || BLDG_COLORS[0];
     const GOJO_DOMAIN_CD = 3600;   // 60 s
     const GOJO_DOMAIN_R  = 420;    // how far the domain reaches
     const GOJO_DOMAIN_T  = 360;    // 6 s inside it
+    const SHRINE_R = 550;          // Malevolent Shrine's reach (no barrier, so it can be wide)
+    const SHRINE_T = 300;          // 5 s
     const DOMAINS = {
         // Unlimited Void: everything inside stops dead and takes heavy hits.
         'Gojo': {
@@ -9936,13 +10097,16 @@ const col = b.color || BLDG_COLORS[0];
                 });
             },
         },
-        // Malevolent Shrine: a dark-red shrine that never stops cutting. Nothing is frozen — they can
-        // still move, slowly — but everything inside is slashed six times a second for five seconds.
-        // Total damage ≈ Gojo's (2 + 30 × 0.7 = 23 hits of damage vs 4 + 12 × 1.6 = 23.2).
+        // Malevolent Shrine, the way it looks in the anime: NO barrier. A shrine rises behind him and
+        // the ground goes a faint red out to a wide reach; inside, Cleave and Dismantle never stop.
+        // Nothing is frozen — they can still move, slowly — but everything inside is slashed six times
+        // a second for five seconds. Total damage ≈ Gojo's (2 + 30 × 0.7 = 23 hits of damage vs
+        // 4 + 12 × 1.6 = 23.2). The visuals are in _shrineVisual / _shrineCutsVisual.
         'Sikuna': {
-            flag: 'sikunaPower', icon: '👹', cd: 3600, r: 400, t: 300,
+            flag: 'sikunaPower', icon: '👹', cd: 3600, r: SHRINE_R, t: SHRINE_T,
             clientBanner() {
-                showStatus('👹 DOMAIN EXPANSION — MALEVOLENT SHRINE!', '#ff2d55');
+                showStatus('👹 Domain Expansion…', '#ff2d55');
+                setTimeout(() => { if (typeof gameRunning === 'undefined' || gameRunning) showStatus('⛩️ MALEVOLENT SHRINE', '#e84118'); }, 900);
             },
             open(p, local) {
                 const R = this.r;
@@ -9955,34 +10119,30 @@ const col = b.color || BLDG_COLORS[0];
                         }
                     }
                 });
-                spawnGameEffect('dome',  p.x, p.y, '#7a0010', { maxR: R, maxT: this.t, rim: '#ff2d55', rim2: '#2b0006' });
-                spawnGameEffect('ring',  p.x, p.y, '#ff2d55', { maxR: R, maxT: 40 });
-                spawnGameEffect('pillar', p.x, p.y, '#e84118', { maxR: 70, maxT: 60 });
-                spawnGameEffect('burst', p.x, p.y, '#8b0000', { maxR: R * 0.6, maxT: 40 });
-                addShake(18);
-                if (local) {
-                    showStatus('DOMAIN EXPANSION…', '#ff2d55');
-                    setTimeout(() => { if (typeof gameRunning === 'undefined' || gameRunning) showStatus('👹 MALEVOLENT SHRINE!', '#e84118'); }, 900);
-                }
-                try { SFX.shrine(); } catch (e) {}
+                // The shrine stands behind him, facing the way he faces.
+                const ang = p.angle || 0;
+                const sx = Math.round(p.x - Math.cos(ang) * 110), sy = Math.round(p.y - Math.sin(ang) * 110);
+                _shrineVisual(p.x, p.y, sx, sy, ang, R, this.t);
+                _skBroadcast({ k: 'shrine', who: local ? 0 : p.idx, x: Math.round(p.x), y: Math.round(p.y), sx, sy,
+                    ang: Math.round(ang * 100) / 100, R, dur: this.t });   // not `t`: that is the message type
+                if (local) this.clientBanner();
             },
             tick(p, d, local) {
                 if (d.t % 10 !== 0) return;
                 const R = this.r;
-                let cuts = 0;
+                let inside = 0;
                 _asLocalDamage(local, () => {
                     for (let i = monsters.length - 1; i >= 0; i--) {
                         const m = monsters[i]; if (!m) continue;
                         if (Math.hypot(m.x - d.x, m.y - d.y) < R) {
+                            inside++;
                             m.slow = Math.max(m.slow || 0, 20);
-                            // A red cut across the body. Capped per tick so a crowd can't flood the scene.
-                            if (cuts++ < 14) spawnGameEffect('cut', m.x, m.y, '#ff2d55',
-                                { angle: Math.random() * Math.PI, maxR: (m.r || 14) * 1.5 + 8, maxT: 10 });
                             hitMonster(m, i, Math.max(1, Math.floor(p.damage * 0.7 * (m.isBoss ? 0.35 : 1))), false, local);
                         }
                     }
                 });
-                if (cuts && d.t % 30 === 0) { try { SFX.melee(); } catch (e) {} }
+                _shrineCutsVisual(d.x, d.y, R);
+                if (inside && d.t % 20 === 0) { try { SFX.shrineCut(); } catch (e) {} }
             },
         },
     };
@@ -10208,6 +10368,355 @@ const col = b.color || BLDG_COLORS[0];
         }
     }
 
+    // ---- Sikuna [E]: DISMANTLE ----
+    // Sukuna's everyday cut (a fan tribute). A fan of thin, nearly invisible slashes flies out in front
+    // of him; every monster a line crosses is cut (white-red flashes) and slowed. Only what is in the
+    // cone is touched. Damage is in line with Gojo's Red (≈1.8x on a hit, 5 s cooldown).
+    const DIS_LEN = 500;        // how far each slash reaches
+    const DIS_HALF = 0.42;      // half the cone's width, in radians (~48° in all)
+    const DIS_LINES = 7;        // slashes per cast (odd, so one runs straight down the aim)
+    const DIS_BAND = 20;        // how wide one slash is
+    const DIS_CD = 300;         // 5 s, like Red
+    function _skBroadcast(d) {
+        if (typeof NET !== 'undefined' && NET.mode === 'host' && NET.started) mpBroadcast(Object.assign({ t:'event', type:'skfx' }, d));
+    }
+    function _skSfxBroadcast(name) {
+        if (typeof NET !== 'undefined' && NET.mode === 'host' && NET.started) mpBroadcast({ t:'event', type:'sfx', name });
+    }
+    function _sikunaDismantle(p, mx, my) {
+        let ang = Math.atan2(my - p.y, mx - p.x); if (!isFinite(ang)) ang = p.angle || 0;
+        const x = p.x, y = p.y, dmg = p.damage, local = (p === player), who = local ? 0 : p.idx;
+        const angs = [];
+        for (let k = 0; k < DIS_LINES; k++) {
+            const jit = k === (DIS_LINES >> 1) ? 0 : (Math.random() - 0.5) * 0.05;
+            angs.push(ang + (k / (DIS_LINES - 1) - 0.5) * 2 * DIS_HALF + jit);
+        }
+        const hits = [];
+        _asLocalDamage(local, () => {
+            for (let i = monsters.length - 1; i >= 0; i--) {
+                const m = monsters[i]; if (!m) continue;
+                const r = m.r || 12, dx = m.x - x, dy = m.y - y;
+                let lines = 0;
+                for (let k = 0; k < angs.length; k++) {
+                    const ux = Math.cos(angs[k]), uy = Math.sin(angs[k]);
+                    const along = dx * ux + dy * uy;
+                    if (along < -r || along > DIS_LEN + r) continue;
+                    if (Math.abs(dx * uy - dy * ux) > DIS_BAND / 2 + r) continue;
+                    lines++;
+                }
+                if (!lines) continue;
+                m.slow = Math.max(m.slow || 0, 90);
+                if (hits.length < 24) hits.push({ x: Math.round(m.x), y: Math.round(m.y), r: Math.round(r) });
+                // Up to two slashes count (close in, every line crosses the same body).
+                hitMonster(m, i, Math.max(1, Math.floor(dmg * 0.9 * Math.min(lines, 2) * (m.isBoss ? 0.6 : 1))), false, local);
+            }
+        });
+        _dismantleVisual(x, y, angs, hits);
+        if (local) showStatus('✂️ Dismantle!', '#ff6b81');
+        _skBroadcast({ k: 'dis', who, x: Math.round(x), y: Math.round(y), a: angs.map(v => Math.round(v * 1000) / 1000), hits });
+        return hits.length;
+    }
+    // What you SEE of Dismantle — shared by the host and by guests (who get it as an event).
+    function _dismantleVisual(x, y, angs, hits) {
+        for (const a of (angs || [])) spawnGameEffect('dismantle', x + Math.cos(a) * 18, y + Math.sin(a) * 18, '#ff2d55', { angle: a, maxR: DIS_LEN, maxT: 16 });
+        for (const h of (hits || [])) spawnGameEffect('cut', h.x, h.y, '#ff4d6d', { angle: Math.random() * Math.PI, maxR: (h.r || 12) * 1.4 + 6, maxT: 12 });
+        addShake(3);
+        try { SFX.dismantle(); } catch (e) {}
+    }
+
+    // ---- Sikuna [X]: Open… FUGA ----
+    // Flames gather in his hands into a bow and arrow ("🔥 Open…"), then the fire arrow flies forward
+    // fast. When it hits a monster, a building or the end of its range it bursts into a firestorm that
+    // burns everything inside for a few seconds (the same _burn DoT the Fire element uses). Bosses take
+    // less. Then he enters DEMON FORM, the way Hollow Purple opens Gojo's Six Eyes.
+    // The arrow is one of the orbs in `gojoOrbs` (kinds 'fuga' then 'storm', with the bow as 'fbow'),
+    // so it shares their update loop, their 2D + 3D effect and their guest sync (`gorbs`).
+    const FUGA_CD = 1200;        // 20 s
+    const FUGA_CHARGE = 40;      // frames of "Open…" while the bow forms
+    const FUGA_SPEED = 15, FUGA_RANGE = 700, FUGA_ARROW_R = 10;
+    const FUGA_R = 220;          // the firestorm's radius
+    const FUGA_STORM_T = 180;    // 3 s of fire
+    function _sikunaFuga(p, mx, my) {
+        let ang = Math.atan2(my - p.y, mx - p.x); if (!isFinite(ang)) ang = p.angle || 0;
+        const ux = Math.cos(ang), uy = Math.sin(ang);
+        const o = _gojoNewOrb('fuga', p, p.x + ux * 26, p.y + uy * 26, ux, uy, FUGA_ARROW_R, '#ff7f11');
+        o.phase = 'charge'; o.fx.fade = 1;                 // the arrow only appears when it is loosed
+        o.dmg = p.damage;
+        o.fxA = spawnGameEffect('gorb', o.x, o.y, '#ff9f1a', { maxR: 12, maxT: 1e9, kind: 'fbow', angle: ang });
+        _fugaCharge(o);
+        p.invincible = Math.max(p.invincible || 0, FUGA_CHARGE + 10);   // he is not touched while he draws
+        spawnGameEffect('ring', o.x, o.y, '#ff7f11', { maxR: 50, maxT: 30 });
+        if (p === player) showStatus('🔥 Open…', '#ff9f43');
+        try { SFX.fugaOpen(); } catch (e) {}
+        _skSfxBroadcast('fugaOpen');
+        return o;
+    }
+    function _fugaCharge(o) {
+        const p = o.p, q = Math.min(1, o.t / FUGA_CHARGE);
+        o.x = p.x + o.ux * 26; o.y = p.y + o.uy * 26;
+        o.fx.x = o.x; o.fx.y = o.y;
+        if (o.fxA) { o.fxA.x = o.x; o.fxA.y = o.y; o.fxA.maxR = 12 + 16 * q; }
+    }
+    function _fugaLaunch(o) {
+        removeGameEffect(o.fxA); o.fxA = null;
+        o.phase = 'fly'; o.fx.fade = 0;
+        o.x = o.p.x + o.ux * 30; o.y = o.p.y + o.uy * 30; o.fx.x = o.x; o.fx.y = o.y;
+        enterForm(o.p, 'demon');                           // and the King of Curses lets loose
+        spawnGameEffect('ring', o.x, o.y, '#ff9f1a', { maxR: 90, maxT: 18 });
+        addShake(8);
+        if (o.local) showStatus('🔥 FUGA!', '#ff7f11');
+        try { SFX.fugaShot(); } catch (e) {}
+        _skSfxBroadcast('fugaShot');
+    }
+    // Does the arrow touch a monster this frame?
+    function _fugaTouch(o) {
+        for (let i = 0; i < monsters.length; i++) {
+            const m = monsters[i]; if (!m) continue;
+            if (Math.hypot(m.x - o.x, m.y - o.y) < o.r + (m.r || 12) + 6) return true;
+        }
+        return false;
+    }
+    function _fugaBurn(m, dmg) {
+        m._burn = Math.max(m._burn || 0, 90);
+        m._burnDmg = Math.max(m._burnDmg || 0, Math.max(2, Math.ceil(dmg * (m.isBoss ? 0.5 : 1))));
+    }
+    function _fugaExplode(o) {
+        o.k = 'storm'; o.phase = 'storm'; o.t = 0;
+        removeGameEffect(o.fx);
+        o.fx = spawnGameEffect('gorb', o.x, o.y, '#ff4500', { maxR: FUGA_R, maxT: 1e9, kind: 'storm' });
+        for (let i = monsters.length - 1; i >= 0; i--) {
+            const m = monsters[i]; if (!m) continue;
+            if (Math.hypot(m.x - o.x, m.y - o.y) >= FUGA_R + (m.r || 12)) continue;
+            _fugaBurn(m, o.dmg);
+            m._burn = Math.max(m._burn, 180);
+            hitMonster(m, i, Math.max(1, Math.floor(o.dmg * (m.isBoss ? 2 : 6))), false, o.local);
+        }
+        spawnGameEffect('burst', o.x, o.y, '#ffb142', { maxR: FUGA_R, maxT: 26 });
+        spawnGameEffect('ring',  o.x, o.y, '#ff4500', { maxR: FUGA_R + 40, maxT: 30 });
+        spawnGameEffect('ring',  o.x, o.y, '#ffffff', { maxR: FUGA_R * 0.5, maxT: 12 });
+        spawnGameEffect('pillar', o.x, o.y, '#ff7f11', { maxR: 90, maxT: 40 });
+        addShake(16);
+        try { SFX.fugaBoom(); } catch (e) {}
+        _skSfxBroadcast('fugaBoom');
+    }
+    // The firestorm keeps everything inside it burning.
+    function _fugaStormStep(o) {
+        o.fx.fade = o.t > FUGA_STORM_T - 30 ? (o.t - (FUGA_STORM_T - 30)) / 30 : 0;
+        if (o.t % 30 !== 0) return;
+        for (let i = 0; i < monsters.length; i++) {
+            const m = monsters[i]; if (!m) continue;
+            if (Math.hypot(m.x - o.x, m.y - o.y) < FUGA_R + (m.r || 12)) _fugaBurn(m, o.dmg);
+        }
+    }
+
+    // ---- Malevolent Shrine: what you see (the damage is in DOMAINS.Sikuna) ----
+    // Like the anime there is no barrier: a shrine rises behind him and the ground around goes a faint
+    // red, out to SHRINE_R. Inside it Cleave and Dismantle never stop — red cut lines across random
+    // monsters and across the ground. Guests get the opening as an event and draw the cuts themselves.
+    const _skGuestDoms = [];     // guest side: the shrines it is drawing cuts for
+    function _shrineVisual(x, y, sx, sy, ang, R, t) {
+        spawnGameEffect('redzone', x, y, '#8b0000', { maxR: R, maxT: t, rim: '#ff2d55' });
+        spawnGameEffect('shrine', sx, sy, '#7a0010', { maxR: 70, maxT: t, angle: ang });
+        spawnGameEffect('ring',  x, y, '#ff2d55', { maxR: R, maxT: 40 });
+        spawnGameEffect('burst', sx, sy, '#8b0000', { maxR: 160, maxT: 40 });
+        addShake(18);
+        try { SFX.shrine(); } catch (e) {}
+    }
+    // ---- Sikuna's effects in 3D ----
+    // Built ONCE per effect from the shared TG geometry cache, then only moved / scaled / faded; every
+    // material a mesh owns is listed in userData.mats with its base opacity so fading is a plain loop.
+    // No lights: the glow is unlit MeshBasicMaterial.
+    function _skMat(list, color, opacity, opts) {
+        const m = new THREE.MeshBasicMaterial(Object.assign({ color, transparent: true, opacity, depthWrite: opacity >= 0.99 }, opts || {}));
+        list.push(m, opacity);
+        return m;
+    }
+    function _skFade(ud, a) {
+        const L = ud.mats;
+        for (let k = 0; k < L.length; k += 2) L[k].opacity = L[k + 1] * a;
+    }
+    function _skAdd(g, geo, mat, x, y, z, rx, ry, rz) {
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(x || 0, y || 0, z || 0);
+        if (rx) m.rotation.x = rx; if (ry) m.rotation.y = ry; if (rz) m.rotation.z = rz;
+        g.add(m); return m;
+    }
+    // Dismantle: a thin white blade-line with a faint red glow, lying along local +x.
+    function _buildDismantle3D(e) {
+        const g = new THREE.Group(), mats = [], L = e.maxR;
+        _skAdd(g, TG.Box(L, 0.7, 0.7), _skMat(mats, 0xffffff, 0.95), L / 2, 15, 0);
+        _skAdd(g, TG.Box(L, 0.3, 3.2), _skMat(mats, 0xff2d55, 0.35, { depthWrite: false }), L / 2, 14.5, 0);
+        g.userData = { mats };
+        g.position.set(e.x, 0, e.y); g.rotation.y = -e.angle;
+        return g;
+    }
+    // The Shrine's reach: a faint red disc on the ground and a brighter edge. Unit-sized, scaled.
+    function _buildRedzone3D(e) {
+        const g = new THREE.Group(), mats = [];
+        const disc = _skAdd(g, TG.Circle(1, 48), _skMat(mats, 0x8b0000, 0.16, { depthWrite: false }), 0, 1.5, 0, -Math.PI / 2);
+        const edge = _skAdd(g, TG.Torus(1, 0.006, 6, 96), _skMat(mats, 0xff2d55, 0.7, { depthWrite: false }), 0, 2, 0, -Math.PI / 2);
+        g.userData = { mats, disc, edge };
+        g.position.set(e.x, 0, e.y);
+        return g;
+    }
+    // Malevolent Shrine: a stylised Japanese shrine — stone base lined with skulls and bones, four red
+    // pillars, a glowing dark-red mouth and a two-tier roof with upturned eaves. Faces local +x.
+    function _buildShrine3D(e) {
+        const g = new THREE.Group(), mats = [];
+        const stone = _skMat(mats, 0x2a1215, 1), pillar = _skMat(mats, 0x7a0010, 1), roof = _skMat(mats, 0x1a0a0c, 1);
+        const bone = _skMat(mats, 0xe9e3d0, 1), eye = _skMat(mats, 0x120006, 1), gold = _skMat(mats, 0xb8860b, 1);
+        const glow = _skMat(mats, 0xff2d55, 0.6, { depthWrite: false }), aura = _skMat(mats, 0xff0033, 0.12, { depthWrite: false, side: THREE.DoubleSide });
+        _skAdd(g, TG.Box(120, 10, 160), stone, 0, 5, 0);                          // base
+        _skAdd(g, TG.Box(26, 5, 70), stone, 70, 2.5, 0);                          // steps
+        for (let k = 0; k < 4; k++) _skAdd(g, TG.Cylinder(4.5, 5, 74, 10), pillar, (k & 1) ? 38 : -38, 47, (k & 2) ? 58 : -58);
+        _skAdd(g, TG.Box(90, 7, 136), pillar, 0, 86, 0);                          // beam
+        _skAdd(g, TG.Box(2, 56, 64), glow, 39, 40, 0);                            // the glowing mouth
+        for (let k = 0; k < 6; k++) _skAdd(g, TG.Cone(3, 12, 6), bone, 40, 64, -27 + k * 11, Math.PI);   // teeth over it
+        // Two roof tiers: square pyramids (a cone with 4 sides) flattened, eave tips curling up.
+        _skAdd(g, TG.Cone(118, 36, 4), roof, 0, 108, 0, 0, Math.PI / 4);
+        _skAdd(g, TG.Cone(70, 30, 4), roof, 0, 138, 0, 0, Math.PI / 4);
+        for (let k = 0; k < 4; k++) {
+            const cx = (k & 1) ? 1 : -1, cz = (k & 2) ? 1 : -1;
+            _skAdd(g, TG.Cone(5, 22, 6), roof, cx * 80, 98, cz * 80, cz * 0.7, 0, -cx * 0.7);
+            _skAdd(g, TG.Cone(3, 14, 6), roof, cx * 48, 126, cz * 48, cz * 0.7, 0, -cx * 0.7);
+        }
+        _skAdd(g, TG.Sphere(6, 10, 8), gold, 0, 158, 0);                          // finial
+        // Skulls along the front of the base, and bones piled at the corners.
+        for (let k = 0; k < 5; k++) {
+            const z = -48 + k * 24;
+            _skAdd(g, TG.Sphere(6, 10, 8), bone, 56, 16, z);
+            _skAdd(g, TG.Box(1, 2.4, 2.4), eye, 61.5, 17, z - 2.4);
+            _skAdd(g, TG.Box(1, 2.4, 2.4), eye, 61.5, 17, z + 2.4);
+        }
+        for (let k = 0; k < 4; k++) {
+            const cx = (k & 1) ? 1 : -1, cz = (k & 2) ? 1 : -1;
+            _skAdd(g, TG.Cylinder(1.6, 1.6, 22, 6), bone, cx * 52, 13, cz * 72, 0.4, 0, 1.2);
+            _skAdd(g, TG.Cylinder(1.6, 1.6, 22, 6), bone, cx * 52, 15, cz * 70, -0.4, 0, -1.1);
+        }
+        // The dark-red glow it sits in.
+        _skAdd(g, TG.Sphere(1, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), aura, 0, 0, 0).scale.set(140, 190, 140);
+        g.userData = { mats };
+        g.position.set(e.x, 0, e.y); g.rotation.y = -e.angle;
+        return g;
+    }
+    // Fuga in 3D: the flaming bow while he draws, the arrow in flight, then the firestorm.
+    function _buildFireOrb3D(e) {
+        const g = new THREE.Group(), mats = [], ud = { fireOrb: true, mats, flames: null, flash: null, disc: null, edge: null, trail: null };
+        if (e.kind === 'fbow') {
+            // Unit-sized, scaled to the bow; held upright in the plane of his aim (local x forward, y up).
+            const fire = _skMat(mats, 0xff7f11, 0.95), hot = _skMat(mats, 0xffd166, 0.95);
+            _skAdd(g, TG.Torus(1, 0.09, 6, 20, 2.2), fire, -0.6, 0, 0, 0, 0, -1.1);                // the bow
+            _skAdd(g, TG.Box(0.04, 1.78, 0.04), hot, -0.15, 0, 0);                                  // the string
+            _skAdd(g, TG.Cylinder(0.05, 0.05, 1.6, 6), hot, 0.1, 0, 0, 0, 0, Math.PI / 2);          // the arrow
+            _skAdd(g, TG.Cone(0.16, 0.4, 8), hot, 1.0, 0, 0, 0, 0, -Math.PI / 2);
+            _skAdd(g, TG.Sphere(1, 12, 8), _skMat(mats, 0xff4500, 0.25, { depthWrite: false }), 0, 0, 0).scale.setScalar(1.2);
+        } else if (e.kind === 'fuga') {
+            // Unit-sized: a shaft along +x, a white-hot head, and a long flame trail behind it.
+            const hot = _skMat(mats, 0xffb142, 1);
+            _skAdd(g, TG.Cylinder(0.12, 0.12, 2, 6), hot, 0, 0, 0, 0, 0, Math.PI / 2);
+            _skAdd(g, TG.Cone(0.35, 0.8, 8), _skMat(mats, 0xfff3c4, 1), 1.3, 0, 0, 0, 0, -Math.PI / 2);
+            ud.trail = _skAdd(g, TG.Cone(0.55, 5, 8), _skMat(mats, 0xff4500, 0.5, { depthWrite: false }), -3.2, 0, 0, 0, 0, Math.PI / 2);
+            _skAdd(g, TG.Sphere(1, 10, 8), _skMat(mats, 0xff7f11, 0.35, { depthWrite: false }), 0.4, 0, 0);
+        } else {
+            // The firestorm: a burning disc, an edge, a ring of flames that flicker, a flash at first.
+            ud.disc = _skAdd(g, TG.Circle(1, 40), _skMat(mats, 0xff4500, 0.28, { depthWrite: false }), 0, 1.8, 0, -Math.PI / 2);
+            ud.edge = _skAdd(g, TG.Torus(1, 0.02, 6, 64), _skMat(mats, 0xffb142, 0.7, { depthWrite: false }), 0, 2.4, 0, -Math.PI / 2);
+            const fm = _skMat(mats, 0xff7f11, 0.8, { depthWrite: false }), fm2 = _skMat(mats, 0xffd166, 0.8, { depthWrite: false });
+            ud.flames = [];
+            for (let k = 0; k < 16; k++) {
+                const fa = k * 2.399963, fr = Math.sqrt((k + 0.5) / 16) * 0.88;
+                const f = _skAdd(g, TG.Cone(1, 1, 6), k % 3 ? fm : fm2, Math.cos(fa) * fr, 0, Math.sin(fa) * fr);
+                f.userData.fr = fr; f.userData.fa = fa; ud.flames.push(f);
+            }
+            ud.flash = _skAdd(g, TG.Sphere(1, 14, 10), _skMat(mats, 0xffffff, 0.8, { depthWrite: false }), 0, 10, 0);
+        }
+        g.userData = ud;
+        return g;
+    }
+    function _updateFireOrb3D(e) {
+        const m = e._mesh, ud = m.userData, a = 1 - (e.fade || 0), R = Math.max(2, e.maxR), ph = e.t;
+        m.visible = a > 0.01;
+        if (!m.visible) return;
+        _skFade(ud, a);
+        if (e.kind === 'storm') {
+            m.position.set(e.x, 0, e.y);
+            ud.disc.scale.setScalar(R); ud.edge.scale.setScalar(R);
+            for (let k = 0; k < ud.flames.length; k++) {
+                const f = ud.flames[k], h = 18 + 12 * Math.sin(ph * 0.3 + k * 1.3);
+                f.position.set(Math.cos(f.userData.fa) * f.userData.fr * R, h / 2 + 2, Math.sin(f.userData.fa) * f.userData.fr * R);
+                f.scale.set(8, h, 8);
+            }
+            const flash = Math.max(0, 1 - ph / 14);
+            ud.flash.visible = flash > 0;
+            if (flash > 0) { ud.flash.scale.setScalar(R * (0.3 + 0.7 * (1 - flash))); ud.flash.material.opacity = 0.8 * flash * a; }
+            return;
+        }
+        m.position.set(e.x, 18, e.y);
+        m.rotation.y = -e.angle;
+        if (e.kind === 'fbow') m.scale.setScalar(R * (0.95 + 0.05 * Math.sin(ph * 0.7)));
+        else { m.scale.setScalar(R * 1.6); if (ud.trail) ud.trail.scale.set(1, 0.85 + 0.15 * Math.sin(ph * 0.9), 1); }
+    }
+    // One curved roof tier with upturned eaves, for the 2D shrine.
+    function _shrineRoof2D(x, cy, w, h) {
+        ctx.beginPath();
+        ctx.moveTo(x - w, cy - h * 0.25);
+        ctx.quadraticCurveTo(x - w * 0.55, cy - h * 0.1, x - w * 0.35, cy - h);
+        ctx.lineTo(x + w * 0.35, cy - h);
+        ctx.quadraticCurveTo(x + w * 0.55, cy - h * 0.1, x + w, cy - h * 0.25);
+        ctx.lineTo(x + w * 0.85, cy); ctx.lineTo(x - w * 0.85, cy); ctx.closePath(); ctx.fill();
+    }
+    // A flurry of cuts inside the Shrine: across random monsters in reach, and across the ground.
+    function _shrineCutsVisual(x, y, R) {
+        let cuts = 0;
+        for (let i = 0; i < monsters.length && cuts < 10; i++) {
+            const m = monsters[i]; if (!m || Math.random() < 0.4) continue;
+            if (Math.hypot(m.x - x, m.y - y) >= R) continue;
+            cuts++;
+            // Cleave: a heavy dark-red cut; Dismantle: a thin bright one.
+            const cleave = Math.random() < 0.5;
+            spawnGameEffect('cut', m.x, m.y, cleave ? '#c0001a' : '#ff6b81',
+                { angle: Math.random() * Math.PI, maxR: (m.r || 14) * (cleave ? 1.8 : 1.4) + 8, maxT: 10 });
+        }
+        for (let k = 0; k < 2; k++) {
+            const a = Math.random() * Math.PI * 2, rr = R * Math.sqrt(Math.random()) * 0.9, la = Math.random() * Math.PI * 2;
+            const cx = x + Math.cos(a) * rr, cy = y + Math.sin(a) * rr;
+            spawnGameEffect('dismantle', cx - Math.cos(la) * 70, cy - Math.sin(la) * 70, '#ff2d55', { angle: la, maxR: 140, maxT: 10 });
+        }
+        return cuts;
+    }
+    // Guest side: draw what the host's Sikuna did.
+    function mpClientSikunaFx(d) {
+        const mine = typeof NET !== 'undefined' && d.who === NET.myIdx;
+        if (d.k === 'dis') {
+            _dismantleVisual(d.x, d.y, d.a, d.hits);
+            if (mine) showStatus('✂️ Dismantle!', '#ff6b81');
+        } else if (d.k === 'shrine') {
+            _shrineVisual(d.x, d.y, d.sx, d.sy, d.ang || 0, d.R || SHRINE_R, d.dur || SHRINE_T);
+            _skGuestDoms.push({ x: d.x, y: d.y, R: d.R || SHRINE_R, t: d.dur || SHRINE_T });
+        }
+    }
+    // Guest, every frame. The host ages effects in update(), which a guest never runs, so without
+    // this anything spawned on a guest (a cut, a slash, the shrine) would hang there forever. Orbs and
+    // the Infinity ring are left alone: their owners move and age them.
+    function mpClientTickEffects() {
+        for (let i = gameEffects.length - 1; i >= 0; i--) {
+            const e = gameEffects[i];
+            if (e.type === 'gorb' || e.type === 'infring') continue;
+            e.t++;
+            if (e.t >= e.maxT) {
+                if (e._mesh && _three) { _three.scene.remove(e._mesh); _disposeMesh(e._mesh); }
+                gameEffects.splice(i, 1);
+            }
+        }
+        for (let i = _skGuestDoms.length - 1; i >= 0; i--) {
+            const d = _skGuestDoms[i];
+            d.t--;
+            if (d.t % 10 === 0) { const c = _shrineCutsVisual(d.x, d.y, d.R); if (c && d.t % 20 === 0) { try { SFX.shrineCut(); } catch (e) {} } }
+            if (d.t <= 0) _skGuestDoms.splice(i, 1);
+        }
+    }
+
+
     const MOVES = {
         // ====== COMMON ======
         'Physico': {
@@ -10334,7 +10843,9 @@ const col = b.color || BLDG_COLORS[0];
         'Sikuna': {
             // 30 s: it wipes out every ordinary monster on a line across the whole world.
             z:{ cd:1800, name:'World Cutting Slash', color:'#ff2d55', ownBanner:true, run:(p,mx,my)=>{ _sikunaWorldCut(p,mx,my); } },
-            x:{ cd:900, name:'DEMON FORM', color:'#e84118', emoji:'👹', cs:true, form:'demon', run:(p,mx,my)=>{ enterForm(p,'demon'); _mvDmgRadius(p,260,Math.floor(p.damage*2)); addShake(15); SFX.shoot(); } } },
+            // 20 s: Open… FUGA! A fire arrow that bursts into a firestorm; then he enters DEMON FORM
+            // (the way Hollow Purple opens Gojo's Six Eyes).
+            x:{ cd:FUGA_CD, name:'FUGA', color:'#ff7f11', emoji:'🔥', cs:true, form:'demon', run:(p,mx,my)=>{ _sikunaFuga(p,mx,my); } } },
         'Gojo': {
             z:{ cd:240, name:'Blue Lapse', color:'#3fa9ff', run:(p,mx,my)=>{ _gojoBlue(p,mx,my); } },
             x:{ cd:900, name:'HOLLOW PURPLE', color:'#a55eea', emoji:'🟣', cs:true, form:'sixeyes', run:(p,mx,my)=>{ _gojoHollowPurple(p,mx,my); } } },
@@ -10437,8 +10948,9 @@ const col = b.color || BLDG_COLORS[0];
         const _skMk = (p === player) ? skinMark() : null;   // arcade ability skin
         try { _asLocalDamage(p === player, () => _useAbilityCore(p, aimX, aimY)); }
         finally { p.damage = _origEDmg; }
-        // Gojo announces his own move ("Reversal: RED!"), so the generic banner would only cover it.
-        if (p === player && !p.cls.infinity) { showStatus('[E] ' + _eAbilityName(p.cls), p.cls?.rarityColor || '#feca57'); spawnGameEffect(_eAbilityArchetype(p.cls), p.x, p.y, p.cls?.rarityColor || '#feca57', { angle: p.angle, maxR: 150 }); }
+        // Gojo announces his own move ("Reversal: RED!"), Sikuna his ("✂️ Dismantle!"), so the generic
+        // banner would only cover it.
+        if (p === player && !p.cls.infinity && !p.cls.sikunaPower) { showStatus('[E] ' + _eAbilityName(p.cls), p.cls?.rarityColor || '#feca57'); spawnGameEffect(_eAbilityArchetype(p.cls), p.x, p.y, p.cls?.rarityColor || '#feca57', { angle: p.angle, maxR: 150 }); }
         skinTintSince(_skMk);
         if (p === player) { const lvlUp = addAbilityUse(p.cls.name, 'e'); if (lvlUp) { _abilityLevelUpToast(p, 'e', lvlUp); p.abilityLvls.e = lvlUp; } }
     }
@@ -10448,7 +10960,7 @@ const col = b.color || BLDG_COLORS[0];
         if (c.canTeleport) return 'Teleport'; if (c.canShout) return '67!'; if (c.canBuild) return 'Build';
         if (c.canScream) return 'Scream'; if (c.canSwallow) return 'Swallow'; if (c.speedModes) return 'Speed Mode';
         if (c.canRevive) return 'Revive'; if (c.mindSwap) return 'Possess'; if (c.ghostMode) return 'Vanish';
-        if (c.necromancer) return 'Raise Dead'; if (c.canSpawnTurret) return 'Turret'; if (c.sikunaPower) return 'Finger'; if (c.infinity) return 'Red';
+        if (c.necromancer) return 'Raise Dead'; if (c.canSpawnTurret) return 'Turret'; if (c.sikunaPower) return 'Dismantle'; if (c.infinity) return 'Red';
         if (c.isSupporter) return 'Buff'; if (c.canCopy) return 'Copy'; if (c.allInOne) return 'All In One';
         return c.name || 'Ability';
     }
@@ -10970,16 +11482,11 @@ const col = b.color || BLDG_COLORS[0];
             if (p === player) showStatus('💀 RISE!', '#26de81');
             SFX.revive();
         }
-        // Sikuna — Finger Sacrifice: spend one of the fingers the passive collects for a burst of power.
+        // Sikuna — Dismantle: a fan of thin, nearly invisible slashes thrown forward; see _sikunaDismantle.
+        // His fingers are still a passive (they drop from kills and buff him when eaten).
         if (p.cls.sikunaPower && (p._eCd||0) <= 0) {
-            p._eCd = 360;
-            p.sikunaBuff = Math.max(p.sikunaBuff || 0, 420);
-            p.chiliBoost = Math.max(p.chiliBoost || 0, 300);
-            p.invincible = Math.max(p.invincible, 45);
-            _mvDmgRadius(p, 140, Math.floor(p.damage * 1.4));
-            _mvRing(p.x, p.y, '#e84118', 16, 50);
-            if (p === player) showStatus('👹 FINGER SACRIFICE!', '#e84118');
-            SFX.shout67();
+            p._eCd = DIS_CD;
+            _sikunaDismantle(p, aimX, aimY);
         }
         // Gojo — Reversal: RED. A red orb thrown forward along the aim; see _gojoRed.
         if (p.cls.infinity && (p._eCd||0) <= 0) {
@@ -20008,7 +20515,8 @@ const col = b.color || BLDG_COLORS[0];
         else if (p.cls.ghostMode) ab=p.invisible?'👻 Invisible!':'👻 [E] Vanish';
         else if (p.cls.necromancer) ab=`💀 Allies: ${allies.length}`;
         else if (p.cls.canSpawnTurret) ab=`🤖 Turret ${Math.ceil(p.turretSpawnTimer/60)}s`;
-        else if (p.cls.sikunaPower) ab=`👹 Fingers ${p.sikunaFingersUsed||0}/30 ${p.sikunaBuff>0?'(BUFFED!)':''}`;
+        else if (p.cls.sikunaPower) { const _dcd = Math.ceil((p._eCd || 0) / 60);
+            ab = (_dcd > 0 ? `✂️ Dismantle ${_dcd}s` : '✂️ [E] Dismantle') + ` 🖐️${p.sikunaFingersUsed||0}/30${p.sikunaBuff>0?' BUFFED!':''}`; }
         else if (p.cls.isSupporter) ab='💖 [E] Buff Panel';
         // Append unlockable move set status (Z at Lv.2, X at Lv.3) — names from MOVES table
         const lvl = p.charLevel || 1;
@@ -20085,7 +20593,7 @@ const col = b.color || BLDG_COLORS[0];
             else if (c.ghostMode) eIcon = '👻';
             else if (c.necromancer) eIcon = '💀';
             else if (c.canSpawnTurret) eIcon = '🤖';
-            else if (c.sikunaPower) eIcon = '👹';
+            else if (c.sikunaPower) eIcon = '✂️';
             else if (c.infinity) eIcon = '🔴';
             else if (c.isSupporter) eIcon = '💖';
             else if (c.canCopy) eIcon = '🎭';
