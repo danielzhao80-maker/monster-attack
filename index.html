@@ -1828,6 +1828,34 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                 s.connect(sg); sg.connect(audioCtx.destination); s.start(t+d); s.stop(t+d+0.09);
             }
         },
+        // ---- Gojo ----
+        // One shaped tone: type, start/end pitch, start time, length, peak volume.
+        _tone(type, f0, f1, d, len, vol) {
+            const t=audioCtx.currentTime+d, o=audioCtx.createOscillator(), g=audioCtx.createGain();
+            o.type=type; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),t+len);
+            g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+Math.min(0.03,len*0.3));
+            g.gain.exponentialRampToValueAtTime(0.001,t+len);
+            o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t+len+0.02);
+        },
+        gojoRed(burst) {
+            // Reversal: Red — a hard low BOOM (the burst at the end is deeper and longer).
+            if (burst) { this._tone('sine',120,30,0,0.45,0.28); this._tone('square',300,60,0,0.18,0.08); return; }
+            this._tone('sawtooth',520,140,0,0.16,0.1); this._tone('sine',180,60,0,0.25,0.18);
+        },
+        gojoBlue() {
+            // Lapse: Blue — a rising whoosh that sucks inward, then a hollow wobble.
+            this._tone('sawtooth',90,700,0,0.45,0.06); this._tone('sine',900,160,0.05,0.6,0.07);
+            this._tone('triangle',220,110,0.35,0.5,0.05);
+        },
+        gojoPurple(launch) {
+            // Hollow Purple: a deep growing hum while the orbs meet, then a CRACK as it is released.
+            if (launch) { this._tone('square',1800,120,0,0.12,0.12); this._tone('sine',90,28,0,0.9,0.3); this._tone('sawtooth',300,50,0.02,0.5,0.1); return; }
+            this._tone('sine',45,70,0,0.8,0.2); this._tone('triangle',90,140,0.1,0.7,0.06);
+        },
+        gojoVoid() {
+            // Unlimited Void: nothing at all for a moment… then one clear chime that rings out.
+            this._tone('sine',1568,1560,0.9,1.8,0.1); this._tone('sine',2349,2340,0.9,1.4,0.05); this._tone('sine',784,780,0.92,1.6,0.06);
+        },
         revenge() {
             const t=audioCtx.currentTime;
             [[392,0],[523,0.12],[659,0.24],[784,0.36],[1047,0.52]].forEach(([f,d]) => {
@@ -2176,7 +2204,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         { name:'Ghost', emoji:'👻', accessory:'🔗', armorColor:'#dfe6e9', rarity:'mythical', rarityColor:'#ff2d55', speed:4.0, hp:80, damage:12, fireRate:7, ammo:30, type:'ranged', ghostMode:true, desc:'[E] Turn invisible — enemies ignore you!' },
         { name:'Machine', emoji:'🤖', accessory:'🔧', armorColor:'#95a5a6', rarity:'mythical', rarityColor:'#ff2d55', speed:3.0, hp:100, damage:10, fireRate:8, ammo:30, type:'ranged', canSpawnTurret:true, desc:'Auto-spawns a turret every 60s' },
         { name:'Sikuna', emoji:'👹', accessory:'🔥', armorColor:'#e84118', rarity:'mythical', rarityColor:'#ff2d55', speed:3.5, hp:110, damage:12, fireRate:7, ammo:30, type:'ranged', sikunaPower:true, desc:'Eat Sikuna fingers for +50% speed & damage (10s)!' },
-        { name:'Gojo', emoji:'🕶️', accessory:'♾️', armorColor:'#1b2440', rarity:'mythical', rarityColor:'#ff2d55', speed:3.4, hp:105, damage:12, fireRate:7, ammo:30, type:'ranged', infinity:true, desc:'Infinity guard • [E] Red • [Z] Blue • [X] Hollow Purple' },
+        { name:'Gojo', emoji:'🕶️', accessory:'♾️', armorColor:'#1b2440', rarity:'mythical', rarityColor:'#ff2d55', speed:3.4, hp:105, damage:12, fireRate:7, ammo:30, type:'ranged', infinity:true, desc:'Infinity barrier • [E] Red • [Z] Blue • [X] Hollow Purple' },
         { name:'Calm Kid', emoji:'😌', accessory:'☮️', armorColor:'#74b9ff', rarity:'secret', rarityColor:'#00ffe0', speed:4.0, hp:200, damage:30, fireRate:5, ammo:60, type:'ranged', dodgeChance:0.7, desc:'70% dodge bullets & melee — super strong gun!' },
         { name:'Supporter', emoji:'💖', accessory:'⚕️', armorColor:'#26de81', rarity:'secret', rarityColor:'#00ffe0', speed:3.2, hp:130, damage:6, fireRate:8, ammo:30, type:'ranged', isSupporter:true, desc:'[E] Open Buff Panel — strongest, longest buffs!' },
     ];
@@ -3128,7 +3156,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         document.getElementById('pause-screen').style.display='none';
         gamePaused = false;
         // Client: just set up empty arrays and wait for state
-        bullets=[]; monsters=[]; particles=[]; pickups=[]; walls=[]; fireTiles=[]; poisonTiles=[]; allies=[]; turrets=[]; traps=[]; remotePlayers=[]; zaps=[]; buildings=[];
+        bullets=[]; monsters=[]; particles=[]; pickups=[]; walls=[]; fireTiles=[]; poisonTiles=[]; allies=[]; turrets=[]; traps=[]; remotePlayers=[]; zaps=[]; buildings=[]; clearGojoOrbs();
         _netMon.clear(); _cliTodWave = 0; _loadedChunkKey = null; _predHist.length = 0;
         _recErr.x = 0; _recErr.y = 0; NET._lastAck = undefined;   // all belongs to the game we just left
         score=0; wave=1; monstersToSpawn=5; monstersSpawned=0; spawnTimer=0;
@@ -3348,6 +3376,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             if (Math.abs(_recErr.x) < 0.05) _recErr.x = 0;
             if (Math.abs(_recErr.y) < 0.05) _recErr.y = 0;
         }
+        mpClientTickGojoFx();                // animate Gojo's orbs between packets
         mpPredictLocal();
         refreshChunks();                     // buildings/traps are generated here, not received
         if (wave !== _cliTodWave) { _cliTodWave = wave; setTimeOfDayForWave(wave); }
@@ -3391,6 +3420,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         poisonTiles = s.poisonTiles || [];
         allies = s.allies || [];
         turrets = s.turrets || [];
+        mpClientGojoOrbs(s.gorbs);
         // Buildings are no longer transmitted. Reproduce the host's world from its seed — buildChunk()
         // is deterministic, so the same seed builds the same city, street for street. This also finally
         // gives guests the TRAPS, which were never in the state packet at all: they were invisible.
@@ -3487,6 +3517,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                 if (_fk) enterForm(player, _fk);
             }
             player._formKey = _fk;
+            if (mine._inf !== undefined) { player._inf = mine._inf; player._infDown = mine._infDown || 0; }
         }
         // Remote players = everyone except me (attach cls by name for drawing).
         // Slots can be null — a disconnected player's slot is held open so indices stay stable.
@@ -3547,7 +3578,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         document.getElementById('mp-lobby').style.display='none';
         document.getElementById('pause-screen').style.display='none';
         gamePaused = false;
-        bullets=[]; monsters=[]; particles=[]; pickups=[]; walls=[]; fireTiles=[]; poisonTiles=[]; allies=[]; turrets=[]; traps=[]; remotePlayers=[]; zaps=[];
+        bullets=[]; monsters=[]; particles=[]; pickups=[]; walls=[]; fireTiles=[]; poisonTiles=[]; allies=[]; turrets=[]; traps=[]; remotePlayers=[]; zaps=[]; clearGojoOrbs();
         score=0; wave=1; monstersToSpawn=5; monstersSpawned=0; spawnTimer=90; bossHabitat=null;
         currentMonsterClass = rollMonsterClass();
         waveIntroTimer = 120;
@@ -3620,6 +3651,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             shieldUp:pl.shieldUp, meleeSwing:pl.meleeSwing, copiedPower:pl.copiedPower||false, copySpeedBonus:pl.copySpeedBonus||0,
             chiliBoost:pl.chiliBoost||0, sikunaBuff:pl.sikunaBuff||0, poisoned:pl.poisoned||0,
             form: pl.form ? pl.form.key : null,   // so everyone sees the transformation, not just its owner
+            // Gojo's Infinity meter, so a guest's HUD and everyone's ring show the host's truth.
+            _inf: pl.cls.infinity ? Math.round(pl._inf === undefined ? 100 : pl._inf) : undefined,
+            _infDown: pl.cls.infinity ? (pl._infDown || 0) : undefined,
             ack:pl.lastSeq,   // which of THEIR inputs this snapshot has already applied
             clsName:pl.cls.name, name:pl.name||(pl===player?(playerName||'Host'):'Player'), idx:pl===player?0:pl.idx };
     }
@@ -3697,6 +3731,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             poisonTiles: poisonTiles.map(pt=>({x:pt.x,y:pt.y,life:pt.life})),
             allies: allies.map(a=>({x:a.x,y:a.y,r:a.r,life:a.life,hp:a.hp,maxHp:a.maxHp,kind:a.kind,cls:a.cls,color:a.color})),
             turrets: turrets.map(t=>({x:t.x,y:t.y,r:t.r,hp:t.hp,maxHp:t.maxHp,angle:t.angle,ammo:t.ammo,kind:t.kind})),
+            gorbs: mpSerializeGojoOrbs(),   // Gojo's Red / Blue / Purple, so guests see them in 2D and 3D
             // Buildings and traps are GENERATED, not transmitted — the seed is the whole payload.
             worldSeed: _worldSeed, worldId: currentWorld ? currentWorld.id : null,
             t: _netNow(),   // the host's clock — what the client interpolates against
@@ -8094,7 +8129,7 @@ const col = b.color || BLDG_COLORS[0];
         'Ghost':           { name:'Vanish',        emoji:'👻', color:'#dfe6e9', desc:'Step out of the world' },
         'Machine':         { name:'Deploy Turret', emoji:'🤖', color:'#95a5a6', desc:'It shoots so you do not have to' },
         'Sikuna':          { name:'Finger Sacrifice', emoji:'👹', color:'#e84118', desc:'Spend a finger for raw power' },
-        'Gojo':            { name:'Red Reversal',  emoji:'🔴', color:'#ff4757', desc:'A red blast that shoves them all away' },
+        'Gojo':            { name:'Red Reversal',  emoji:'🔴', color:'#ff4757', desc:'A red orb that blasts everything off its path' },
         'Calm Kid':        { name:'Zen Burst',     emoji:'🧘', color:'#74b9ff', desc:'Full health, briefly untouchable' },
         'Supporter':       { name:'Buff Panel',    emoji:'💖', color:'#fd79a8', desc:'Hand a teammate a boost' },
         'Archer':          { name:'Volley',        emoji:'🏹', color:'#6ab04c', desc:'Five arrows that pass through' },
@@ -8226,7 +8261,7 @@ const col = b.color || BLDG_COLORS[0];
                     blurb:'The pack answers, and so do you.' },
         sixeyes:  { name:'SIX EYES',    emoji:'👁️', color:'#3fa9ff', dur:540,
                     hpBonus:130, dmgMult:1.8, speedMult:1.15, fireRate:5, crit:8, stillness:true, scale:1.3,
-                    blurb:'You see everything. Nothing near you moves fast.' },
+                    blurb:'Blindfold off. Infinity refills faster, Red and Blue come back sooner.' },
         beacon:   { name:'BEACON',      emoji:'💖', color:'#fd79a8', dur:660,
                     hpBonus:180, dmgMult:1.2, speedMult:1.15, fireRate:7, mend:5, aura:10, scale:1.3,
                     blurb:'Everyone near you gets better at this.' },
@@ -8359,6 +8394,7 @@ const col = b.color || BLDG_COLORS[0];
         if (p._nerdCrit > 0) { p._nerdCrit--; if (p._nerdCrit === 0) p.gsCrit = Math.max(0, (p.gsCrit || 0) - 4); }
         if (p._domainCd > 0) p._domainCd--;
         if (p._domain) tickDomain(p);
+        if (p.cls && p.cls.infinity) tickInfinity(p);
         updateForm(p);
     }
 
@@ -8813,8 +8849,20 @@ const col = b.color || BLDG_COLORS[0];
         }
         ctx.globalAlpha = 1;
     }
-    function spawnGameEffect(type, x, y, color, opts = {}) {
-        gameEffects.push({ type, x, y, color, angle: opts.angle || 0, maxR: opts.maxR || 180, maxT: opts.maxT || 36, t: 0, _mesh: null, emoji: opts.emoji || null, relic: opts.relic || null, rim: opts.rim || null, rim2: opts.rim2 || null });
+    function spawnGameEffect(type, x, y, color, opts) {
+        opts = opts || {};
+        const e = { type, x, y, color, angle: opts.angle || 0, maxR: opts.maxR || 180, maxT: opts.maxT || 36, t: 0, _mesh: null, emoji: opts.emoji || null, relic: opts.relic || null, rim: opts.rim || null, rim2: opts.rim2 || null,
+            kind: opts.kind || null, fade: 0, low: 0, reach: opts.reach || 0 };
+        gameEffects.push(e);
+        return e;   // a long-lived effect (a Gojo orb, the Infinity ring) is moved by whoever owns it
+    }
+    // Take one effect out now, mesh and all — for the long-lived ones whose owner decides when they end.
+    function removeGameEffect(e) {
+        if (!e) return;
+        const i = gameEffects.indexOf(e);
+        if (i >= 0) gameEffects.splice(i, 1);
+        if (e._mesh && _three) { _three.scene.remove(e._mesh); _disposeMesh(e._mesh); }
+        e._mesh = null;
     }
     function updateGameEffects() {
         for (let i = gameEffects.length - 1; i >= 0; i--) {
@@ -8899,6 +8947,85 @@ const col = b.color || BLDG_COLORS[0];
                     ctx.fillStyle = e.color;
                     ctx.beginPath(); ctx.arc(sx, sy, 8 * (1 - p), 0, Math.PI*2); ctx.fill();
                 }
+            } else if (e.type === 'gorb') {
+                // Gojo's orbs. Moved every frame by their owner; `fade` 0..1 dims them in and out.
+                const a = 1 - (e.fade || 0);
+                if (a > 0.01) {
+                    const R = Math.max(2, e.maxR), ph = e.t, TAU = Math.PI * 2;
+                    if (e.kind === 'blue') {
+                        if (e.reach) {
+                            // The pull: a faint edge, a ring that keeps bending inward, and streaks of
+                            // everything nearby streaming into the middle.
+                            ctx.strokeStyle = '#3fa9ff'; ctx.lineWidth = 2; ctx.globalAlpha = 0.16 * a;
+                            ctx.beginPath(); ctx.arc(e.x, e.y, e.reach, 0, TAU); ctx.stroke();
+                            const ring = R + (e.reach - R) * (1 - ((ph * 0.025) % 1));
+                            ctx.lineWidth = 3; ctx.globalAlpha = 0.4 * a;
+                            ctx.beginPath(); ctx.arc(e.x, e.y, ring, ph * 0.09, ph * 0.09 + Math.PI * 1.3); ctx.stroke();
+                            ctx.strokeStyle = '#a8d8ff'; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.6 * a;
+                            for (let k = 0; k < 10; k++) {
+                                const q = (ph * 0.03 + k * 0.37) % 1, ang = k * 0.628 + q * 1.4;
+                                const r0 = R + (e.reach - R) * (1 - q), r1 = Math.max(R, r0 - 28);
+                                ctx.beginPath(); ctx.moveTo(e.x + Math.cos(ang) * r0, e.y + Math.sin(ang) * r0);
+                                ctx.lineTo(e.x + Math.cos(ang + 0.3) * r1, e.y + Math.sin(ang + 0.3) * r1); ctx.stroke();
+                            }
+                        }
+                        ctx.globalAlpha = 0.45 * a; ctx.fillStyle = '#3fa9ff';
+                        ctx.beginPath(); ctx.arc(e.x, e.y, R * 1.7, 0, TAU); ctx.fill();
+                        ctx.globalAlpha = a; ctx.fillStyle = '#070b22';
+                        ctx.beginPath(); ctx.arc(e.x, e.y, R, 0, TAU); ctx.fill();
+                        ctx.strokeStyle = '#74b9ff'; ctx.lineWidth = 3;
+                        ctx.beginPath(); ctx.arc(e.x, e.y, R, ph * 0.2, ph * 0.2 + Math.PI * 1.5); ctx.stroke();
+                    } else if (e.kind === 'red') {
+                        const ca = Math.cos(e.angle), sa = Math.sin(e.angle);
+                        ctx.globalAlpha = 0.3 * a; ctx.strokeStyle = '#ff4757'; ctx.lineWidth = R * 1.2; ctx.lineCap = 'round';
+                        ctx.beginPath(); ctx.moveTo(e.x - ca * 46, e.y - sa * 46); ctx.lineTo(e.x, e.y); ctx.stroke();
+                        ctx.lineCap = 'butt';
+                        ctx.globalAlpha = 0.35 * a; ctx.fillStyle = '#ff4757';
+                        ctx.beginPath(); ctx.arc(e.x, e.y, R * 1.8, 0, TAU); ctx.fill();
+                        ctx.globalAlpha = a; ctx.fillStyle = '#ff2d55';
+                        ctx.beginPath(); ctx.arc(e.x, e.y, R, 0, TAU); ctx.fill();
+                        ctx.fillStyle = '#ffffff';
+                        ctx.beginPath(); ctx.arc(e.x, e.y, R * 0.45, 0, TAU); ctx.fill();
+                    } else {
+                        // Hollow Purple: a huge sphere with a white-hot heart and crackling edges.
+                        ctx.globalAlpha = 0.25 * a; ctx.fillStyle = '#6c5ce7';
+                        ctx.beginPath(); ctx.arc(e.x, e.y, R * 1.3, 0, TAU); ctx.fill();
+                        ctx.globalAlpha = 0.85 * a; ctx.fillStyle = '#a55eea';
+                        ctx.beginPath(); ctx.arc(e.x, e.y, R, 0, TAU); ctx.fill();
+                        ctx.fillStyle = '#e0c3fc';
+                        ctx.beginPath(); ctx.arc(e.x, e.y, R * 0.55, 0, TAU); ctx.fill();
+                        ctx.globalAlpha = a; ctx.fillStyle = '#ffffff';
+                        ctx.beginPath(); ctx.arc(e.x, e.y, R * 0.25, 0, TAU); ctx.fill();
+                        ctx.strokeStyle = '#f5e6ff'; ctx.lineWidth = 2;
+                        for (let k = 0; k < 3; k++) {
+                            const s0 = ph * (0.12 + k * 0.05) + k * 2.1;
+                            ctx.beginPath(); ctx.arc(e.x, e.y, R * (0.8 + k * 0.08), s0, s0 + 0.9); ctx.stroke();
+                        }
+                    }
+                }
+            } else if (e.type === 'ripple') {
+                // Something pressing on Infinity: a small ring spreading out from the point of contact.
+                ctx.globalAlpha = 0.8 * (1 - p); ctx.strokeStyle = e.color; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.arc(e.x, e.y, 3 + p * e.maxR, 0, Math.PI * 2); ctx.stroke();
+                ctx.globalAlpha = 0.4 * (1 - p);
+                ctx.beginPath(); ctx.arc(e.x, e.y, 2 + p * e.maxR * 0.55, 0, Math.PI * 2); ctx.stroke();
+            } else if (e.type === 'voidstars') {
+                // Unlimited Void from the inside: stars of infinite information, streaks of light racing out.
+                const grow = Math.min(1, p / 0.12), fade = p > 0.8 ? (p - 0.8) / 0.2 : 0;
+                const R = e.maxR * (0.2 + 0.8 * grow), a = 1 - fade;
+                ctx.fillStyle = '#ffffff';
+                for (let k = 0; k < 60; k++) {
+                    const ang = k * 2.399963, rr = R * Math.sqrt((k + 0.5) / 60);
+                    ctx.globalAlpha = a * (0.45 + 0.45 * Math.sin(e.t * 0.12 + k * 1.7));
+                    ctx.fillRect(e.x + Math.cos(ang) * rr - 1, e.y + Math.sin(ang) * rr - 1, 2.2, 2.2);
+                }
+                ctx.strokeStyle = '#bfe6ff'; ctx.lineWidth = 2;
+                for (let k = 0; k < 14; k++) {
+                    const ang = k * 0.4488 + 0.2, q = (e.t * 0.018 + k * 0.29) % 1, r0 = R * q, r1 = Math.min(R, r0 + 46);
+                    ctx.globalAlpha = a * 0.7 * (1 - q);
+                    ctx.beginPath(); ctx.moveTo(e.x + Math.cos(ang) * r0, e.y + Math.sin(ang) * r0);
+                    ctx.lineTo(e.x + Math.cos(ang) * r1, e.y + Math.sin(ang) * r1); ctx.stroke();
+                }
             } else if (e.type === 'pillar') {
                 // Vertical column of light rising over time
                 const h = 60 + p * 80;
@@ -8917,6 +9044,7 @@ const col = b.color || BLDG_COLORS[0];
     }
     function update3DEffects() {
         if (!_three) return;
+        syncInfinityRings();   // Gojo's Infinity ring follows him (3D; the 2D ring is his aura)
         for (const e of gameEffects) {
             const p = e.t / e.maxT;
             if (!e._mesh) {
@@ -8946,6 +9074,59 @@ const col = b.color || BLDG_COLORS[0];
                 } else if (e.type === 'pillar') {
                     mesh = new THREE.Mesh(TG.Cylinder(8, 14, 100, 16, 1, true), new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true, opacity: 1, side: THREE.DoubleSide }));
                     mesh.position.set(e.x, 50, e.y);
+                } else if (e.type === 'gorb') {
+                    // A Gojo orb: a core and a glowing shell (Blue adds its inward-bending swirl and
+                    // streamers). Unit-sized and scaled each frame; built once, moved every frame.
+                    mesh = new THREE.Group();
+                    const k = e.kind;
+                    const coreCol = k === 'blue' ? 0x070b22 : k === 'red' ? 0xff2d55 : 0xe0c3fc;
+                    const shellCol = k === 'blue' ? 0x3fa9ff : k === 'red' ? 0xff4757 : 0xa55eea;
+                    const core = new THREE.Mesh(TG.Sphere(1, 16, 12), new THREE.MeshBasicMaterial({ color: coreCol, transparent: true }));
+                    const shell = new THREE.Mesh(TG.Sphere(1, 16, 12), new THREE.MeshBasicMaterial({ color: shellCol, transparent: true, opacity: 0.35, depthWrite: false }));
+                    mesh.add(core); mesh.add(shell);
+                    mesh.userData = { core, shell, swirl: null, streams: null, heart: null };
+                    if (k === 'purple' || k === 'red') {
+                        const heart = new THREE.Mesh(TG.Sphere(1, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true }));
+                        mesh.add(heart); mesh.userData.heart = heart;
+                    }
+                    if (k === 'blue' && e.reach) {
+                        const sw = new THREE.Mesh(TG.Torus(1, 0.035, 6, 48), new THREE.MeshBasicMaterial({ color: 0x74b9ff, transparent: true, opacity: 0.5, depthWrite: false }));
+                        sw.rotation.x = -Math.PI / 2; mesh.add(sw); mesh.userData.swirl = sw;
+                        const sm = new THREE.MeshBasicMaterial({ color: 0xa8d8ff, transparent: true, opacity: 0.8 });
+                        const streams = [];
+                        for (let i = 0; i < 10; i++) { const d = new THREE.Mesh(TG.Sphere(1.6, 6, 4), sm); mesh.add(d); streams.push(d); }
+                        mesh.userData.streams = streams;
+                    }
+                    mesh.position.set(e.x, 16, e.y);
+                } else if (e.type === 'ripple') {
+                    mesh = new THREE.Mesh(TG.Torus(1, 0.12, 6, 20), new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
+                    mesh.position.set(e.x, 14, e.y);   // upright, facing the camera is not worth a per-frame lookAt
+                    mesh.rotation.x = -Math.PI / 2;
+                } else if (e.type === 'infring') {
+                    // Infinity: a faint shimmering ring held around Gojo.
+                    mesh = new THREE.Mesh(TG.Torus(1, 0.03, 6, 64), new THREE.MeshBasicMaterial({ color: _hex(e.color), transparent: true, opacity: 0.25, depthWrite: false }));
+                    mesh.rotation.x = -Math.PI / 2; mesh.scale.set(e.maxR, e.maxR, e.maxR);
+                    mesh.position.set(e.x, 8, e.y);
+                } else if (e.type === 'voidstars') {
+                    // Inside Unlimited Void: stars of infinite information, and streaks of light racing out.
+                    mesh = new THREE.Group();
+                    const starM = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true });
+                    const streakM = new THREE.MeshBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.7, depthWrite: false });
+                    const R = e.maxR;
+                    for (let k = 0; k < 48; k++) {
+                        const ang = k * 2.399963, rr = R * 0.92 * Math.sqrt((k + 0.5) / 48);
+                        const st = new THREE.Mesh(TG.Sphere(1.4, 5, 4), starM);
+                        st.position.set(Math.cos(ang) * rr, Math.sqrt(Math.max(0, R * R * 0.85 - rr * rr)) * 0.9 + 6, Math.sin(ang) * rr);
+                        mesh.add(st);
+                    }
+                    const streaks = [];
+                    for (let k = 0; k < 12; k++) {
+                        const s = new THREE.Mesh(TG.Box(46, 0.8, 0.8), streakM);
+                        s.rotation.y = -(k * 0.5236 + 0.2); s.userData.ang = k * 0.5236 + 0.2; s.userData.h = 12 + (k % 4) * 22;
+                        mesh.add(s); streaks.push(s);
+                    }
+                    mesh.userData = { starM, streakM, streaks };
+                    mesh.position.set(e.x, 0, e.y);
                 } else if (e.type === 'dome') {
                     // A real half-sphere over the ground, seen from inside and out.
                     mesh = new THREE.Mesh(TG.Sphere(1, 28, 14, 0, Math.PI*2, 0, Math.PI*0.5),
@@ -9040,6 +9221,51 @@ const col = b.color || BLDG_COLORS[0];
                 if (ring) { const rs = 1 + Math.max(0, p-0.35)/0.65*5; ring.scale.set(rs,rs,1); ring.material.opacity = Math.max(0, 1 - (p-0.35)/0.65); }
                 const fade = p > 0.82 ? (p-0.82)/0.18 : 0;
                 e._mesh.traverse(o => { if (o.material && 'opacity' in o.material) { o.material.transparent = true; o.material.opacity = 1 - fade; } });
+                continue;
+            }
+            if (e.type === 'gorb') {
+                const ud = e._mesh.userData, R = Math.max(2, e.maxR), a = 1 - (e.fade || 0), h = Math.max(16, R * 0.75);
+                e._mesh.visible = a > 0.01;
+                e._mesh.position.set(e.x, h, e.y);
+                ud.core.scale.setScalar(R); ud.shell.scale.setScalar(R * (1.6 + Math.sin(e.t * 0.25) * 0.08));
+                ud.core.material.opacity = a; ud.shell.material.opacity = 0.35 * a;
+                if (ud.heart) { ud.heart.scale.setScalar(R * (e.kind === 'purple' ? 0.45 : 0.4)); ud.heart.material.opacity = a; }
+                if (ud.swirl) {
+                    const q = (e.t * 0.025) % 1, rr = R + (e.reach - R) * (1 - q);
+                    ud.swirl.scale.set(rr, rr, rr * 0.6);
+                    ud.swirl.position.y = 4 - h; ud.swirl.rotation.z = e.t * 0.09;
+                    ud.swirl.material.opacity = 0.5 * a * (0.4 + 0.6 * q);
+                }
+                if (ud.streams) for (let k = 0; k < ud.streams.length; k++) {
+                    const q = (e.t * 0.03 + k * 0.37) % 1, ang = k * 0.628 + q * 1.4, rr = R + (e.reach - R) * (1 - q);
+                    ud.streams[k].position.set(Math.cos(ang) * rr, (8 - h) * (1 - q), Math.sin(ang) * rr);
+                }
+                continue;
+            }
+            if (e.type === 'ripple') {
+                const s = 3 + p * e.maxR;
+                e._mesh.scale.set(s, s, s);
+                e._mesh.material.opacity = 0.8 * (1 - p);
+                continue;
+            }
+            if (e.type === 'infring') {
+                e._mesh.visible = !(e.fade > 0);
+                e._mesh.position.set(e.x, 8 + Math.sin(e.t * 0.05) * 1.5, e.y);
+                e._mesh.rotation.z = e.t * 0.01;
+                // Shimmer normally; flicker hard when the meter is nearly empty.
+                e._mesh.material.opacity = e.low ? (((e.t >> 2) & 1) ? 0.06 : 0.4) : 0.2 + 0.08 * Math.sin(e.t * 0.12);
+                continue;
+            }
+            if (e.type === 'voidstars') {
+                const grow = Math.min(1, p / 0.12), fade = p > 0.8 ? (p - 0.8) / 0.2 : 0, ud = e._mesh.userData;
+                e._mesh.scale.setScalar(0.2 + 0.8 * grow);
+                e._mesh.rotation.y = e.t * 0.004;
+                ud.starM.opacity = (1 - fade) * (0.7 + 0.3 * Math.sin(e.t * 0.15));
+                ud.streakM.opacity = 0.7 * (1 - fade);
+                for (let k = 0; k < ud.streaks.length; k++) {
+                    const s = ud.streaks[k], q = (e.t * 0.018 + k * 0.29) % 1, r = e.maxR * 0.9 * q + 23;
+                    s.position.set(Math.cos(s.userData.ang) * r, s.userData.h, Math.sin(s.userData.ang) * r);
+                }
                 continue;
             }
             if (e.type === 'dome') {
@@ -9154,62 +9380,412 @@ const col = b.color || BLDG_COLORS[0];
         return true;
     }
     // ======================== GOJO ========================
-    // A fan tribute to Gojo Satoru. Red pushes, Blue pulls, and Hollow Purple is the two thrown
-    // together — a purple beam that wipes out the line it travels. Pressing E + Z + X at once opens
-    // his Domain (see abilityKeyPress below). Every visual goes through spawnGameEffect so it shows in
-    // the 3D camera modes too; particles alone would be invisible there.
+    // A fan tribute to Gojo Satoru (Jujutsu Kaisen), built the way his Limitless works in the show:
+    //   ♾️ Infinity (passive) — an invisible barrier. Anything coming at him slows down the closer it
+    //      gets and never quite arrives; shots stop in mid-air. It runs on cursed energy (a meter):
+    //      every blocked contact or shot costs some, it refills when nothing is pushing on it, and at
+    //      zero it drops for a few seconds and he takes hits like anybody else.
+    //   🔴 [E] Reversal: RED — an orb thrown forward that blasts everything off its path.
+    //   🔵 [Z] Lapse: BLUE — a small black hole at the aim point that drags everything in and crushes
+    //      it. Press Z again while it is alive to snap to it.
+    //   🟣 [X] Hollow Technique: PURPLE — red and blue pressed together into a sphere that travels
+    //      forward, slow and unstoppable, erasing everything it touches. Then the blindfold comes off.
+    // Pressing E + Z + X at once opens his Domain (see DOMAINS below).
+    //
+    // The orbs live in `gojoOrbs` and are simulated by the host (updateGojoOrbs, from update()). Each
+    // one OWNS a long-lived gameEffect it moves every frame, so the same orb draws in 2D and in every
+    // 3D camera mode. Guests get the orbs in the state packet (`gorbs`) and mirror them into their
+    // own effects (mpClientGojoOrbs). Nothing here allocates per frame once an orb exists.
+    const INF_R = 45;                // the barrier's radius around him
+    const INF_MAX = 100;             // the Infinity meter (his cursed energy)
+    const INF_DRAIN_HOLD = 0.07;     // per held monster, per frame (about 4 a second each)
+    const INF_DRAIN_BOSS = 0.25;     // a boss leaning on it costs far more
+    const INF_DRAIN_SHOT = 6;        // per stopped projectile
+    const INF_REGEN = 0.4;           // per frame once nothing has pushed on it for a moment
+    const INF_REGEN_DELAY = 45;      // frames of quiet before it starts refilling
+    const INF_DOWN_T = 180;          // 3 s with the barrier down when the meter empties
+    const INF_BACK = 30;             // what it comes back at
+    const INF_SIXEYES_REGEN = 2.5;   // Six Eyes refills it this much faster
+    const RED_SPEED = 12, RED_RANGE = 600, RED_REACH = 26, RED_BURST_R = 90;
+    const BLUE_LIFE = 180, BLUE_PULL_R = 220, BLUE_CRUSH_R = 60, BLUE_MAX_AIM = 320;
+    const PURPLE_CHARGE = 45, PURPLE_R = 60, PURPLE_SPEED = 4.5, PURPLE_RANGE = 800;
+    let gojoOrbs = [];
+    let _gojoOrbId = 0;
 
-    // Z — Blue Lapse: a point where you aim that drags everything near it together, then crushes it.
-    function _gojoBlue(p, mx, my) {
-        let ang = Math.atan2(my - p.y, mx - p.x), dist = Math.min(320, Math.hypot(mx - p.x, my - p.y) || 200);
-        const cx = p.x + Math.cos(ang) * dist, cy = p.y + Math.sin(ang) * dist;
-        let n = 0;
-        for (const m of monsters) {
-            const d = Math.hypot(m.x - cx, m.y - cy);
-            if (d < 240 && d > 1) {
-                const keep = m.isBoss ? 0.7 : 0.25;          // bosses only budge a little
-                const nx = cx + (m.x - cx) * keep, ny = cy + (m.y - cy) * keep;
-                if (!ptInBld(nx, ny, m.r || 12)) { m.x = nx; m.y = ny; }
-                m.slow = Math.max(m.slow || 0, 90);
+    function gojoSixEyes(p) { return !!(p && ((p.form && p.form.key === 'sixeyes') || p._formKey === 'sixeyes' || p.formKey === 'sixeyes')); }
+    // The blindfold is on unless the Six Eyes are open.
+    function gojoBlindfolded(p) { return !gojoSixEyes(p); }
+    function infinityUp(p) {
+        return !!(p && p.cls && p.cls.infinity && p.hp > 0 && !(p._infDown > 0) && (p._inf === undefined || p._inf > 0));
+    }
+    // Run from tickPlayerTimers (host, for every Gojo). Whatever was blocked this frame was added to
+    // p._infBlk by the monster and bullet loops; spend it here.
+    function tickInfinity(p) {
+        if (p._inf === undefined) p._inf = INF_MAX;
+        const blk = p._infBlk || 0; p._infBlk = 0;
+        if (p._infDown > 0) {
+            p._infDown--;
+            if (p._infDown === 0) {
+                p._inf = INF_BACK; p._infQuiet = 0;
+                if (p === player) showStatus('♾️ Infinity is back!', '#3fa9ff');
+                spawnGameEffect('ring', p.x, p.y, '#9fd3ff', { maxR: INF_R, maxT: 20 });
             }
+            return;
         }
-        for (let i = monsters.length - 1; i >= 0; i--) {
-            const m = monsters[i];
-            if (m && Math.hypot(m.x - cx, m.y - cy) < 130) { hitMonster(m, i, Math.floor(p.damage * 1.6)); n++; }
+        if (blk > 0) {
+            p._inf -= blk; p._infQuiet = 0;
+            if (p._inf <= 0) {
+                p._inf = 0; p._infDown = INF_DOWN_T;
+                if (p === player) showStatus('♾️ Infinity is DOWN!', '#ff6b81');
+                spawnGameEffect('ring', p.x, p.y, '#ff6b81', { maxR: 60, maxT: 20 });
+            }
+            return;
         }
-        spawnGameEffect('ring',  cx, cy, '#3fa9ff', { maxR: 240, maxT: 30 });
-        spawnGameEffect('burst', cx, cy, '#74b9ff', { maxR: 120, maxT: 34 });
-        _mvRing(cx, cy, '#3fa9ff', 16, 60);
-        if (p === player) showStatus(n ? `🔵 BLUE! x${n}` : '🔵 BLUE!', '#3fa9ff');
-        SFX.freeze();
+        p._infQuiet = (p._infQuiet || 0) + 1;
+        if (p._infQuiet > INF_REGEN_DELAY && p._inf < INF_MAX)
+            p._inf = Math.min(INF_MAX, p._inf + INF_REGEN * (gojoSixEyes(p) ? INF_SIXEYES_REGEN : 1));
+    }
+    // A subtle ripple where something is pressing on Infinity. Throttled per monster and capped overall.
+    function _infRipple(x, y, color) {
+        if (gameEffects.length < 90) spawnGameEffect('ripple', x, y, color || '#9fd3ff', { maxR: 12, maxT: 18 });
+    }
+    // Called for every monster after it has moved this frame. (ox, oy) is where it started the frame.
+    function infinityHold(m, ox, oy) {
+        _infHoldOne(player, m, ox, oy);
+        for (let k = 0; k < remotePlayers.length; k++) _infHoldOne(remotePlayers[k], m, ox, oy);
+    }
+    function _infHoldOne(g, m, ox, oy) {
+        if (!g || !infinityUp(g)) return;
+        const din = Math.max(INF_R, (g.r || 14) + (m.r || 12) + 8);   // where it stops: a hand's width away
+        const dout = din + 60;                                        // where the slowing starts
+        let dx = m.x - g.x, dy = m.y - g.y, d = Math.hypot(dx, dy);
+        if (d >= dout) return;
+        const od = Math.hypot(ox - g.x, oy - g.y);
+        if (d < od) {
+            // Coming closer: only a fraction of this frame's step survives, and that fraction shrinks
+            // toward nothing at the edge — so it crawls, then hangs there.
+            const f0 = Math.max(0, Math.min(1, (od - din) / (dout - din)));
+            let f = f0;
+            if (m.isBoss) f = Math.max(f0, 0.3);                      // a boss forces its way in, slowly
+            m.x = ox + (m.x - ox) * f; m.y = oy + (m.y - oy) * f;
+            dx = m.x - g.x; dy = m.y - g.y; d = Math.hypot(dx, dy);
+        }
+        if (m._infRip > 0) m._infRip--;
+        if (m.isBoss) {
+            if (d < din) {
+                g._infBlk = (g._infBlk || 0) + INF_DRAIN_BOSS;
+                if (!(m._infRip > 0) && d > 0.01) { m._infRip = 20; _infRipple(g.x + dx / d * INF_R, g.y + dy / d * INF_R, '#ff9ff3'); }
+            }
+            return;
+        }
+        if (d < din && d > 0.01) {
+            // Already inside (Gojo walked into it, or it was thrown in): Infinity holds it at the edge.
+            const nx = g.x + dx / d * din, ny = g.y + dy / d * din;
+            if (!ptInBld(nx, ny, m.r || 12)) { m.x = nx; m.y = ny; d = din; }
+        }
+        if (d < din + 3) {
+            g._infBlk = (g._infBlk || 0) + INF_DRAIN_HOLD;
+            if (!(m._infRip > 0) && d > 0.01) { m._infRip = 30; const c = d - (m.r || 12); _infRipple(g.x + dx / d * c, g.y + dy / d * c); }
+        }
+    }
+    // An enemy shot entering Infinity stops in mid-air and fades. Returns true if it was caught.
+    function infinityCatchShot(b) {
+        if (_infCatchOne(player, b)) return true;
+        for (let k = 0; k < remotePlayers.length; k++) if (_infCatchOne(remotePlayers[k], b)) return true;
+        return false;
+    }
+    function _infCatchOne(g, b) {
+        if (!g || !infinityUp(g)) return false;
+        if (Math.hypot(b.x - g.x, b.y - g.y) >= INF_R + 4) return false;
+        b.vx = 0; b.vy = 0; b.vz = 0;
+        b._inf = true; b.life = Math.min(b.life, 20);
+        g._infBlk = (g._infBlk || 0) + INF_DRAIN_SHOT;
+        _infRipple(b.x, b.y);
+        return true;
     }
 
-    // X — Hollow Purple: a huge purple orb fired forward. Everything in its path is wiped out (bosses
-    // take a heavy hit instead), and Gojo opens his Six Eyes form.
-    function _gojoHollowPurple(p, mx, my) {
-        if (p === player) { try { showGojoCutscene('HOLLOW PURPLE', '🔴 + 🔵 = 🟣', '#a55eea'); } catch (e) {} }
-        enterForm(p, 'sixeyes');
-        const ang = Math.atan2(my - p.y, mx - p.x), ux = Math.cos(ang), uy = Math.sin(ang);
-        const LEN = 720, HALF = 55;
+    // ---- the orbs ----
+    function _gojoNewOrb(k, p, x, y, ux, uy, r, color) {
+        const o = { id: ++_gojoOrbId, k, p, x, y, ux, uy, r, t: 0, dist: 0, dmg: p.damage, local: p === player,
+                    phase: 'fly', warped: false, fx: null, fxA: null, fxB: null, end: 0 };
+        o.fx = spawnGameEffect('gorb', x, y, color, { maxR: r, maxT: 1e9, kind: k,
+            reach: k === 'blue' ? BLUE_PULL_R : 0, angle: Math.atan2(uy, ux) });
+        gojoOrbs.push(o);
+        return o;
+    }
+    function _gojoEndOrb(i) {
+        const o = gojoOrbs[i];
+        removeGameEffect(o.fx); removeGameEffect(o.fxA); removeGameEffect(o.fxB);
+        gojoOrbs.splice(i, 1);
+    }
+    // Knock a monster along (kx, ky) without shoving it into a building.
+    function _gojoShove(m, kx, ky, dist) {
+        for (let s = 0; s < 3; s++) {
+            const nx = m.x + kx * dist, ny = m.y + ky * dist;
+            if (!ptInBld(nx, ny, m.r || 12)) { m.x = nx; m.y = ny; return; }
+            dist *= 0.5;
+        }
+    }
+
+    // E — Reversal: RED. The orb flies forward; whatever it passes is blasted off its path.
+    function _gojoRed(p, aimX, aimY) {
+        let ang = Math.atan2(aimY - p.y, aimX - p.x);
+        if (!isFinite(ang)) ang = p.angle || 0;
+        const ux = Math.cos(ang), uy = Math.sin(ang);
+        const o = _gojoNewOrb('red', p, p.x + ux * 24, p.y + uy * 24, ux, uy, 16, '#ff4757');
+        o.dmg = Math.floor(p.damage * 1.8);
+        _gojoRedStep(o);                                   // the first frame happens now, at his hand
+        spawnGameEffect('ring', p.x + ux * 24, p.y + uy * 24, '#ff4757', { maxR: 30, maxT: 14 });
+        addShake(4);
+        if (p === player) showStatus('🔴 Reversal: RED!', '#ff4757');
+        try { SFX.gojoRed(); } catch (e) {}
+        return o;
+    }
+    function _gojoRedStep(o) {
+        for (let i = monsters.length - 1; i >= 0; i--) {
+            const m = monsters[i]; if (!m || m._gHit === o.id) continue;
+            const dx = m.x - o.x, dy = m.y - o.y;
+            if (Math.hypot(dx, dy) >= o.r + (m.r || 12) + RED_REACH) continue;
+            m._gHit = o.id;
+            // Thrown off the side of the path it was on, and a little onward.
+            const side = (dx * -o.uy + dy * o.ux) >= 0 ? 1 : -1;
+            let kx = -o.uy * side + o.ux * 0.6, ky = o.ux * side + o.uy * 0.6;
+            const kl = Math.hypot(kx, ky); kx /= kl; ky /= kl;
+            _gojoShove(m, kx, ky, m.isBoss ? 35 : 120);
+            m.stunned = Math.max(m.stunned || 0, m.isBoss ? 15 : 45);
+            hitMonster(m, i, o.dmg, false, o.local);
+        }
+    }
+    function _gojoRedBurst(o) {
         for (let i = monsters.length - 1; i >= 0; i--) {
             const m = monsters[i]; if (!m) continue;
-            const dx = m.x - p.x, dy = m.y - p.y;
-            const along = dx * ux + dy * uy, across = Math.abs(dx * uy - dy * ux);
-            if (along > -20 && along < LEN && across < HALF + (m.r || 12)) {
-                hitMonster(m, i, Math.floor(p.damage * (m.isBoss ? 3 : 6)));
+            const dx = m.x - o.x, dy = m.y - o.y, d = Math.hypot(dx, dy);
+            if (d >= RED_BURST_R + (m.r || 12)) continue;
+            if (d > 0.01) _gojoShove(m, dx / d, dy / d, m.isBoss ? 20 : 60);
+            hitMonster(m, i, Math.max(1, Math.floor(o.dmg * 0.6)), false, o.local);
+        }
+        spawnGameEffect('burst', o.x, o.y, '#ff4757', { maxR: RED_BURST_R, maxT: 22 });
+        spawnGameEffect('ring',  o.x, o.y, '#ff6b81', { maxR: RED_BURST_R + 40, maxT: 26 });   // the shockwave
+        spawnGameEffect('ring',  o.x, o.y, '#ffffff', { maxR: RED_BURST_R * 0.6, maxT: 12 });  // the flash
+        _mvRing(o.x, o.y, '#ff4757', 14, 40);
+        addShake(6);
+        try { SFX.gojoRed(true); } catch (e) {}
+    }
+
+    // Z — Lapse: BLUE. A tiny black hole where you aim that pulls everything in for 3 seconds.
+    function _gojoBlue(p, mx, my) {
+        let ang = Math.atan2(my - p.y, mx - p.x); if (!isFinite(ang)) ang = p.angle || 0;
+        const dist = Math.min(BLUE_MAX_AIM, Math.hypot(mx - p.x, my - p.y) || 200);
+        const cx = p.x + Math.cos(ang) * dist, cy = p.y + Math.sin(ang) * dist;
+        const o = _gojoNewOrb('blue', p, cx, cy, 0, 0, 14, '#3fa9ff');
+        o.dmg = Math.max(1, Math.floor(p.damage * 0.4));
+        _gojoBlueStep(o);
+        spawnGameEffect('ring', cx, cy, '#74b9ff', { maxR: BLUE_PULL_R, maxT: 24 });
+        // Six Eyes: everything comes round faster.
+        if (p.cls && p.cls.infinity && gojoSixEyes(p)) p.moveQCooldown = Math.min(p.moveQCooldown || 0, 120);
+        if (p === player) showStatus('🔵 Lapse: BLUE!', '#3fa9ff');
+        try { SFX.gojoBlue(); } catch (e) {}
+        return o;
+    }
+    function _gojoBlueStep(o) {
+        for (let i = monsters.length - 1; i >= 0; i--) {
+            const m = monsters[i]; if (!m) continue;
+            const dx = o.x - m.x, dy = o.y - m.y, d = Math.hypot(dx, dy);
+            if (d >= BLUE_PULL_R || d < 0.5) continue;
+            // Pulled harder the closer it is to the middle; a boss only drifts.
+            const pull = m.isBoss ? 0.7 : Math.min(d, 2.2 + 3 * (1 - d / BLUE_PULL_R));
+            const nx = m.x + dx / d * pull, ny = m.y + dy / d * pull;
+            if (!ptInBld(nx, ny, m.r || 12)) { m.x = nx; m.y = ny; }
+            m.slow = Math.max(m.slow || 0, 6);
+        }
+        if (o.t % 20 === 0) {
+            for (let i = monsters.length - 1; i >= 0; i--) {
+                const m = monsters[i]; if (!m) continue;
+                if (Math.hypot(m.x - o.x, m.y - o.y) < BLUE_CRUSH_R + (m.r || 12))
+                    hitMonster(m, i, Math.max(1, Math.floor(o.dmg * (m.isBoss ? 0.5 : 1))), false, o.local);
             }
         }
-        for (let k = 1; k <= 9; k++) {
-            const d = k * 80;
-            spawnGameEffect('burst', p.x + ux * d, p.y + uy * d, k % 2 ? '#a55eea' : '#6c5ce7', { maxR: 70, maxT: 24 + k * 3 });
+    }
+    // Pressing Z again while his Blue is alive pulls Gojo himself to it.
+    function gojoBlueWarp(p) {
+        if (!p || !p.cls || !p.cls.infinity) return false;
+        for (const o of gojoOrbs) {
+            if (o.k !== 'blue' || o.p !== p || o.warped || o.t < 10) continue;
+            if (ptInBld(o.x, o.y, p.r || 14)) return false;
+            spawnGameEffect('ring', p.x, p.y, '#3fa9ff', { maxR: 50, maxT: 16 });
+            p.x = o.x; p.y = o.y; p.vx = 0; p.vy = 0;
+            p.invincible = Math.max(p.invincible || 0, 20);
+            o.warped = true;
+            spawnGameEffect('ring', p.x, p.y, '#74b9ff', { maxR: 70, maxT: 18 });
+            if (p === player) showStatus('🔵 Blue: warp!', '#3fa9ff');
+            try { SFX.teleport(); } catch (e) {}
+            return true;
         }
-        spawnGameEffect('lightning', p.x, p.y, '#a29bfe', { maxR: 120, maxT: 26 });
-        for (let k = 0; k < 24; k++) {
-            const d = Math.random() * LEN;
-            particles.push({ x: p.x + ux * d, y: p.y + uy * d, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 24, maxLife: 24, color: '#a55eea', r: 5 });
+        return false;
+    }
+
+    // X — Hollow Technique: PURPLE. The chant, red and blue meeting at his hands, then the sphere.
+    function _gojoHollowPurple(p, mx, my) {
+        let ang = Math.atan2(my - p.y, mx - p.x); if (!isFinite(ang)) ang = p.angle || 0;
+        const ux = Math.cos(ang), uy = Math.sin(ang);
+        const o = _gojoNewOrb('purple', p, p.x + ux * 30, p.y + uy * 30, ux, uy, PURPLE_R, '#a55eea');
+        o.phase = 'charge'; o.fx.fade = 1;                 // the purple only appears as they merge
+        o.dmg = p.damage;
+        o.fxA = spawnGameEffect('gorb', p.x, p.y, '#ff4757', { maxR: 13, maxT: 1e9, kind: 'red' });
+        o.fxB = spawnGameEffect('gorb', p.x, p.y, '#3fa9ff', { maxR: 13, maxT: 1e9, kind: 'blue' });
+        _gojoPurpleCharge(o);
+        p.invincible = Math.max(p.invincible || 0, PURPLE_CHARGE + 10);   // he is not touched while he chants
+        if (p === player) {
+            showStatus('🤞 Phase… Twilight… Eyes of Wisdom…', '#a29bfe');
+            try { showGojoCutscene('HOLLOW PURPLE', '🔴 + 🔵 = 🟣', '#a55eea'); } catch (e) {}
         }
+        try { SFX.gojoPurple(); } catch (e) {}
+        return o;
+    }
+    function _gojoPurpleCharge(o) {
+        const p = o.p, q = Math.min(1, o.t / PURPLE_CHARGE);
+        // He keeps his aim; the orbs sit at his hands and close in.
+        o.x = p.x + o.ux * 30; o.y = p.y + o.uy * 30;
+        const side = 42 * (1 - q), px = -o.uy * side, py = o.ux * side;
+        if (o.fxA) { o.fxA.x = o.x + px; o.fxA.y = o.y + py; }
+        if (o.fxB) { o.fxB.x = o.x - px; o.fxB.y = o.y - py; }
+        o.fx.x = o.x; o.fx.y = o.y;
+        o.fx.fade = q < 0.6 ? 1 : 1 - (q - 0.6) / 0.4;
+        o.fx.maxR = PURPLE_R * Math.max(0.15, (q - 0.5) * 2);
+    }
+    function _gojoPurpleLaunch(o) {
+        removeGameEffect(o.fxA); removeGameEffect(o.fxB); o.fxA = o.fxB = null;
+        o.phase = 'fly'; o.fx.fade = 0; o.fx.maxR = o.r;
+        o.x = o.p.x + o.ux * (o.r + 10); o.y = o.p.y + o.uy * (o.r + 10);
+        enterForm(o.p, 'sixeyes');                        // and the blindfold comes off
+        spawnGameEffect('ring', o.x, o.y, '#a55eea', { maxR: 160, maxT: 24 });
+        spawnGameEffect('lightning', o.x, o.y, '#a29bfe', { maxR: 120, maxT: 20 });
         addShake(16);
-        SFX.shout67();
+        if (o.local) showStatus('🟣 HOLLOW TECHNIQUE: PURPLE!', '#a55eea');
+        try { SFX.gojoPurple(true); } catch (e) {}
+    }
+    function _gojoPurpleStep(o) {
+        for (let i = monsters.length - 1; i >= 0; i--) {
+            const m = monsters[i]; if (!m) continue;
+            if (Math.hypot(m.x - o.x, m.y - o.y) >= o.r + (m.r || 12)) continue;
+            if (m.isBoss) {
+                // Bosses are too much to erase in one touch: a heavy hit every 12 frames while inside.
+                if (m._gpId === o.id && o.t - m._gpLast < 12) continue;
+                m._gpId = o.id; m._gpLast = o.t;
+                m.slow = Math.max(m.slow || 0, 20);
+                hitMonster(m, i, Math.floor(o.dmg * 1.5), false, o.local);
+            } else {
+                hitMonster(m, i, Math.max(Math.floor(o.dmg * 10), Math.ceil(m.hp) + 1), false, o.local);
+            }
+        }
+        // Enemy shots in its path simply stop existing.
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            const b = bullets[i];
+            if (b.owner !== 'monster' || Math.hypot(b.x - o.x, b.y - o.y) >= o.r + 4) continue;
+            bullets.splice(i, 1);
+            _infRipple(b.x, b.y, '#a55eea');
+        }
+    }
+
+    // Host: move every orb one frame.
+    function updateGojoOrbs() {
+        for (let i = gojoOrbs.length - 1; i >= 0; i--) {
+            const o = gojoOrbs[i];
+            o.t++;
+            if (o.k === 'red') {
+                o.x += o.ux * RED_SPEED; o.y += o.uy * RED_SPEED; o.dist += RED_SPEED;
+                _gojoRedStep(o);
+                o.fx.x = o.x; o.fx.y = o.y;
+                if (o.dist >= RED_RANGE || ptInBld(o.x, o.y, 4)) { _gojoRedBurst(o); _gojoEndOrb(i); }
+            } else if (o.k === 'blue') {
+                _gojoBlueStep(o);
+                o.fx.fade = o.t > BLUE_LIFE - 20 ? (o.t - (BLUE_LIFE - 20)) / 20 : 0;
+                if (o.t >= BLUE_LIFE) {
+                    spawnGameEffect('burst', o.x, o.y, '#3fa9ff', { maxR: 70, maxT: 18 });
+                    _gojoEndOrb(i);
+                }
+            } else if (o.k === 'purple') {
+                if (o.phase === 'charge') {
+                    if (!o.p || o.p.hp <= 0) { _gojoEndOrb(i); continue; }
+                    _gojoPurpleCharge(o);
+                    if (o.t >= PURPLE_CHARGE) { _gojoPurpleLaunch(o); o.t = 0; }
+                    continue;
+                }
+                if (o.end > 0) {
+                    o.end--; o.fx.fade = 1 - o.end / 15;
+                    if (o.end <= 0) _gojoEndOrb(i);
+                    continue;
+                }
+                if (o.t === 70 && o.local) showStatus('✨ Six Eyes!', '#3fa9ff');
+                o.x += o.ux * PURPLE_SPEED; o.y += o.uy * PURPLE_SPEED; o.dist += PURPLE_SPEED;
+                o.fx.x = o.x; o.fx.y = o.y;
+                _gojoPurpleStep(o);
+                if (o.dist >= PURPLE_RANGE) {
+                    o.end = 15;
+                    spawnGameEffect('burst', o.x, o.y, '#a55eea', { maxR: 120, maxT: 24 });
+                }
+            }
+        }
+    }
+    // The orbs as the state packet carries them. Rebuilt into a reused array, not a fresh one.
+    const _gorbOut = [];
+    function mpSerializeGojoOrbs() {
+        let n = 0;
+        for (const o of gojoOrbs) {
+            const e = o.fx;
+            let s = _gorbOut[n]; if (!s) s = _gorbOut[n] = {};
+            s.i = o.id; s.k = o.k; s.x = _r1(e.x); s.y = _r1(e.y); s.r = Math.round(e.maxR); s.f = Math.round(e.fade * 100) / 100;
+            n++;
+            if (o.fxA) { let a = _gorbOut[n]; if (!a) a = _gorbOut[n] = {}; a.i = -o.id; a.k = 'red'; a.x = _r1(o.fxA.x); a.y = _r1(o.fxA.y); a.r = 13; a.f = 0; n++; }
+            if (o.fxB) { let b = _gorbOut[n]; if (!b) b = _gorbOut[n] = {}; b.i = -o.id - 0.5; b.k = 'blue'; b.x = _r1(o.fxB.x); b.y = _r1(o.fxB.y); b.r = 13; b.f = 0; n++; }
+        }
+        _gorbOut.length = n;
+        return _gorbOut;
+    }
+    // Guest: keep one effect per orb the host says exists, move it, drop the ones that have gone.
+    const _gorbFx = new Map();
+    function mpClientGojoOrbs(list) {
+        const seen = mpClientGojoOrbs._seen || (mpClientGojoOrbs._seen = new Set());
+        seen.clear();
+        for (const s of (list || [])) {
+            let e = _gorbFx.get(s.i);
+            if (!e) {
+                e = spawnGameEffect('gorb', s.x, s.y, s.k === 'red' ? '#ff4757' : s.k === 'blue' ? '#3fa9ff' : '#a55eea',
+                    { maxR: s.r, maxT: 1e9, kind: s.k, reach: s.k === 'blue' && s.i > 0 ? BLUE_PULL_R : 0 });
+                _gorbFx.set(s.i, e);
+            }
+            e.x = s.x; e.y = s.y; e.maxR = s.r; e.fade = s.f || 0;
+            seen.add(s.i);
+        }
+        for (const [id, e] of _gorbFx) if (!seen.has(id)) { removeGameEffect(e); _gorbFx.delete(id); }
+    }
+    // Guest effects are never aged by updateGameEffects (the host owns the simulation), so the orbs'
+    // animation clock is ticked here.
+    function mpClientTickGojoFx() { for (const e of _gorbFx.values()) e.t++; }
+
+    // A new run starts with no orbs in the air.
+    function clearGojoOrbs() {
+        while (gojoOrbs.length) _gojoEndOrb(gojoOrbs.length - 1);
+        for (const e of _gorbFx.values()) removeGameEffect(e);
+        _gorbFx.clear();
+    }
+    // The Infinity ring in 3D: one long-lived effect per Gojo, following him. In 2D the same ring is
+    // drawn by drawClassBodyBehind. It shimmers, flickers when the meter is low and is gone while down.
+    function syncInfinityRings() {
+        _syncInfRing(player);
+        for (let k = 0; k < remotePlayers.length; k++) _syncInfRing(remotePlayers[k]);
+    }
+    function _syncInfRing(p) {
+        if (!p) return;
+        const want = !!(p.cls && p.cls.infinity && p.hp > 0);
+        if (!want) { if (p._infFx) { removeGameEffect(p._infFx); p._infFx = null; } return; }
+        let e = p._infFx;
+        if (!e || gameEffects.indexOf(e) < 0) e = p._infFx = spawnGameEffect('infring', p.x, p.y, '#9fd3ff', { maxR: INF_R, maxT: 1e9 });
+        e.x = p.x; e.y = p.y;
+        e.t = (e.t + 1) % 100000;
+        const inf = p._inf === undefined ? INF_MAX : p._inf;
+        e.fade = (p._infDown > 0) ? 1 : 0;
+        e.low = inf < 30 ? 1 : 0;
     }
 
     // A short Gojo set-piece over the game view: a red orb and a blue orb collide into purple.
@@ -9250,8 +9826,9 @@ const col = b.color || BLDG_COLORS[0];
         'Gojo': {
             flag: 'infinity', icon: '♾️', cd: GOJO_DOMAIN_CD, r: GOJO_DOMAIN_R, t: GOJO_DOMAIN_T,
             clientBanner() {
-                showStatus('🤞 DOMAIN EXPANSION — UNLIMITED VOID!', '#a29bfe');
+                showStatus('🤞 Domain Expansion… UNLIMITED VOID!', '#a29bfe');
                 try { showGojoCutscene('DOMAIN EXPANSION', 'UNLIMITED VOID', '#6c5ce7'); } catch (e) {}
+                try { SFX.gojoVoid(); } catch (e) {}
             },
             open(p, local) {
                 const R = this.r;
@@ -9266,16 +9843,18 @@ const col = b.color || BLDG_COLORS[0];
                         }
                     }
                 });
-                spawnGameEffect('dome',  p.x, p.y, '#6c5ce7', { maxR: R, maxT: this.t });
+                // A dark, starry space with streaks of light racing through it — infinite information.
+                spawnGameEffect('dome',  p.x, p.y, '#140a3a', { maxR: R, maxT: this.t, rim: '#3fa9ff', rim2: '#02010a' });
+                spawnGameEffect('voidstars', p.x, p.y, '#ffffff', { maxR: R, maxT: this.t });
                 spawnGameEffect('ring',  p.x, p.y, '#3fa9ff', { maxR: R, maxT: 40 });
                 spawnGameEffect('burst', p.x, p.y, '#a55eea', { maxR: R * 0.6, maxT: 40 });
                 addShake(18);
                 if (local) {
-                    showStatus('🤞 DOMAIN EXPANSION...', '#a29bfe');
-                    setTimeout(() => { if (typeof gameRunning === 'undefined' || gameRunning) showStatus('♾️ UNLIMITED VOID!', '#3fa9ff'); }, 900);
+                    showStatus('🤞 Domain Expansion…', '#a29bfe');
+                    setTimeout(() => { if (typeof gameRunning === 'undefined' || gameRunning) showStatus('♾️ UNLIMITED VOID', '#3fa9ff'); }, 900);
                     try { showGojoCutscene('DOMAIN EXPANSION', 'UNLIMITED VOID', '#6c5ce7'); } catch (e) {}
                 }
-                try { SFX.rollResult('secret'); } catch (e) {}
+                try { SFX.gojoVoid(); } catch (e) {}   // a beat of silence, then a chime
             },
             tick(p, d, local) {
                 if (d.t % 30 !== 0) return;
@@ -9639,12 +10218,14 @@ const col = b.color || BLDG_COLORS[0];
         const p = targetPlayer || player;
         if (!p || p.frozen > 0 || p.stunned > 0) return;
         if ((p.charLevel || 1) < 2 && !p.moveZUnlocked) { if (p === player) showStatus('Z LOCKED — Lv.2', '#888'); return; }
+        // Gojo: Z again while his Blue is still out pulls him to it (Blue-assisted movement).
+        if (gojoBlueWarp(p)) return;
         if (p.moveQCooldown > 0) return;
         const _skMk = (p === player) ? skinMark() : null;   // arcade ability skin
         const _aimPt = _abilityAim(p, mx, my); const aimX = _aimPt.x, aimY = _aimPt.y;
         const m = (MOVES[p.cls.name] && MOVES[p.cls.name].z) || { cd:180, name:'Dash', color:'#0abde3', run:(p,mx,my)=>{ _mvDash(p,120,'#0abde3',mx,my); SFX.teleport(); } };
         p.moveQCooldown = m.cd;
-        if (p === player) {
+        if (p === player && !p.cls.infinity) {   // Gojo announces "Lapse: BLUE!" himself
             showStatus(m.name.toUpperCase()+'!', m.color);
             spawnGameEffect(_abilityArchetype(m.name, 'z'), p.x, p.y, m.color || '#0abde3', { angle: p.angle, maxR: 140 });
         }
@@ -9706,7 +10287,8 @@ const col = b.color || BLDG_COLORS[0];
         const _skMk = (p === player) ? skinMark() : null;   // arcade ability skin
         try { _asLocalDamage(p === player, () => _useAbilityCore(p, aimX, aimY)); }
         finally { p.damage = _origEDmg; }
-        if (p === player) { showStatus('[E] ' + _eAbilityName(p.cls), p.cls?.rarityColor || '#feca57'); spawnGameEffect(_eAbilityArchetype(p.cls), p.x, p.y, p.cls?.rarityColor || '#feca57', { angle: p.angle, maxR: 150 }); }
+        // Gojo announces his own move ("Reversal: RED!"), so the generic banner would only cover it.
+        if (p === player && !p.cls.infinity) { showStatus('[E] ' + _eAbilityName(p.cls), p.cls?.rarityColor || '#feca57'); spawnGameEffect(_eAbilityArchetype(p.cls), p.x, p.y, p.cls?.rarityColor || '#feca57', { angle: p.angle, maxR: 150 }); }
         skinTintSince(_skMk);
         if (p === player) { const lvlUp = addAbilityUse(p.cls.name, 'e'); if (lvlUp) { _abilityLevelUpToast(p, 'e', lvlUp); p.abilityLvls.e = lvlUp; } }
     }
@@ -10249,29 +10831,10 @@ const col = b.color || BLDG_COLORS[0];
             if (p === player) showStatus('👹 FINGER SACRIFICE!', '#e84118');
             SFX.shout67();
         }
-        // Gojo — Red Reversal: a red blast that shoves everything near him away, hard.
+        // Gojo — Reversal: RED. A red orb thrown forward along the aim; see _gojoRed.
         if (p.cls.infinity && (p._eCd||0) <= 0) {
-            p._eCd = 300;
-            let n = 0;
-            for (let i = monsters.length - 1; i >= 0; i--) {
-                const m = monsters[i];
-                const d = Math.hypot(m.x - p.x, m.y - p.y);
-                if (d < 220) {
-                    const a = Math.atan2(m.y - p.y, m.x - p.x);
-                    const push = m.isBoss ? 40 : 130;
-                    const nx = m.x + Math.cos(a) * push, ny = m.y + Math.sin(a) * push;
-                    if (!ptInBld(nx, ny, m.r || 12)) { m.x = nx; m.y = ny; }
-                    m.stunned = Math.max(m.stunned || 0, 50);
-                    hitMonster(m, i, Math.floor(p.damage * 1.8));
-                    n++;
-                }
-            }
-            spawnGameEffect('burst', p.x, p.y, '#ff4757', { maxR: 220, maxT: 30 });
-            spawnGameEffect('ring',  p.x, p.y, '#ff6b81', { maxR: 220, maxT: 26 });
-            _mvRing(p.x, p.y, '#ff4757', 16, 50);
-            addShake(6);
-            if (p === player) showStatus(n ? `🔴 RED! x${n}` : '🔴 RED!', '#ff4757');
-            SFX.shoot();
+            p._eCd = gojoSixEyes(p) ? 150 : 300;          // Six Eyes: half the wait
+            _gojoRed(p, aimX, aimY);
         }
         // Flash — Blink: a hard dash forward, no aiming needed, briefly untouchable.
         if (p.cls.speedModes && (p._eCd||0) <= 0) {
@@ -11006,6 +11569,8 @@ const col = b.color || BLDG_COLORS[0];
                     }
                 }
             } else {
+                // Gojo's Infinity: a shot that reaches it hangs in mid-air until it fades (life runs out).
+                if (b._inf || infinityCatchShot(b)) continue;
                 // Monster bullets hit any player
                 let hit = false;
                 for (const pl of _playersScratch()) {   // reused array — spreading built a fresh one per bullet, per frame
@@ -11033,6 +11598,7 @@ const col = b.color || BLDG_COLORS[0];
             const m = monsters[i];
             // Multiplayer: retarget to nearest living, visible player (shadows outer p)
             const p = nearestPlayer(m) || player;
+            const _mox = m.x, _moy = m.y;   // where it started this frame (Gojo's Infinity slows the step)
             if (m.slow > 0) { m.slow--; if (m.slow === 0) m.slowMult = undefined; }
             if (m.stunned > 0) m.stunned--;
             if (m.frozen > 0) m.frozen--;
@@ -11203,6 +11769,8 @@ const col = b.color || BLDG_COLORS[0];
                 }
             }
 
+            // Gojo's Infinity: whatever is coming at him crawls to a stop a hand's width away.
+            infinityHold(m, _mox, _moy);
             // Contact damage (Miku doesn't deal damage while player is swallowed, ghost invisible = safe)
             if (dist < m.r + p.r && p.invincible <= 0 && p.teleporting <= 0 && !p.invisible && !(m.canSwallow && p.stunned > 0)) {
                 if (p.shieldUp && p.cls.hasPlayerShield) { if(p===player){SFX.shield();showStatus('SHIELD BLOCK!','#bdc3c7');} p.shieldUp=false;p.shieldRecharge=0;p.invincible=20;continue; }
@@ -11211,16 +11779,17 @@ const col = b.color || BLDG_COLORS[0];
                     if (p.hitsTaken>=p.cls.reflectEvery) { p.hitsTaken=0; if(p===player){SFX.reflect();showStatus('REFLECT!','#e67e22');} hitMonster(m,i,15);p.invincible=20;continue; }
                 }
                 if (p.cls.dodgeChance && Math.random()<p.cls.dodgeChance) { if(p===player){SFX.dodge();showStatus('DODGED!','#2ecc71');} p.invincible=10;continue; }
-                // Gojo — Infinity: whatever touches him is held off a little, and only part of the hit
-                // gets through (15% of the time none of it does).
-                if (p.cls.infinity) {
-                    const ia = Math.atan2(m.y - p.y, m.x - p.x);
-                    const hx = m.x + Math.cos(ia) * 8, hy = m.y + Math.sin(ia) * 8;
-                    if (!ptInBld(hx, hy, m.r)) { m.x = hx; m.y = hy; }
-                    if (Math.random() < 0.15) { if(p===player) showStatus('♾️ INFINITY!','#3fa9ff'); p.invincible=12; continue; }
+                // Gojo — Infinity: nothing ordinary reaches him while it is up (infinityHold keeps it at
+                // the edge). A boss can force its way in: half the hit lands and it costs a lot of meter.
+                // With the meter empty the barrier is down and he is hit like anybody else.
+                if (infinityUp(p)) {
+                    if (!m.isBoss) continue;
+                    p._infBlk = (p._infBlk || 0) + 4;
+                    playerHit(Math.max(1, Math.ceil(m.damage * 0.5)), p, m.name);
+                    continue;
                 }
                 if (m.canWeb && !(p.disableImmune>0)) { p.frozen = 60; if(p===player){SFX.freeze();showStatus('WEBBED!','#2c3e50');} }
-                playerHit(p.cls.infinity ? Math.max(1, Math.ceil(m.damage * 0.6)) : m.damage, p, m.name);
+                playerHit(m.damage, p, m.name);
             }
         }
 
@@ -11274,6 +11843,7 @@ const col = b.color || BLDG_COLORS[0];
         }
 
         updateBanShocks(); // expanding Ban Hammer shockwave kills monsters as it passes
+        updateGojoOrbs();  // Gojo's Red / Blue / Purple orbs
         // Fire tiles damage monsters (Flame class)
         for (let i = fireTiles.length-1; i >= 0; i--) {
             const f = fireTiles[i]; f.life--;
@@ -12222,6 +12792,7 @@ const col = b.color || BLDG_COLORS[0];
         ctx.restore();
     }
 
+    let _accFor = null;   // the player whose accessory / aura is being drawn right now (null for monsters)
     function drawAccessory(name, cx, cy, scale) {
         const s = scale || 1;
         ctx.save(); ctx.translate(cx, cy); ctx.lineCap='round'; ctx.lineJoin='round';
@@ -12592,6 +13163,18 @@ const col = b.color || BLDG_COLORS[0];
             ctx.lineTo(6.5*s, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
             ctx.fillStyle='#ffffff';
             ctx.beginPath(); ctx.moveTo(-1.5*s, -3*s); ctx.lineTo(0.8*s, -9*s); ctx.lineTo(0.5*s, -3*s); ctx.closePath(); ctx.fill();
+            if (typeof _accFor !== 'undefined' && _accFor && gojoSixEyes(_accFor)) {
+                // Six Eyes: the blindfold is off and the eyes blaze bright blue.
+                ctx.save(); ctx.shadowColor = '#3fa9ff'; ctx.shadowBlur = 8;
+                ctx.fillStyle = '#bfe6ff';
+                ctx.beginPath(); ctx.ellipse(-3*s, 1*s, 1.9*s, 1.2*s, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(3*s, 1*s, 1.9*s, 1.2*s, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#3fa9ff';
+                ctx.beginPath(); ctx.arc(-3*s, 1*s, 0.9*s, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(3*s, 1*s, 0.9*s, 0, Math.PI*2); ctx.fill();
+                ctx.restore();
+                break;
+            }
             // blindfold
             ctx.fillStyle='#111216'; ctx.fillRect(-7*s, -0.5*s, 14*s, 2.6*s);
             ctx.fillStyle='rgba(63,169,255,0.55)'; ctx.fillRect(-7*s, -0.5*s, 14*s, 0.5*s);
@@ -12907,7 +13490,11 @@ const col = b.color || BLDG_COLORS[0];
             break;
         }
         case 'Gojo': { // Infinity: a faint blue ring held off his body, with a purple glint orbiting it
-            const ar = R * 1.45 + Math.sin(frame * 0.06) * 1.5;
+            // Drawn at the barrier's real radius. It flickers when the meter is low and is gone while down.
+            const gp = (typeof _accFor !== 'undefined') ? _accFor : null;   // (tests run this case on its own)
+            if (gp && gp._infDown > 0) break;
+            if (gp && gp._inf !== undefined && gp._inf < 30 && (Math.floor(frame / 4) & 1)) { ctx.globalAlpha = 0.25; }
+            const ar = (gp ? INF_R : R * 1.45) + Math.sin(frame * 0.06) * 1.5;
             const ag = ctx.createRadialGradient(cx, cy, R * 0.9, cx, cy, ar + 4);
             ag.addColorStop(0, 'rgba(63,169,255,0)'); ag.addColorStop(0.8, 'rgba(63,169,255,0.18)'); ag.addColorStop(1, 'rgba(63,169,255,0)');
             ctx.fillStyle = ag;
@@ -14054,6 +14641,7 @@ const col = b.color || BLDG_COLORS[0];
         else if (p.cls.name==='Ghost') bodyColor = '#dfe6e9';
 
         // Class-specific decorations behind the body (capes, tails, wings)
+        _accFor = p;   // who is being dressed — Gojo's ring and eyes depend on his Infinity and form
         drawClassBodyBehind(p.cls.name, p.x, p.y + bob, R);
         // SWAT officer, seen from above: camo-dotted suit in the class colour, plate carrier, sleeves.
         // Helmet and gloves go on after the gun so the hands hold it and the head sits on top.
@@ -14127,6 +14715,7 @@ const col = b.color || BLDG_COLORS[0];
         drawSwatHead2D(p, bodyColor, R, bob, swatSwing);
         // Drawn accessory (per-class headgear)
         drawAccessory(p.cls.name, p.x, p.y + bob - R + 1, 1);
+        _accFor = null;
         // Class accessory — emoji floating above head
         if (p.cls.emoji) {
             const bob = Math.sin(Date.now()/220 + p.x) * 1.2;
@@ -15979,11 +16568,21 @@ const col = b.color || BLDG_COLORS[0];
             for (const [hx, hz, tilt] of [[-0.22, 0.05, 0.45], [0.02, -0.1, 0], [0.24, 0.05, -0.45]])
                 add(TG.Cone(r*0.16, r*0.55, 8), hairM, hx * r, r*4.55, hz * r, 0, 0, tilt, 'hair');
             add(TG.Cylinder(r*0.52, r*0.52, r*0.16, 18, 1, true), foldM, 0, r*3.92, 0, 0, 0, 0, 'blindfold');
+            // Six Eyes: two bright blue eyes, hidden until the blindfold comes off (see gojoFigureEyes).
+            const eyeM = _pf('pf-gojo-eyes', () => new THREE.MeshBasicMaterial({ color: 0x7fd0ff }));
+            for (const side of [-1, 1]) add(TG.Sphere(r*0.07, 8, 6), eyeM, side * r*0.17, r*3.93, r*0.5, 0, 0, 0, 'sixeyes').visible = false;
         }
 
         g.userData.head = head;
         g.userData.parts = parts;
         return g;
+    }
+
+    // Gojo's 3D head: blindfold on normally, glowing blue eyes in his Six Eyes form.
+    function gojoFigureEyes(g, open) {
+        const parts = g && g.userData && g.userData.parts; if (!parts) return;
+        if (parts.blindfold) for (const m of parts.blindfold) m.visible = !open;
+        if (parts.sixeyes) for (const m of parts.sixeyes) m.visible = !!open;
     }
 
     // ======================== SUMMONS (3D) ========================
@@ -18444,6 +19043,7 @@ const col = b.color || BLDG_COLORS[0];
                 const _rf = rp.form ? FORMS[rp.form.key] : (rp.formKey ? FORMS[rp.formKey] : null);
                 const _sc = _rf ? (_rf.scale || 1) : 1;
                 if (mesh.scale.x !== _sc) mesh.scale.setScalar(_sc);
+                if (rp.cls && rp.cls.infinity) gojoFigureEyes(mesh, gojoSixEyes(rp));
                 mesh.visible = rp.hp > 0 && !rp.invisible;
             });
         // Your pets, trotting along beside you.
@@ -19289,7 +19889,17 @@ const col = b.color || BLDG_COLORS[0];
             const _dcd = Math.ceil((p._domainCd || 0) / 60);
             domainPart = _dcd > 0 ? ` | ${_dom.icon} Domain ${_dcd}s` : ` | ${_dom.icon} E+Z+X Domain`;
         }
-        const abilityText = ab + qPart + fPart + elemPart + domainPart;
+        // Gojo's Infinity meter (cursed energy). Down = the barrier is off and hits land normally.
+        let infPart = '';
+        if (p.cls && p.cls.infinity) {
+            if (p._infDown > 0) infPart = ` | ♾️ DOWN ${Math.ceil(p._infDown / 60)}s`;
+            else {
+                const _iv = Math.max(0, Math.min(100, Math.round(p._inf === undefined ? 100 : p._inf)));
+                const _ib = Math.round(_iv / 20);
+                infPart = ` | ♾️ ${'▰'.repeat(_ib)}${'▱'.repeat(5 - _ib)} ${_iv}%`;
+            }
+        }
+        const abilityText = ab + qPart + fPart + elemPart + domainPart + infPart;
         _setHud('ability-display', abilityText);
         // On-screen cooldown overlay for the 3D / first-person views (the #hud text is hard to see there)
         const a3d = _hudEls.get('ability-hud-3d') !== undefined ? _hudEls.get('ability-hud-3d')
@@ -19841,7 +20451,7 @@ const col = b.color || BLDG_COLORS[0];
             player.speedMode = d.player.speedMode || 1;
             player.hitsTaken = d.player.hitsTaken || 0;
 
-            bullets=[]; monsters=[]; particles=[]; pickups=[]; walls=[]; fireTiles=[]; poisonTiles=[]; allies=[]; turrets=[]; traps=[];
+            bullets=[]; monsters=[]; particles=[]; pickups=[]; walls=[]; fireTiles=[]; poisonTiles=[]; allies=[]; turrets=[]; traps=[]; clearGojoOrbs();
             score = d.score; wave = d.wave;
             // Flesh is NOT taken from the save — see saveGame. loadFlesh() already put the real total
             // in `coins` at startup and every earn/spend keeps it current.
@@ -21889,7 +22499,7 @@ const col = b.color || BLDG_COLORS[0];
         document.getElementById('pause-screen').style.display = 'none';
         gamePaused = false;
         player = createPlayer();
-        bullets=[]; monsters=[]; particles=[]; pickups=[]; walls=[]; fireTiles=[]; poisonTiles=[]; allies=[]; turrets=[]; traps=[]; remotePlayers=[]; zaps=[];
+        bullets=[]; monsters=[]; particles=[]; pickups=[]; walls=[]; fireTiles=[]; poisonTiles=[]; allies=[]; turrets=[]; traps=[]; remotePlayers=[]; zaps=[]; clearGojoOrbs();
         score=0; wave=1; monstersToSpawn=5; monstersSpawned=0; spawnTimer=90; bossHabitat=null;
         // Roll first monster class
         currentMonsterClass = rollMonsterClass();

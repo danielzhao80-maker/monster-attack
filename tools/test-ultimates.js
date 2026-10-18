@@ -505,6 +505,167 @@ const Cl = JSON.parse(cool);
 check(!Cl.again && Cl.r.every(function(x){ return x === 'fired'; }), 'on cooldown the combo does nothing special; the keys fire normally', JSON.stringify(Cl.r));
 check(/Domain \d+s/.test(Cl.hud), 'the Domain cooldown shows on the ability line', Cl.hud);
 check(Cl.ready, 'and it is ready again after 60 seconds');
+// ---- Gojo's Limitless, the way it works in the show ----
+console.log('\nGojo techniques:');
+// A Gojo standing still in a real running game, so the REAL update() loop moves the monsters.
+const GOJO_LIVE = `(function(){
+   chosenClass = CLASSES.find(function(c){ return c.name === 'Gojo'; });
+   gameRunning = false; cameraMode = 'topdown'; startGame(); gameRunning = true; gamePaused = false;
+   player = createPlayer(); player.x = 4500; player.y = 2750; player.angle = 0; player.charLevel = 3;
+   player.moveZUnlocked = true; player.moveXUnlocked = true; player.maxHp = 5000; player.hp = 5000;
+   player._eCd = 0; player.moveQCooldown = 0; player.moveFCooldown = 0; player.invincible = 0;
+   if (player.form) exitForm(player, true);
+   keys = {}; shooting = false; mouseDown = false; remotePlayers = []; allies = []; turrets = []; walls = [];
+   NET.mode = 'single'; buildings = []; bullets = []; particles = []; gameEffects.length = 0; clearGojoOrbs();
+   waveIntroTimer = 0; monstersToSpawn = 0; monstersSpawned = 0; spawnTimer = 1e9;
+   monsters = [{ x:6500, y:2750, r:14, hp:5000, maxHp:5000, name:'Far', emoji:'Z', color:'#7bed9f', speed:0,
+      frozen:0, stunned:0, slow:0, score:1, damage:5 }];   // one far away, so the wave never ends
+})`;
+const mon = (x, y, extra) => `Object.assign({ x:${x}, y:${y}, r:14, hp:5000, maxHp:5000, name:'Z', emoji:'Z', color:'#7bed9f',
+   speed:1.5, frozen:0, stunned:0, slow:0, score:1, damage:5 }, ${extra || '{}'})`;
+
+// 1. A monster walking at him crawls to a stop at the edge and never touches him.
+const inf = JSON.parse(q(`(function(){ ${GOJO_LIVE}();
+   var m = ${mon(4700, 2750)}; monsters.push(m);
+   var hp0 = player.hp, minD = 1e9, steps = [];
+   for (var f = 0; f < 300; f++) { var x0 = m.x; update(); var d = Math.hypot(m.x - player.x, m.y - player.y);
+      minD = Math.min(minD, d); steps.push(Math.abs(m.x - x0)); }
+   var early = steps.slice(60, 70).reduce(function(a,b){return a+b;},0) / 10;
+   var late = steps.slice(240).reduce(function(a,b){return a+b;},0);
+   return JSON.stringify({ minD: minD, hp: hp0 - player.hp, early: early, late: late, inf: player._inf, up: infinityUp(player) }); })()`));
+check(inf.minD >= 45 && inf.minD > 14 + 14 && inf.hp === 0,
+      'Infinity: a monster walking at Gojo stops at the edge and never touches him', 'closest ' + inf.minD.toFixed(1) + ', hp lost ' + inf.hp);
+check(inf.late < inf.early * 0.5 && inf.late < 2, 'it slows the closer it gets, then hangs there (asymptotic)',
+      'step ' + inf.early.toFixed(2) + '/frame early, ' + inf.late.toFixed(3) + ' total over the last second');
+check(inf.up && inf.inf < 100, 'holding it costs some Infinity meter, and the barrier stays up', 'meter ' + Math.round(inf.inf));
+
+// 2. A projectile entering it stops in mid-air and fades.
+const shot = JSON.parse(q(`(function(){ ${GOJO_LIVE}();
+   bullets.push({ x:4620, y:2750, vx:-5, vy:0, life:90, damage:9, owner:'monster', from:'Z', color:'#fff' });
+   var b = bullets[0], hp0 = player.hp, stopped = false, minD = 1e9;
+   for (var f = 0; f < 60; f++) { update(); if (bullets.indexOf(b) >= 0) { minD = Math.min(minD, Math.hypot(b.x - player.x, b.y - player.y)); if (b.vx === 0 && b._inf) stopped = true; } }
+   return JSON.stringify({ hp: hp0 - player.hp, stopped: stopped, gone: bullets.indexOf(b) < 0, minD: minD, inf: player._inf }); })()`));
+check(shot.stopped && shot.gone && shot.hp === 0 && shot.minD > 40,
+      'Infinity: an enemy shot stops in mid-air, fades out and never hits', 'stopped ' + shot.minD.toFixed(1) + ' away');
+
+// 3. The meter: drains under a swarm, drops at 0 (hits land), comes back, refills.
+const meter = JSON.parse(q(`(function(){ ${GOJO_LIVE}();
+   for (var k = 0; k < 8; k++) { var a = k / 8 * Math.PI * 2; monsters.push(${mon('4500 + Math.cos(a) * 60', '2750 + Math.sin(a) * 60', '{ speed: 1.2 }')}); }
+   var dropAt = -1, hpAtDrop = 0, f;
+   for (f = 0; f < 900 && dropAt < 0; f++) { update(); if (player._infDown > 0) { dropAt = f; hpAtDrop = player.hp; } }
+   var hurt = 0; for (var g = 0; g < 100; g++) update(); hurt = hpAtDrop - player.hp;
+   monsters = monsters.slice(0, 1);                      // the swarm is gone
+   for (var g2 = 0; g2 < ${'INF_DOWN_T'}; g2++) update();
+   var back = { up: infinityUp(player), inf: player._inf };
+   for (var g3 = 0; g3 < 200; g3++) update();
+   updateHUD(); var hud = document.getElementById('ability-display').textContent || '';
+   return JSON.stringify({ dropAt: dropAt, hurt: hurt, back: back, later: player._inf, hud: hud }); })()`));
+check(meter.dropAt > 30 && meter.dropAt < 600, 'a swarm drains the Infinity meter until the barrier drops (he is not invincible)',
+      'dropped after ' + meter.dropAt + ' frames under 8 monsters');
+check(meter.hurt > 0, 'with Infinity down, hits land normally', '-' + meter.hurt + ' hp');
+check(meter.back.up && meter.back.inf > 0 && meter.later > meter.back.inf, 'it comes back after a few seconds and refills when nothing pushes on it',
+      Math.round(meter.back.inf) + ' -> ' + Math.round(meter.later));
+check(/♾️ [▰▱]{5} \d+%/.test(meter.hud), 'the Infinity meter is on the ability line', meter.hud);
+
+// 4. Red travels forward and knocks back only what is along its path.
+const red = JSON.parse(q(`(function(){ ${GOJO_SETUP}(3); monsters = []; gameEffects.length = 0; clearGojoOrbs();
+   var onPath = ${mon(4720, 2762)}, beside = ${mon(4500, 2960)}, behind = ${mon(4280, 2750)};
+   monsters.push(onPath, beside, behind);
+   useAbility(player, 4800, 2750);
+   var orb = gojoOrbs[0], fx = orb && orb.fx, maxX = 0, gorb3d = !!fx && fx.type === 'gorb' && fx.kind === 'red';
+   for (var f = 0; f < 80 && gojoOrbs.length; f++) { updateGojoOrbs(); if (gojoOrbs[0]) maxX = Math.max(maxX, gojoOrbs[0].x); }
+   return JSON.stringify({ gorb: gorb3d, maxX: maxX, done: gojoOrbs.length === 0, cd: player._eCd,
+      on: { dy: onPath.y - 2762, dx: onPath.x - 4720, hurt: 5000 - onPath.hp },
+      beside: { moved: Math.hypot(beside.x - 4500, beside.y - 2960), hurt: 5000 - beside.hp },
+      behind: { moved: Math.hypot(behind.x - 4280, behind.y - 2750), hurt: 5000 - behind.hp },
+      burst: gameEffects.some(function(e){ return e.type === 'ring' && e.x > 5000; }) }); })()`));
+check(red.gorb && red.maxX > 4500 + 540 && red.done, 'Red is a red orb that flies forward about 600 units, drawn through spawnGameEffect',
+      'reached x=' + Math.round(red.maxX));
+check(red.on.dy > 60 && red.on.hurt > 0, 'a monster on its path is blasted off to the side and hurt',
+      'shoved ' + Math.round(red.on.dy) + ' sideways, ' + Math.round(red.on.dx) + ' onward, -' + red.on.hurt);
+check(red.beside.moved === 0 && red.beside.hurt === 0 && red.behind.moved === 0 && red.behind.hurt === 0,
+      'monsters beside or behind Gojo are untouched (it is not a radial blast any more)');
+check(red.burst, 'it ends in a small red burst where it stops');
+
+// 5. Blue pulls monsters toward the orb over time and crushes them.
+const blue = JSON.parse(q(`(function(){ ${GOJO_SETUP}(3); monsters = []; gameEffects.length = 0; clearGojoOrbs();
+   var near = ${mon(4800, 2900, '{ speed: 0 }')}, far = ${mon(4800, 3200, '{ speed: 0 }')};
+   monsters.push(near, far);
+   useMoveQ(player, 4800, 2750);
+   var orb = gojoOrbs[0], d = [];
+   for (var f = 0; f < 200; f++) { updateGojoOrbs(); if (f % 30 === 0) d.push(Math.round(Math.hypot(near.x - 4800, near.y - 2750))); }
+   return JSON.stringify({ at: orb ? [orb.x, orb.y] : null, kind: orb && orb.fx.kind, d: d, hurt: 5000 - near.hp,
+      far: Math.hypot(far.x - 4800, far.y - 3200), farHurt: 5000 - far.hp, over: gojoOrbs.length === 0, zcd: player.moveQCooldown }); })()`));
+check(blue.at && blue.at[0] === 4800 && blue.at[1] === 2750 && blue.kind === 'blue', 'Blue opens a small black hole at the aim point', JSON.stringify(blue.at));
+check(blue.d[1] < blue.d[0] && blue.d[2] < blue.d[1] && blue.d[blue.d.length - 1] < 30, 'it pulls a monster in toward its centre over time', blue.d.join(' -> '));
+check(blue.hurt > 0 && blue.far === 0 && blue.farHurt === 0, 'and crushes what it pulls in; anything out of reach is left alone', '-' + blue.hurt);
+check(blue.over, 'it lasts about three seconds');
+const warp = JSON.parse(q(`(function(){ ${GOJO_SETUP}(3); monsters = []; clearGojoOrbs();
+   useMoveQ(player, 4800, 2750); for (var f = 0; f < 20; f++) updateGojoOrbs();
+   useMoveQ(player, 4800, 2750);
+   return JSON.stringify({ x: player.x, y: player.y }); })()`));
+check(warp.x === 4800 && warp.y === 2750, 'pressing Z again while Blue is out pulls Gojo to it', warp.x + ',' + warp.y);
+
+// 6. Hollow Purple: the chant, red + blue merging, then a slow sphere that erases its path.
+const purple = JSON.parse(q(`(function(){ ${GOJO_SETUP}(3); monsters = []; gameEffects.length = 0; clearGojoOrbs();
+   var a = ${mon(4700, 2750, '{ speed: 0 }')}, b = ${mon(4900, 2770, '{ speed: 0 }')}, off = ${mon(4700, 3000, '{ speed: 0 }')};
+   var boss = ${mon(5100, 2750, '{ speed: 0, r: 32, hp: 50000, maxHp: 50000, isBoss: true, name: "BOSS" }')};
+   monsters.push(a, b, off, boss);
+   bullets.push({ x:4800, y:2750, vx:0, vy:0, life:9999, damage:5, owner:'monster', from:'Z', color:'#fff' });
+   var shotObj = bullets[0];
+   useMoveF(player, 5000, 2750);
+   ${flush}
+   var orb = gojoOrbs[0];
+   var charging = !!orb && orb.phase === 'charge' && !!orb.fxA && !!orb.fxB && !player.form;
+   var gapStart = orb && orb.fxA ? Math.hypot(orb.fxA.x - orb.fxB.x, orb.fxA.y - orb.fxB.y) : 0;
+   for (var f = 0; f < 30; f++) updateGojoOrbs();
+   var gapMid = orb && orb.fxA ? Math.hypot(orb.fxA.x - orb.fxB.x, orb.fxA.y - orb.fxB.y) : 0;
+   for (var f2 = 0; f2 < 20; f2++) updateGojoOrbs();
+   var launched = orb.phase === 'fly' && !orb.fxA && player.form && player.form.key === 'sixeyes';
+   var x0 = orb.x; updateGojoOrbs(); var speed = orb.x - x0;
+   for (var f3 = 0; f3 < 260 && gojoOrbs.length; f3++) updateGojoOrbs();
+   return JSON.stringify({ charging: charging, gapStart: gapStart, gapMid: gapMid, launched: launched, speed: speed, r: orb.r,
+      aDead: monsters.indexOf(a) < 0, bDead: monsters.indexOf(b) < 0, offHurt: 5000 - off.hp,
+      boss: monsters.indexOf(boss) >= 0 ? 50000 - boss.hp : -1, shotGone: bullets.indexOf(shotObj) < 0, over: gojoOrbs.length === 0 }); })()`));
+check(purple.charging && purple.gapMid < purple.gapStart, 'Hollow Purple charges: a red orb and a blue orb at his sides close in',
+      Math.round(purple.gapStart) + ' -> ' + Math.round(purple.gapMid) + ' apart');
+check(purple.launched && purple.r >= 50 && purple.speed > 0 && purple.speed < 8,
+      'they merge into a large purple sphere that travels forward slowly, and Six Eyes opens', 'r ' + purple.r + ', ' + purple.speed + '/frame');
+check(purple.aDead && purple.bDead && purple.offHurt === 0, 'it erases every monster on its path and nothing off it');
+check(purple.boss > 0, 'a boss survives it but takes a heavy hit', '-' + purple.boss);
+check(purple.shotGone, 'it destroys enemy projectiles in its path');
+check(purple.over, 'and it ends after its run');
+
+// 7. Six Eyes: blindfold off, faster Infinity, shorter Red / Blue.
+const six = JSON.parse(q(`(function(){ ${GOJO_SETUP}(3); monsters = []; clearGojoOrbs();
+   var before = gojoBlindfolded(player);
+   player._inf = 50; player._infQuiet = 100; player._infDown = 0; for (var f = 0; f < 20; f++) tickInfinity(player); var plain = player._inf - 50;
+   enterForm(player, 'sixeyes');
+   var after = gojoBlindfolded(player);
+   player._inf = 50; player._infQuiet = 100; for (var f2 = 0; f2 < 20; f2++) tickInfinity(player); var fast = player._inf - 50;
+   player._eCd = 0; player.moveQCooldown = 0; useAbility(player, 4800, 2750); useMoveQ(player, 4800, 2750);
+   var e1 = player._eCd, z1 = player.moveQCooldown;
+   exitForm(player, true); clearGojoOrbs();
+   player._eCd = 0; player.moveQCooldown = 0; useAbility(player, 4800, 2750); useMoveQ(player, 4800, 2750);
+   return JSON.stringify({ before: before, after: after, back: gojoBlindfolded(player), plain: plain, fast: fast,
+      e1: e1, z1: z1, e0: player._eCd, z0: player.moveQCooldown }); })()`));
+check(six.before && !six.after && six.back, 'Six Eyes takes the blindfold off (and it goes back on after)');
+check(six.fast > six.plain * 2, 'Infinity refills faster with Six Eyes open', '+' + six.plain.toFixed(1) + ' vs +' + six.fast.toFixed(1) + ' in 20 frames');
+check(six.e1 < six.e0 && six.z1 < six.z0, 'Red and Blue come back sooner in Six Eyes', 'E ' + six.e1 + ' vs ' + six.e0 + ', Z ' + six.z1 + ' vs ' + six.z0);
+
+// 8. Everything draws in 2D without throwing, and the domain is a starry void.
+const draws = q(`(function(){ ${GOJO_SETUP}(3); clearGojoOrbs(); gameEffects.length = 0;
+   useAbility(player, 4800, 2750); useMoveQ(player, 4800, 2900); _gojoHollowPurple(player, 4900, 2750);
+   for (var f = 0; f < 5; f++) updateGojoOrbs();
+   gojoDomain(player);
+   _infRipple(4520, 2750);
+   try { draw2DEffects(-1e9, -1e9, 1e9, 1e9); } catch (e) { return e.message; }
+   var types = {}; gameEffects.forEach(function(e){ types[e.type + (e.kind ? ':' + e.kind : '')] = 1; });
+   return Object.keys(types).sort().join(','); })()`);
+check(/gorb:red/.test(draws) && /gorb:blue/.test(draws) && /gorb:purple/.test(draws) && /ripple/.test(draws),
+      'Red, Blue, Purple and the Infinity ripple are all spawnGameEffect effects that draw in 2D', draws);
+check(/voidstars/.test(draws) && /dome/.test(draws), 'Unlimited Void is a dark dome full of stars and streaks of light');
+q(`clearGojoOrbs(); gameEffects.length = 0;`);
 // ---- Sikuna: the same E + Z + X combo opens Malevolent Shrine ----
 console.log('\nSikuna Domain:');
 const SIK_SETUP = GOJO_SETUP.replace("c.name === 'Gojo'", "c.name === 'Sikuna'");

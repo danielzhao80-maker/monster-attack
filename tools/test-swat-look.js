@@ -172,6 +172,18 @@ const gojo3d = JSON.parse(q(`__withFake(function(){
     shared: g.children.every(function(m){ return m.material && m.material.userData.shared; }) }); })`));
 check(gojo3d.hair > 0 && gojo3d.fold === 1 && gojo3d.meshes <= 40 && gojo3d.shared,
       'Gojo wears white spiky hair and a blindfold in 3D, inside the mesh budget', gojo3d.meshes + ' meshes');
+// Six Eyes: the blindfold comes off and two glowing blue eyes show instead (hidden otherwise).
+const gojoEyes = JSON.parse(q(`__withFake(function(){
+  var g = makePlayerFigure(CLASSES.find(function(c){ return c.name === 'Gojo'; })), p = g.userData.parts;
+  var vis = function(a){ return (a||[]).map(function(m){ return m.visible !== false; }); };
+  var shut = { eyes: vis(p.sixeyes), fold: vis(p.blindfold) };
+  gojoFigureEyes(g, true);  var open = { eyes: vis(p.sixeyes), fold: vis(p.blindfold) };
+  gojoFigureEyes(g, false); var again = { eyes: vis(p.sixeyes), fold: vis(p.blindfold) };
+  return JSON.stringify({ shut: shut, open: open, again: again }); })`));
+check(gojoEyes.shut.eyes.length === 2 && gojoEyes.shut.eyes.every(v => !v) && gojoEyes.shut.fold.every(v => v) &&
+      gojoEyes.open.eyes.every(v => v) && gojoEyes.open.fold.every(v => !v) &&
+      gojoEyes.again.eyes.every(v => !v) && gojoEyes.again.fold.every(v => v),
+      'Six Eyes in 3D: the blindfold comes off and two glowing eyes appear, then it goes back on');
 check(q(`__withFake(function(){ var g = makePlayerFigure(CLASSES[0]);
   return g.children.every(function(m){ return m.material && m.material.userData.shared; }); })`) === true,
   'every material comes from the shared _pf pool');
