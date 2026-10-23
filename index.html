@@ -146,6 +146,10 @@
         .world-card.selected { border-color: #6c5ce7; box-shadow: 0 0 20px rgba(108,92,231,0.3); }
         .world-card.locked { opacity: 0.5; cursor: not-allowed; }
         .world-card.locked:hover { transform: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .special-maps { margin-top: 26px; display: flex; flex-direction: column; align-items: center; width: 100%; }
+        .special-maps-title { font-family: 'Fredoka One', cursive; font-size: 1.5em; color: #b8860b; text-shadow: 1px 1px 0 #fff3b0; margin-bottom: 10px; }
+        .world-card.special { background: linear-gradient(180deg, #fffbe6, #f3e7b0); border-color: #e0cf86; }
+        .world-card.special.selected { border-color: #b8860b; box-shadow: 0 0 20px rgba(184,134,11,0.35); }
         .world-emoji { font-size: 2.2em; margin-bottom: 4px; }
         .world-name { font-family: 'Fredoka One', cursive; font-size: 0.9em; color: #2d3436; text-align: center; padding: 0 4px; }
         .world-status { font-size: 0.66em; color: #636e72; font-weight: 700; margin-top: 3px; text-align: center; }
@@ -2075,6 +2079,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             carnival:{ filt:'bandpass', freq: 800, q:0.9, gain:0.030, sway:0.5,  rate:0.10, ev:'chime' },
             room:    { filt:'lowpass',  freq: 300, q:0.7, gain:0.022, sway:0.25, rate:0.04 },
             vacuum:  { filt:'lowpass',  freq: 120, q:2.0, gain:0.018, sway:0.15, rate:0.03, drone:38 },
+            // The Backrooms: the fluorescent tubes. A tight band of noise at the mains-hum harmonic,
+            // a buzzy 120 Hz drone under it, and now and then a tube flickering.
+            fluoro:  { filt:'bandpass', freq: 240, q:9.0, gain:0.030, sway:0.08, rate:0.37, drone:120, droneType:'triangle', ev:'buzz' },
         };
         const WORLD_BED = {
             desert:'wind',   mountain:'gale',  arctic:'gale',    sky:'gale',    storm:'gale',
@@ -2090,6 +2097,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             city:'room',     ruins:'room',      boneyard:'room',  mansion:'room', dojo:'room',
             dream:'vacuum',  mirror:'vacuum',   astral:'vacuum',
             clockwork:'hum', grove:'jungle',    storybook:'room',
+            backrooms:'fluoro',
         };
         let src = null, filt = null, gain = null, lfo = null, lfoGain = null, drone = null;
         let evTimer = null, current = null, running = false;
@@ -2121,6 +2129,15 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                 g.gain.exponentialRampToValueAtTime(kind === 'chime' ? 0.030 : 0.022, now + 0.02);
                 g.gain.exponentialRampToValueAtTime(0.0001, now + 0.30);
                 o.connect(g); o.start(now); o.stop(now + 0.34);
+            } else if (kind === 'buzz') {      // a fluorescent tube stuttering
+                const o = audioCtx.createOscillator(); o.type = 'sawtooth';
+                o.frequency.setValueAtTime(120, now);
+                g.gain.setValueAtTime(0.0001, now);
+                for (let k = 0; k < 4; k++) {
+                    g.gain.setValueAtTime(k % 2 ? 0.0001 : 0.010, now + k * 0.05);
+                }
+                g.gain.setValueAtTime(0.0001, now + 0.22);
+                o.connect(g); o.start(now); o.stop(now + 0.24);
             } else if (kind === 'croak') {
                 const o = audioCtx.createOscillator(); o.type = 'sawtooth';
                 o.frequency.setValueAtTime(120 + Math.random()*50, now);
@@ -2177,7 +2194,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             lfoGain = audioCtx.createGain(); lfoGain.gain.value = B.freq * B.sway;
             lfo.connect(lfoGain); lfoGain.connect(filt.frequency); lfo.start(now);
             if (B.drone) {
-                drone = audioCtx.createOscillator(); drone.type = 'sine';
+                drone = audioCtx.createOscillator(); drone.type = B.droneType || 'sine';
                 drone.frequency.value = B.drone;
                 const dg = audioCtx.createGain(); dg.gain.setValueAtTime(0.0001, now);
                 dg.gain.exponentialRampToValueAtTime(B.gain * 0.55, now + 2.2);
@@ -2315,6 +2332,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         { name:'Myconid King', emoji:'🌱', accessory:'👑', armorColor:'#6ab04c', rarity:'legendary', rarityColor:'#f1c40f', color:'#6ab04c', hp:80, speed:0.8, damage:18, score:140, isBossOnly:true, body:'titan', habitat:'jungle', hasShield:true, poisonTrail:true, desc:'Boss only!' },
         { name:'The Devourer', emoji:'🌀', accessory:'👑', armorColor:'#5f27cd', rarity:'legendary', rarityColor:'#f1c40f', color:'#5f27cd', hp:70, speed:1.1, damage:20, score:160, isBossOnly:true, body:'kraken', habitat:'void', canSwallow:true, phasing:true, enrage:true, desc:'Boss only!' },
         { name:'Null Titan', emoji:'⬛', accessory:'👑', armorColor:'#2d3436', rarity:'legendary', rarityColor:'#f1c40f', color:'#2d3436', hp:95, speed:0.75, damage:21, score:170, isBossOnly:true, body:'titan', habitat:'void', hasShield:true, phasing:true, isRanged:true, desc:'Boss only!' },
+        // ---- SPECIAL MAP BOSSES (The Backrooms) — mid-level numbers, existing bodies ----
+        { name:'The Entity', emoji:'👤', accessory:'👑', armorColor:'#3d3526', rarity:'legendary', rarityColor:'#f1c40f', color:'#3d3526', hp:46, speed:1.3, damage:15, score:108, isBossOnly:true, body:'wraith', habitat:'void', phasing:true, teleports:true, desc:'Boss only! Drifts straight through the walls' },
+        { name:'Bacteria', emoji:'🦠', accessory:'👑', armorColor:'#8a8f3a', rarity:'legendary', rarityColor:'#f1c40f', color:'#8a8f3a', hp:64, speed:0.95, damage:15, score:108, isBossOnly:true, body:'blob', habitat:'toxic', splits:true, poisonTrail:true, desc:'Boss only! Splits into more of itself' },
         // ---- MAGICAL WORLD BOSSES ----
         { name:'The Sandman',     emoji:'💤', rarity:'legendary', rarityColor:'#c7b3f5', color:'#7d5fbf', hp:900, speed:0.7, damage:26, score:600, isBoss:true, isBossOnly:true, hasShield:true, desc:'Dreams you into sleep' },
         { name:'Night Terror',    emoji:'😱', rarity:'legendary', rarityColor:'#c7b3f5', color:'#4a2f7d', hp:850, speed:1.0, damage:30, score:620, isBoss:true, isBossOnly:true, canScream:true, desc:'Screams from inside the dream' },
@@ -2381,6 +2401,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         drips:    { col:'#9fc4d8', sz:1.7, fall:120, drift:  2, spin:0,   n:110, streak:true },
         flies:    { col:'#2f2a22', sz:1.6, fall:  0, drift: 46, spin:0,   n:120, erratic:true },
         petals:   { col:'#ffb3d9', sz:3.0, fall: 26, drift: 28, spin:1,   n:170 },
+        motes:    { col:'#fff4c2', sz:1.6, fall:  2, drift: 10, spin:0,   n:170, glow:true },   // dust in fluorescent light
     };
     const WORLD_FX = {
         arctic:'snow',    sky:'snow',
@@ -2396,6 +2417,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         casino:'petals',  dojo:'petals',
         dream:'stardust', mirror:'stardust', astral:'stardust',
         clockwork:'sparks', grove:'spores',  storybook:'petals',
+        backrooms:'motes',
         city:null,                            // clear air over an ordinary city
     };
     function worldFxKind(w) { const k = w && WORLD_FX[w.id]; return k ? FX_KINDS[k] : null; }
@@ -2428,6 +2450,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         mossglow:{ f:120, dur:0.13, type:'sine',     vol:0.04,  noise:0.9 },
         paper:  { f:200, dur:0.09, type:'sine',      vol:0.035, noise:0.75 },
         runefloor:{ f:280,dur:0.14, type:'triangle', vol:0.045, noise:0.4,  ring:true },
+        dampcarpet:{ f:90, dur:0.13, type:'sine',    vol:0.032, noise:0.75, wet:true },   // squelchy office carpet
     };
     function playStep(fast) {
         const K = STEP_SOUNDS[groundArtOf(currentWorld)] || STEP_SOUNDS.asphalt;
@@ -2556,6 +2579,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         grove:     [['Dewcap','🍄','#7fe0b0'],['Wisp','✨','#c7f5e0'],['Bark Warden','🌳','#398c68'],['Screeching Pixie','🧚','#a8f0cf']],
         storybook: [['Inkling','🖋️','#3a3a3a'],['Burnt Page','🔥','#d4b98f'],['Bookend','📚','#c9a97f'],['Shouting Quote','❗','#e0c9a0']],
         astral:    [['Starchill','❄️','#b39ddb'],['Comet','☄️','#d1c4e9'],['Warden Rune','🔯','#7e57c2'],['Wailing Oracle','🔮','#9575cd']],
+        // ---- special maps ----
+        backrooms: [['Smiler','😁','#f5f0d0'],['Partygoer','🎈','#ff9f43'],['Skin-Stealer','🧍','#b8a07a'],['Hound','🐕','#6b5b4a']],
     };
     // Which base each slot re-skins, in order.
     const MONSTER_BASES = ['Frost', 'Flame', 'Shield', 'Mad Mom'];
@@ -3460,7 +3485,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // gives guests the TRAPS, which were never in the state packet at all: they were invisible.
         if (!s.worldSeed && s.buildings) buildings = s.buildings;   // older host that still sends them
         if (s.worldSeed && (s.worldSeed !== _worldSeed || (s.worldId && currentWorld && currentWorld.id !== s.worldId))) {
-            if (s.worldId) currentWorld = WORLDS.find(w => w.id === s.worldId) || currentWorld;
+            if (s.worldId) currentWorld = findWorld(s.worldId) || currentWorld;   // the host's world, special or not
             _worldSeed = s.worldSeed;
             _chunkCache = new Map();
             _loadedChunkKey = null;
@@ -6954,7 +6979,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const bs = [];
         const styleId = worldStyleId(currentWorld);
         const S = BLDG_STYLES[styleId] || BLDG_STYLES.tower;
-        for (let i = 0; i < 70; i++) {
+        if (S.maze) buildMazeChunk(bs, rnd, ox, oy, S, styleId);
+        for (let i = 0; !S.maze && i < 70; i++) {
             // Footprint and height come from the world's archetype, so a Desert block is genuinely
             // low and wide while a Crystal spire is narrow and enormous — not the same box repainted.
             const w = S.w[0] + rnd()*(S.w[1]-S.w[0]), h = S.h[0] + rnd()*(S.h[1]-S.h[0]);
@@ -6999,6 +7025,36 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             ts.push({ x: ox + tx, y: oy + ty, r: 28, type:'pebble', emoji:'🪨', color:'#26de81', dmg: 0, effect:'poison', duration: 600, label:'POISONED 10s!', cooldown: 0 });
         }
         return { buildings: bs, traps: ts };
+    }
+
+    // The Backrooms' walls. A lattice every MAZE_CELL units (it divides both WORLD_W and WORLD_H, so
+    // the grid lines up across chunk edges and the rooms never shear). At some lattice points a wall
+    // runs east and/or south, always stopping short to leave a doorway; a few points get a lone
+    // pillar. Kept to roughly the same building count as other worlds (~70-90 per chunk) because
+    // collision walks the whole list.
+    const MAZE_CELL = 500, MAZE_THICK = 22;
+    function buildMazeChunk(bs, rnd, ox, oy, S, styleId) {
+        const nx = Math.floor(WORLD_W / MAZE_CELL), ny = Math.floor(WORLD_H / MAZE_CELL);
+        const hgtOf = () => Math.round((S.hgt[0] + rnd() * (S.hgt[1] - S.hgt[0])) / 20) * 20;
+        const add = (x, y, w, h) => bs.push({ lx: x, ly: y, x: ox + x, y: oy + y, w, h, hgt: hgtOf(), st: styleId });
+        for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+            const px = i * MAZE_CELL, py = j * MAZE_CELL;
+            // The middle of the chunk is where a run starts — leave a clear room there.
+            if (Math.abs(px + MAZE_CELL/2 - WORLD_W/2) < MAZE_CELL * 1.5 && Math.abs(py + MAZE_CELL/2 - WORLD_H/2) < MAZE_CELL * 1.5) continue;
+            const r = rnd();
+            if (r < 0.27) {
+                const shape = rnd();                      // L, east-only, or south-only
+                const door = 150 + rnd() * 70;            // every wall leaves a doorway
+                const len = MAZE_CELL - door;
+                const atStart = rnd() < 0.5;              // doorway at the near or far end
+                if (shape < 0.75 && i < nx - 1)            // east
+                    add(px + (atStart ? door : 0), py, Math.round(len), MAZE_THICK);
+                if (shape >= 0.5 && j < ny - 1)            // south
+                    add(px, py + (atStart ? 0 : door), MAZE_THICK, Math.round(len));
+            } else if (r < 0.33) {
+                add(px - 14, py - 14, 50, 50);             // a lone square pillar
+            }
+        }
     }
 
     function getChunk(cx, cy) {
@@ -7108,6 +7164,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         fairytree:{ body:'fairytree', w:[70,140],  h:[70,140],  hgt:[200,360], tall:0.18, tallHgt:[420,620], facade:'planks',  gap:80 },
         popup:    { body:'popup',     w:[130,260], h:[100,200], hgt:[140,270], tall:0.16, tallHgt:[320,460], facade:'stripes', gap:100 },
         runestone:{ body:'runestone', w:[80,170],  h:[80,170],  hgt:[190,400], tall:0.22, tallHgt:[460,700], facade:'stone',   gap:90 },
+        // ---- special maps ----
+        // The Backrooms: not buildings at all but WALLS — long thin wallpapered partitions and pillars
+        // laid on a grid, so the open floor reads as endless rooms and corridors. `maze` makes
+        // buildChunk lay them out on that grid instead of scattering footprints (see buildMazeChunk).
+        backroom: { body:'backroom',  w:[22,360],  h:[22,360],  hgt:[140,160], tall:0,    tallHgt:[160,160], facade:'wallpaper', gap:0, maze:true },
     };
     // Which archetype each world builds in. Anything unlisted falls back to 'tower'.
     const WORLD_BLDG_STYLE = {
@@ -7123,6 +7184,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         mushroom:'mushroom', void:'monolith',
         dream:'dreamdoor', clockwork:'gear',  mirror:'mirrorshard',
         grove:'fairytree', storybook:'popup', astral:'runestone',
+        backrooms:'backroom',
     };
 
     function worldStyleId(w) { return (w && WORLD_BLDG_STYLE[w.id]) || 'tower'; }
@@ -7153,7 +7215,21 @@ const col = b.color || BLDG_COLORS[0];
         // Seen from above, each structure draws its own SILHOUETTE. A tree is a canopy, not a
         // rounded box with a cross scratched on it — the plan view has to agree with what you
         // walked past in 3D or the minimap stops being readable.
-        if (kind2 === 'tree') {
+        if (kind2 === 'backroom') {
+            // The Backrooms: the top edge of a wallpapered partition — a thin yellow strip with a
+            // dark cap line and a faint shadow, so the map reads as rooms and corridors.
+            c2.fillStyle = 'rgba(60,45,10,0.18)';
+            c2.fillRect(b.x + 5, b.y + 5, b.w, b.h);
+            c2.fillStyle = col;
+            c2.fillRect(b.x, b.y, b.w, b.h);
+            c2.strokeStyle = 'rgba(70,55,20,0.55)'; c2.lineWidth = 2*LW;
+            c2.strokeRect(b.x, b.y, b.w, b.h);
+            c2.strokeStyle = 'rgba(255,250,210,0.45)'; c2.lineWidth = 1*LW;
+            c2.beginPath();
+            if (b.w >= b.h) { c2.moveTo(b.x + 2, my); c2.lineTo(b.x + b.w - 2, my); }
+            else            { c2.moveTo(mx, b.y + 2); c2.lineTo(mx, b.y + b.h - 2); }
+            c2.stroke();
+        } else if (kind2 === 'tree') {
             c2.fillStyle = 'rgba(0,0,0,0.10)';
             c2.beginPath(); c2.arc(mx+4, my+4, msp*0.62, 0, Math.PI*2); c2.fill();
             c2.fillStyle = col;
@@ -7393,6 +7469,7 @@ const col = b.color || BLDG_COLORS[0];
         { st:'fairytree',  emoji:'\ud83e\uddda', name:'Fairy Tree' },
         { st:'popup',      emoji:'\ud83d\udcd6', name:'Pop-Up'     },
         { st:'runestone',  emoji:'\ud83d\udd2e', name:'Runestone'  },
+        { st:'backroom',   emoji:'\ud83d\udfe8', name:'Office Wall' },
     ];
     function mmActiveStyle() { return mmStyle || worldStyleId(currentWorld); }
 
@@ -12652,7 +12729,8 @@ const col = b.color || BLDG_COLORS[0];
                 showStatus(`Wave ${wave} — Monstrosity: ${currentMonsterClass.emoji} ${currentMonsterClass.name} [${currentMonsterClass.rarity}]`, currentMonsterClass.rarityColor);
             }
             SFX.waveStart();
-            if (NET.mode === 'single' && wave > highestWaveEver) { highestWaveEver = wave; saveWorldProgress(); }
+            // Special maps sit outside the wave ladder: clearing waves there unlocks nothing.
+            if (NET.mode === 'single' && !(currentWorld && currentWorld.special) && wave > highestWaveEver) { highestWaveEver = wave; saveWorldProgress(); }
             awardWaveClear(wave);
             // Surviving a wave still pays a bonus on top of the kills, so pushing deeper beats farming
             // wave 1 forever — just a smaller one than before.
@@ -15964,6 +16042,20 @@ const col = b.color || BLDG_COLORS[0];
             } else if (facade === 'stripes') {
                 x.fillStyle = 'rgba(255,255,255,0.62)';
                 for (let i = 0; i < 8; i++) x.fillRect(i * 32, 0, 16, 256);
+            } else if (facade === 'wallpaper') {
+                // Old mono-yellow office wallpaper: thin vertical pinstripes, a faint repeating
+                // motif, a brown baseboard and water damage creeping up from it.
+                x.strokeStyle = 'rgba(120,95,30,0.22)'; x.lineWidth = 1.5;
+                for (let i = 0; i < 16; i++) { x.beginPath(); x.moveTo(i*16 + 4, 0); x.lineTo(i*16 + 4, 256); x.stroke(); }
+                x.fillStyle = 'rgba(120,95,30,0.16)';
+                for (let gy = 12; gy < 230; gy += 24) for (let gx = 12; gx < 256; gx += 32) {
+                    const ox2 = ((gy / 24) % 2) ? 16 : 0;
+                    x.beginPath(); x.moveTo(gx + ox2, gy - 4); x.lineTo(gx + ox2 + 4, gy); x.lineTo(gx + ox2, gy + 4); x.lineTo(gx + ox2 - 4, gy); x.fill();
+                }
+                const stain = x.createLinearGradient(0, 256, 0, 170);
+                stain.addColorStop(0, 'rgba(90,70,30,0.35)'); stain.addColorStop(1, 'rgba(90,70,30,0)');
+                x.fillStyle = stain; x.fillRect(0, 170, 256, 86);
+                x.fillStyle = '#6b5434'; x.fillRect(0, 238, 256, 18);
             } else if (facade === 'planks') {
                 x.strokeStyle = 'rgba(0,0,0,0.3)'; x.lineWidth = 3;
                 for (let row = 0; row < 10; row++) { const y0 = row * 26; x.beginPath(); x.moveTo(0, y0); x.lineTo(256, y0); x.stroke(); }
@@ -16028,6 +16120,7 @@ const col = b.color || BLDG_COLORS[0];
         casino:'carpet',  dojo:'tatami',    crystal:'facet',
         dream:'dreamhaze', clockwork:'brass', mirror:'mirrorfloor',
         grove:'mossglow',  storybook:'paper', astral:'runefloor',
+        backrooms:'dampcarpet',   // the casino already owns 'carpet' (damask) — this is the moist office kind
     };
     function groundArtOf(w) { return (w && WORLD_GROUND[w.id]) || 'asphalt'; }
 
@@ -16043,6 +16136,7 @@ const col = b.color || BLDG_COLORS[0];
         sky:    '#eef6ff',   // cloud, not pale blue
         dream:  '#9a8ea8',   // dusty lavender, dim enough to read as ground
         mirror: '#aab8c2',   // silvered glass, not pale blue
+        backrooms: '#a89468', // damp beige-brown office carpet
     };
     function worldFloorColor(w) { return (w && (WORLD_FLOOR[w.id] || w.ground)) || '#7ec8e3'; }
 
@@ -16082,6 +16176,8 @@ const col = b.color || BLDG_COLORS[0];
         grove:      { top:0x123a2a, bot:0x5fc99a },
         storybook:  { top:0xc9a97f, bot:0xfff6e0 },
         astral:     { top:0x160f33, bot:0x7e57c2, stars:true },
+        // Not a sky at all: a low, flat, pale-yellow ceiling glow fading into yellow haze.
+        backrooms:  { top:0xe6da9a, bot:0xf0e6b0 },
     };
     // Multiply a colour by the time-of-day tint so dawn and dusk still read on a custom sky.
     function _tintHex(hex, tintHex) {
@@ -16269,6 +16365,17 @@ const col = b.color || BLDG_COLORS[0];
                 x.beginPath();
                 x.moveTo(gx, gy-13); x.lineTo(gx+13, gy); x.lineTo(gx, gy+13); x.lineTo(gx-13, gy);
                 x.closePath(); x.stroke();
+            }
+        } else if (art === 'dampcarpet') {
+            // Low-pile office carpet: a tight weave, lighter and darker tufts, and damp patches.
+            grain(1400, 0.16);
+            x.strokeStyle = shade(0.07); x.lineWidth = 1;
+            for (let i = 0; i <= S; i += 4) { x.beginPath(); x.moveTo(0, i); x.lineTo(S, i); x.stroke(); }
+            for (let i = 0; i < 6; i++) {
+                const gx = Math.random()*S, gy = Math.random()*S, r = 18 + Math.random()*30;
+                const g = x.createRadialGradient(gx, gy, 2, gx, gy, r);
+                g.addColorStop(0, 'rgba(70,52,25,0.30)'); g.addColorStop(0.7, 'rgba(70,52,25,0.14)'); g.addColorStop(1, 'rgba(70,52,25,0)');
+                x.fillStyle = g; x.beginPath(); x.ellipse(gx, gy, r, r*0.7, Math.random()*3, 0, Math.PI*2); x.fill();
             }
         } else if (art === 'tatami') {
             x.strokeStyle = shade(0.30); x.lineWidth = 4;                 // mats with bound edges
@@ -16830,6 +16937,7 @@ const col = b.color || BLDG_COLORS[0];
         grove:    ['shroom','fern','crystalCluster'],
         storybook:['crate','gumdrop','balloon'],
         astral:   ['crystalCluster','beacon','stoneLantern'],
+        backrooms:['ceilingLight','officeChair','ceilingTile','exitSign'],
     };
     function PROPS_FOR(w) { return (w && PROP_SETS[w.id]) || PROP_SETS.city; }
 
@@ -17048,6 +17156,57 @@ const col = b.color || BLDG_COLORS[0];
                 put(TG.Cylinder(1.6, 1.6, 20, 8), dark, 13);
                 const bm2 = M('beaconglow', { color: 0x74ffd0, emissive: 0x2ee6a8, emissiveIntensity: 1.4, roughness: 0.25 });
                 put(TG.Sphere(4, 12, 9), bm2, 26);
+                break;
+            }
+            // ---- the Backrooms: office leftovers. None of these takes a dynamic light — the
+            //      glow is emissive only, so they cost nothing against the scene's three. ----
+            case 'ceilingLight': {
+                // A fluorescent panel hanging at ceiling height on two thin rods.
+                const frame = M('bkr-lightframe', { color: 0xd8d2b8, roughness: 0.6 });
+                const tube = M('bkr-tube', { color: 0xfffbe0, emissive: 0xfff3b0, emissiveIntensity: 1.6, roughness: 0.3 });
+                put(TG.Cylinder(0.4, 0.4, 30, 4), dark, 145, -12, 0);
+                put(TG.Cylinder(0.4, 0.4, 30, 4), dark, 145, 12, 0);
+                put(TG.Box(34, 2, 16), frame, 130);
+                put(TG.Box(30, 1, 12), tube, 128.6);
+                break;
+            }
+            case 'officeChair': {
+                const fabric = M('bkr-fabric', { color: 0x3c3f46, roughness: 0.9 });
+                for (let k = 0; k < 5; k++) {        // five-star base
+                    const a = (k/5)*Math.PI*2;
+                    const leg = put(TG.Box(9, 1.2, 1.6), dark, 1.5, Math.cos(a)*4.5, Math.sin(a)*4.5);
+                    leg.rotation.y = -a;
+                }
+                put(TG.Cylinder(0.9, 0.9, 9, 6), dark, 6);
+                put(TG.Box(13, 2.5, 13), fabric, 11.5);
+                put(TG.Box(13, 13, 2), fabric, 19, 0, -6).rotation.x = -0.12;
+                break;
+            }
+            case 'ceilingTile': {
+                // A ceiling tile that fell down, water-stained.
+                const tileM = M('bkr-tile', { color: 0xe9e3cc, roughness: 0.95 });
+                const stainM = M('bkr-stain', { color: 0x9c8350, roughness: 0.95 });
+                const t = put(TG.Box(22, 1, 22), tileM, 0.6); t.rotation.z = 0.04;
+                put(TG.Cylinder(6, 6, 0.4, 10), stainM, 1.3, 3, -2).scale.set(1, 1, 0.7);
+                break;
+            }
+            case 'exitSign': {
+                // A glowing EXIT sign on a stand. It never leads anywhere.
+                const signM = _pf('prop-bkr-exit', () => {
+                    let map = null;
+                    try {
+                        const c = document.createElement('canvas'); c.width = 64; c.height = 32;
+                        const x2 = c.getContext('2d');
+                        x2.fillStyle = '#0e7a3a'; x2.fillRect(0, 0, 64, 32);
+                        x2.fillStyle = '#eafff0'; x2.font = 'bold 18px sans-serif';
+                        x2.textAlign = 'center'; x2.textBaseline = 'middle'; x2.fillText('EXIT', 32, 17);
+                        map = new THREE.CanvasTexture(c);
+                    } catch (e) { map = null; }
+                    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, emissive: 0x1fbf5a, emissiveIntensity: 0.6, roughness: 0.4 });
+                });
+                put(TG.Cylinder(4, 5, 2, 10), dark, 1);
+                put(TG.Cylinder(0.8, 0.8, 34, 6), dark, 18);
+                put(TG.Box(18, 9, 3), signM, 38);
                 break;
             }
             default:
@@ -18914,6 +19073,9 @@ const col = b.color || BLDG_COLORS[0];
         if (scene.fog) {
             const _fogWant = _hex((currentWorld && (currentWorld.fog || currentWorld.groundAlt)) || '#eaf6ff');
             if (_three._fogHex !== _fogWant) { scene.fog.color.setHex(_fogWant); _three._fogHex = _fogWant; }
+            // A world may ask for thicker air (the Backrooms' yellow haze); everyone else keeps the default.
+            const _densWant = (currentWorld && currentWorld.fogDensity) || 0.00042;
+            if (_three._fogDens !== _densWant && 'density' in scene.fog) { scene.fog.density = _densWant; _three._fogDens = _densWant; }
         }
         if (ARCADE_SKINS.bg) skinApplyBg3D();   // arcade background skin: fog, hemi light, ground tint
         // Keep the earth dark dirt brown — don't override with the world's sky-blue color
@@ -19463,6 +19625,23 @@ const col = b.color || BLDG_COLORS[0];
                         bg.add(ring);
                     }
                     bg.position.y = span*0.14;              // it does not rest on anything
+                } else if (kind === 'backroom') {          // the Backrooms — a wallpapered partition
+                    // Repeat the wallpaper by real length so a 350-unit wall is not one stretched tile.
+                    const along = Math.max(1, Math.round(Math.max(b.w, b.h) / 64));
+                    const across = Math.max(1, Math.round(Math.min(b.w, b.h) / 64));
+                    const rowsW = Math.max(1, Math.round(H / 80));
+                    const capM = flat('bkr-cap', () => new THREE.MeshStandardMaterial({ color: 0xcfc08a, roughness: 0.95 }));
+                    const mats = b.w >= b.h
+                        ? [face(across, rowsW), face(across, rowsW), capM, capM, face(along, rowsW), face(along, rowsW)]
+                        : [face(along, rowsW), face(along, rowsW), capM, capM, face(across, rowsW), face(across, rowsW)];
+                    const gkey = 'bkr' + Math.round(b.w/4)*4 + 'x' + H + 'x' + Math.round(b.h/4)*4;
+                    let geo = _bldgGeoCache.get(gkey);
+                    if (!geo) { geo = TG.Box(Math.round(b.w/4)*4, H, Math.round(b.h/4)*4); _bldgGeoCache.set(gkey, geo); }
+                    const wall = new THREE.Mesh(geo, mats);
+                    wall.position.set(cX, H/2, cZ); wall.castShadow = true; wall.receiveShadow = true; bg.add(wall);
+                    const baseM = flat('bkr-base', () => new THREE.MeshStandardMaterial({ color: 0x5c4630, roughness: 0.8 }));
+                    const base = new THREE.Mesh(TG.Box(Math.round(b.w/4)*4 + 3, 8, Math.round(b.h/4)*4 + 3), baseM);   // baseboard
+                    base.position.set(cX, 4, cZ); bg.add(base);
                 }
                 scene.add(bg);
                 bmap.set(b, bg);
@@ -21123,7 +21302,8 @@ const col = b.color || BLDG_COLORS[0];
 
             // Rebuild the exact city that was saved rather than rolling a new one. buildChunk is a
             // pure function of (chunk, seed), so the seed alone reproduces it street for street.
-            if (d.worldId) currentWorld = WORLDS.find(w => w.id === d.worldId) || currentWorld;
+            if (d.worldId) currentWorld = findWorld(d.worldId) || currentWorld;
+            ensureWorldAllowed();   // a special map whose unlock is gone comes back as the City
             usingCustomMap = !!d.custom && customMap.length > 0;
             if (usingCustomMap) {
                 setTimeOfDayForWave(wave);
@@ -21531,6 +21711,49 @@ const col = b.color || BLDG_COLORS[0];
               { type:'hex',      emoji:'🕯️', color:'#9575cd', dmg:5,  effect:'poison', duration:400, label:'HEXED!', art:'sand' },
           ] },
     ];
+    // ---- SPECIAL MAPS ----
+    // Worlds you do not reach by clearing waves. Each is unlocked by a secret found in ANOTHER game
+    // of Daniel's Arcade, which writes its id into `specialMaps` in the shared arcade save
+    // ('daniels-arcade-v1'). They are deliberately NOT in WORLDS: the wave ladder, the "x/36 worlds
+    // unlocked" count and every progression check only ever see WORLDS, so a special map can never
+    // shift normal progress. No `unlockWave` on purpose — `wave >= undefined` is always false.
+    // Lookups by id (saves, Continue, multiplayer) go through findWorld(), which sees both lists.
+    const SPECIAL_WORLDS = [
+        { id:'backrooms', name:'The Backrooms', emoji:'🌀', special:true, wavesNeeded:20,
+          hint:'Find the secret in another game',
+          ground:'#a89468', groundAlt:'#d8cc8a', fog:'#e3d698', fogDensity:0.0011,
+          bldgColors:['#d9c77a','#d2bf6c','#e0cf88','#cbb964','#d6c578'], shade:'rgba(80,70,20,0.08)',
+          bosses:['The Entity','Bacteria'],
+          trapTypes:[
+              { type:'wetcarpet', emoji:'💧', color:'#8a7a50', dmg:4,  effect:'slow', duration:180, label:'SOGGY CARPET!', art:'pit' },
+              { type:'flicker',   emoji:'💡', color:'#fff3b0', dmg:6,  effect:'stun', duration:110, label:'LIGHTS OUT!', art:'electric' },
+              { type:'noclip',    emoji:'🌀', color:'#c9b866', dmg:5,  effect:'slow', duration:200, label:'NOCLIPPED!', art:'sand' },
+              { type:'fallentile',emoji:'⬜', color:'#e9e3cc', dmg:10, effect:'knockback', duration:0, label:'CEILING TILE!', art:'boom' },
+          ] },
+    ];
+    const ALL_WORLDS = WORLDS.concat(SPECIAL_WORLDS);
+    function findWorld(id) { return ALL_WORLDS.find(w => w.id === id) || null; }
+
+    // Which special maps the arcade save says you have found. Re-read every time it matters (the
+    // Worlds menu opening, a save loading, a run starting) because another game writes it.
+    function getSpecialMaps() {
+        try {
+            const list = (window.ArcadeShop && window.ArcadeShop.load)
+                ? window.ArcadeShop.load().specialMaps
+                : JSON.parse(localStorage.getItem('daniels-arcade-v1') || '{}').specialMaps;
+            return Array.isArray(list) ? list : [];
+        } catch (e) { return []; }
+    }
+    function isWorldUnlocked(w) {
+        if (!w) return false;
+        if (w.special) return getSpecialMaps().indexOf(w.id) > -1;
+        return highestWaveEver >= w.unlockWave;
+    }
+    // A special map you no longer hold (the arcade save was reset) quietly drops you back in the City.
+    function ensureWorldAllowed() {
+        if (currentWorld && currentWorld.special && !isWorldUnlocked(currentWorld)) currentWorld = WORLDS[0];
+    }
+
     const WORLDS_KEY = 'monster_city_worlds';
     let currentWorld = WORLDS[0];
     let highestWaveEver = 0;
@@ -21540,10 +21763,12 @@ const col = b.color || BLDG_COLORS[0];
             const d = JSON.parse(localStorage.getItem(WORLDS_KEY));
             if (d && d.highestWave) highestWaveEver = d.highestWave;
             if (d && d.currentWorldId) {
-                const w = WORLDS.find(w => w.id === d.currentWorldId);
-                if (w && highestWaveEver >= w.unlockWave) currentWorld = w;
+                const w = findWorld(d.currentWorldId);
+                if (w && isWorldUnlocked(w)) currentWorld = w;
+                else if (w && w.special) currentWorld = WORLDS[0];
             }
         } catch(e) {}
+        ensureWorldAllowed();
     }
 
     function saveWorldProgress() {
@@ -21586,10 +21811,59 @@ const col = b.color || BLDG_COLORS[0];
                     : `<div class="world-lock">🔒 Clear ${w.unlockWave} waves</div>`
                 }`;
             if (unlocked) {
-                card.onclick = () => { currentWorld = w; saveWorldProgress(); renderWorldGrid(); SFX.pickup(); };
+                card.onclick = () => { selectWorld(w.id); renderWorldGrid(); SFX.pickup(); };
             }
             grid.appendChild(card);
         });
+        renderSpecialMaps(grid);
+    }
+
+    // The "⭐ Special Maps" section under the normal worlds. Lives in its own grid so it never mixes
+    // with the wave ladder above it.
+    function renderSpecialMaps(grid) {
+        const parent = grid.parentNode;
+        let box = document.getElementById('special-maps');
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'special-maps';
+            if (parent && parent.insertBefore) parent.insertBefore(box, grid.nextSibling);
+            else if (parent && parent.appendChild) parent.appendChild(box);
+        }
+        box.className = 'special-maps';
+        box.innerHTML = '';
+        const head = document.createElement('div');
+        head.className = 'special-maps-title';
+        head.textContent = '⭐ Special Maps';
+        box.appendChild(head);
+        const sgrid = document.createElement('div');
+        sgrid.className = 'world-grid';
+        sgrid.id = 'special-grid';
+        box.appendChild(sgrid);
+        SPECIAL_WORLDS.forEach(w => {
+            const unlocked = isWorldUnlocked(w);
+            const selected = unlocked && currentWorld.id === w.id;
+            const card = document.createElement('div');
+            card.className = 'world-card special' + (selected ? ' selected' : '') + (!unlocked ? ' locked' : '');
+            card.dataset.world = w.id;
+            card.innerHTML = unlocked
+                ? `<div class="world-emoji">${w.emoji}</div>
+                   <div class="world-name">${w.name}</div>
+                   <div class="world-status">${selected ? '✅ Selected' : 'Click to select'}</div>`
+                : `<div class="world-emoji">🔒</div>
+                   <div class="world-name">???</div>
+                   <div class="world-lock">${w.hint || 'Find the secret in another game'}</div>`;
+            if (unlocked) {
+                card.onclick = () => { selectWorld(w.id); renderWorldGrid(); SFX.pickup(); };
+            }
+            sgrid.appendChild(card);
+        });
+    }
+    // Pick a world by id. Refuses anything you have not unlocked, normal or special.
+    function selectWorld(id) {
+        const w = findWorld(id);
+        if (!w || !isWorldUnlocked(w)) return false;
+        currentWorld = w; saveWorldProgress();
+        return true;
     }
 
     loadWorldProgress();
@@ -23152,6 +23426,7 @@ const col = b.color || BLDG_COLORS[0];
 
     function startGame() {
         if (!chosenClass) return;
+        ensureWorldAllowed();
         if (isPlayerBanned(playerName)) { alert('You are BANNED! Contact an Admin or Owner.'); return; }
         document.getElementById('roll-screen').style.display = 'none';
         document.getElementById('pause-screen').style.display = 'none';

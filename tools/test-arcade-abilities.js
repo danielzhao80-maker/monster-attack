@@ -169,7 +169,9 @@ check('power: other damage (allies, tiles, guests) untouched', dealt('hitMonster
 check('power: bullet from a guest (bySelf, not mine) untouched', dealt('hitMonster(__m, 0, 100, true)') === 100);
 check('power: ability flag is restored afterwards', run('_dmgByLocal') === false);
 // Through the real bullet loop.
-const bulletHit = (mine) => dealt(`bullets.push({ x: __m.x, y: __m.y, z: BULLET_EYE, vx: 0, vy: 0, vz: 0, life: 50, damage: 50, color: '#fff'${mine ? ', mine: true' : ''} }); update(); bullets = [];`);
+// The random city can put a building on the dummy; a bullet would hit the wall first (1 run in ~12).
+// Clear the buildings for this one step so the check only measures the damage bonus.
+const bulletHit = (mine) => dealt(`var __bld = buildings; buildings = []; bullets.push({ x: __m.x, y: __m.y, z: BULLET_EYE, vx: 0, vy: 0, vz: 0, life: 50, damage: 50, color: '#fff'${mine ? ', mine: true' : ''} }); update(); bullets = []; buildings = __bld;`);
 check('power: own bullet through update() 50 -> 62', bulletHit(true) === 62, bulletHit(true));
 check('power: untagged bullet through update() stays 50', bulletHit(false) === 50);
 check('power: shootBullet tags its bullets', /b\.mine = true;[^\n]*\n\s*bullets\.push\(b\);/.test(html));

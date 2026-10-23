@@ -135,14 +135,14 @@ q(`chosenClass = CLASSES[0]; playerName='T'; gameRunning=false; cameraMode='topd
 
 const rows = q(`(function(){
   var out = [];
-  for (var i = 0; i < WORLDS.length; i++) {
-    currentWorld = WORLDS[i];
+  for (var i = 0; i < ALL_WORLDS.length; i++) {
+    currentWorld = ALL_WORLDS[i];
     usingCustomMap = false;
     generateBuildings();
     var n = buildings.length;
     var w=0,h=0,g=0,styled=0;
     for (var k=0;k<n;k++){ var b=buildings[k]; w+=b.w; h+=b.h; g+=b.hgt; if(b.st) styled++; }
-    out.push({ id: WORLDS[i].id, style: worldStyleId(WORLDS[i]),
+    out.push({ id: ALL_WORLDS[i].id, style: worldStyleId(ALL_WORLDS[i]),
                facade: bldgStyleOf(buildings[0]).facade,
                body: bldgStyleOf(buildings[0]).body,
                n: n, w: Math.round(w/n), h: Math.round(h/n), hgt: Math.round(g/n),
@@ -152,7 +152,7 @@ const rows = q(`(function(){
 })()`);
 const data = JSON.parse(rows);
 
-check(data.length === 36, 'all worlds generate', data.length + ' worlds');
+check(data.length === 37 && data.some(d => d.id === 'backrooms'), 'all worlds generate, special maps included', data.length + ' worlds');
 check(data.every(d => d.n > 100), 'every world fills its chunks', 'min ' + Math.min(...data.map(d=>d.n)) + ' buildings');
 check(data.every(d => d.styled), 'every building carries its style id');
 
@@ -212,7 +212,7 @@ check(avg('stack','hgt') / avg('stack','w') < 1.2, 'factories are wide and squat
 
 // ---- the ground each world stands on ----
 const grounds = q(`(function(){
-  return JSON.stringify(WORLDS.map(function(w){ return { id:w.id, art: groundArtOf(w), col: w.ground }; }));
+  return JSON.stringify(ALL_WORLDS.map(function(w){ return { id:w.id, art: groundArtOf(w), col: w.ground }; }));
 })()`);
 const gd = JSON.parse(grounds);
 const arts = [...new Set(gd.map(g => g.art))];
@@ -256,15 +256,15 @@ const dirtFallbacks = (code.match(/\|\| _timeOfDay\.groundHex/g) || []).length;
 check(dirtUses === dirtFallbacks, 'the time-of-day earth colour survives only as a fallback',
       dirtUses + ' uses, ' + dirtFallbacks + ' of them fallbacks');
 // groundAlt was declared on all 30 worlds and used nowhere.
-check(q(`WORLDS.every(function(w){ return !!w.groundAlt; })`) === true, 'every world declares a second ground tone');
+check(q(`ALL_WORLDS.every(function(w){ return !!w.groundAlt; })`) === true, 'every world declares a second ground tone');
 check(/currentWorld\.fog \|\| currentWorld\.groundAlt/.test(code), 'fog now takes its colour from the world');
 check(q(`(function(){ var seen = {};
-   WORLDS.forEach(function(w){ seen[w.fog || w.groundAlt] = 1; });
+   ALL_WORLDS.forEach(function(w){ seen[w.fog || w.groundAlt] = 1; });
    return Object.keys(seen).length; })()`) >= 20, 'fog differs across worlds');
 
 // ---- the air in each world ----
 const fx = JSON.parse(q(`(function(){
-  return JSON.stringify(WORLDS.map(function(w){
+  return JSON.stringify(ALL_WORLDS.map(function(w){
     var k = worldFxKind(w);
     return { id:w.id, name: worldFxName(w), n: k ? k.n : 0 };
   }));
@@ -291,19 +291,19 @@ check(/new THREE\.Points\(/.test(code), 'the 3D ambience is a single Points clou
 check(/if \(name === _fxKindName && _three_fx\) return;/.test(code),
       'and it is only rebuilt when the world changes, not per frame');
 check(q(`(function(){
-   currentWorld = WORLDS.find(function(w){ return w.id === 'arctic'; });
+   currentWorld = ALL_WORLDS.find(function(w){ return w.id === 'arctic'; });
    drawWorldFx2D(document.getElementById('game').getContext('2d'));
    var first = _fx2d && _fx2d.length;
    drawWorldFx2D(document.getElementById('game').getContext('2d'));
    var same = _fx2d && _fx2d.length;
-   currentWorld = WORLDS[0];
+   currentWorld = ALL_WORLDS[0];
    return (first > 0 && first === same) ? 'ok' : 'rebuilt: ' + first + ' -> ' + same; })()`) === 'ok',
    'the 2D ambience keeps its particles between frames');
 
 // ---- the monsters each world sends at you ----
 const mons = JSON.parse(q(`(function(){
   var out = [];
-  WORLDS.forEach(function(w){
+  ALL_WORLDS.forEach(function(w){
     currentWorld = w; _themedCache.clear();
     var names = [], muts = [], cols = [];
     ['Frost','Flame','Shield','Mad Mom'].forEach(function(bn){
@@ -318,10 +318,10 @@ const mons = JSON.parse(q(`(function(){
     });
     out.push({ id:w.id, names:names, muts:muts, cols:cols });
   });
-  currentWorld = WORLDS[0]; _themedCache.clear();
+  currentWorld = ALL_WORLDS[0]; _themedCache.clear();
   return JSON.stringify(out);
 })()`));
-check(mons.length === 36, 'every world themes its monsters', mons.length + ' worlds');
+check(mons.length === 37, 'every world themes its monsters', mons.length + ' worlds');
 check(!mons.some(m => m.names.some(n => n.indexOf('MECHANICS-CHANGED') === 0)),
       'a re-skin changes the name and colour, never the mechanics');
 const allNames = mons.flatMap(m => m.names);
@@ -345,7 +345,7 @@ check(q(`(function(){
 // ---- the sky over each world ----
 const skies = JSON.parse(q(`(function(){
   var tod = TIME_OF_DAY[2];   // Afternoon: tint is neutral, so this is the world's own sky
-  return JSON.stringify(WORLDS.map(function(w){
+  return JSON.stringify(ALL_WORLDS.map(function(w){
     var sk = worldSky(w, tod);
     return { id:w.id, top:sk.top, bot:sk.bot, stars:sk.stars, custom: !!WORLD_SKY[w.id] };
   }));
@@ -364,8 +364,8 @@ check(skies.filter(k => k.stars).length >= 2 && skies.filter(k => k.stars).lengt
 check(citySky.custom === false, 'an ordinary world keeps the time-of-day sky, so sunrises still work');
 // A custom sky must still respond to the time of day.
 check(q(`(function(){
-   var noon = worldSky(WORLDS.find(function(w){return w.id==='ocean';}), TIME_OF_DAY[2]);
-   var dusk = worldSky(WORLDS.find(function(w){return w.id==='ocean';}), TIME_OF_DAY[3]);
+   var noon = worldSky(ALL_WORLDS.find(function(w){return w.id==='ocean';}), TIME_OF_DAY[2]);
+   var dusk = worldSky(ALL_WORLDS.find(function(w){return w.id==='ocean';}), TIME_OF_DAY[3]);
    return noon.bot !== dusk.bot ? 'ok' : 'a custom sky ignores the time of day'; })()`) === 'ok',
    'custom skies are still tinted by the time of day');
 // Both sky renderers, and the clear colour, must ask the same helper.
@@ -376,7 +376,7 @@ check(!/scene\.background\.set\(gCol\)/.test(code), 'the background behind every
 // ---- floor colours must be believable as a SURFACE ----
 // `ground` on a world is the backdrop tint the old flat art used, not a floor: the City's is sky blue.
 const floors = JSON.parse(q(`(function(){
-  return JSON.stringify(WORLDS.map(function(w){ return { id:w.id, floor: worldFloorColor(w), back: w.ground }; }));
+  return JSON.stringify(ALL_WORLDS.map(function(w){ return { id:w.id, floor: worldFloorColor(w), back: w.ground }; }));
 })()`));
 const rgb = c => [parseInt(c.slice(1,3),16), parseInt(c.slice(3,5),16), parseInt(c.slice(5,7),16)];
 check(floors.every(f => /^#[0-9a-f]{6}$/i.test(f.floor)), 'every world resolves to a floor colour');
@@ -399,7 +399,7 @@ check((code.match(/worldFloorColor\(/g) || []).length >= 6,
 
 // ---- the clutter scattered between the structures ----
 const props = q(`(function(){
-  return JSON.stringify(WORLDS.map(function(w){ return { id:w.id, set: PROPS_FOR(w) }; }));
+  return JSON.stringify(ALL_WORLDS.map(function(w){ return { id:w.id, set: PROPS_FOR(w) }; }));
 })()`);
 const pd = JSON.parse(props);
 const allProps = [...new Set(pd.flatMap(p => p.set))];
@@ -429,7 +429,7 @@ check(q(`(function(){
    'only lamp props request a dynamic light');
 
 // Same world, same seed -> same city (the save/Continue guarantee must survive this change)
-q(`currentWorld = WORLDS[0]; generateBuildings();`);
+q(`currentWorld = ALL_WORLDS[0]; generateBuildings();`);
 const seed = q('_worldSeed');
 const sig1 = q(`buildings.slice(0,5).map(function(b){return Math.round(b.x)+','+Math.round(b.y)+','+b.st;}).join(' ')`);
 q(`_worldSeed = ${seed}; _chunkCache = new Map(); _loadedChunkKey = null; refreshChunks(true);`);

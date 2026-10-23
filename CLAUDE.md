@@ -116,6 +116,7 @@ node tools/test-multiplayer.js index.html   # movement, prediction, interpolatio
 node tools/test-ultimates.js index.html     # ultimate forms: enter, transform, revert cleanly
 node tools/test-world-styles.js index.html  # per-world architecture across all 30 worlds
 node tools/test-summons-look.js index.html  # summons: one 2D+3D look per kind, mechanics unchanged
+node tools/test-special-maps.js index.html  # ⭐ Special Maps: lock/unlock, Backrooms run, save, City fallback
 ```
 
 ### Saves
@@ -136,6 +137,17 @@ buildings in the SAME shape `buildChunk` does — `{ lx, ly, x, y, w, h, hgt, co
 collision, the 2D draw, the 3D renderer, the minimap and the raycaster need no special cases for it.
 `usingCustomMap` makes `refreshChunks()` return the drawn list instead of streaming chunks;
 `openRollScreen()` clears the flag so normal Play is always the generated world.
+
+### Special maps
+`SPECIAL_WORLDS` (currently only `backrooms`) sit OUTSIDE `WORLDS`, so the wave ladder, the "x/36"
+count and `highestWaveEver` never see them (clearing waves on one does not raise it). They unlock
+when another arcade game puts their id in `specialMaps` in the shared `daniels-arcade-v1` save, read by
+`getSpecialMaps()` each time the Worlds menu opens, a save loads or a run starts. Look worlds up by id
+with `findWorld()` (it sees both lists), check access with `isWorldUnlocked()`, and
+`ensureWorldAllowed()` drops a special map whose unlock is gone back to the City. Per-world tables
+(BLDG_STYLES, WORLD_GROUND, ...) take special maps like any other world; `test-world-styles.js`
+walks `ALL_WORLDS`. The Backrooms' `backroom` body is laid out on a grid by `buildMazeChunk`
+(`maze:true`), not scattered.
 
 ### Per-world structures
 Worlds contain STRUCTURES, not buildings-everywhere. Only a real town builds boxes; a jungle grows
