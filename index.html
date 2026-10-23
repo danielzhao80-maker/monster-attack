@@ -1961,7 +1961,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
           props:['kelp','shell','anemone'], bosses:['Kraken','Leviathan'], exit:['🛟','a hatch above the water'] },
         { n:8,  name:'Cave System',        emoji:'🦇', layout:'maze', loops:0.28, facade:'stone',     cap:'#3a322b',
           walls:['#5a4f45','#4e443b','#66594d'], ground:'#3e362f', groundAlt:'#4a4138', art:'rock',
-          ceiling:{ art:'garageslab', tint:0x5a4c40 }, fog:'#1c1814', fogDensity:0.0018, sky:{ top:0x0c0a08, bot:0x2a221c }, fx:'drips', bed:'cavern',
+          ceiling:{ art:'rock', tint:0xffffff }, fog:'#1c1814', fogDensity:0.0018, sky:{ top:0x0c0a08, bot:0x2a221c }, fx:'drips', bed:'cavern',
           monsters:[['Bat','🦇','#2d3436'],['Mole Man','🐀','#6d4c41'],['Rock Crab','🦀','#8d6e63'],['Glowworm','🐛','#c6ff00']],
           traps:[['rockfall','🪨','#8d6e63',10,'knockback',0,'ROCKFALL!','boom'],['sinkhole','🕳️','#3e362f',5,'slow',200,'SINKHOLE!','pit']],
           props:['stalag','rock','oreRock'], bosses:['Cave Golem','Deep Crawler'], exit:['🪢','a rope up a crack'] },
@@ -13262,7 +13262,7 @@ const col = b.color || BLDG_COLORS[0];
         // 🕳️ Secret: a falling tile leaves a hole in the Backrooms ceiling. A class that BUILDS notices
         // it — look up through it within 10 s and Floor 1 unlocks (checked in tickTileHole).
         const _hole = trap.type === 'fallentile' && pl === player && currentWorld.id === 'backrooms' && buildsThings(pl.cls);
-        if (_hole) pl._tileHole = 600;
+        if (_hole) { pl._tileHole = 600; pl._holeAt = { x: trap.x, y: trap.y }; }
         // Visual + audio feedback (only show status text + flash for local player)
         if (pl === player) {
             showStatus(_hole && !isWorldUnlocked(findWorld('backrooms2')) ? '⬜ CEILING TILE! …there is a hole up there.' : trap.label, trap.color);
@@ -16267,16 +16267,21 @@ const col = b.color || BLDG_COLORS[0];
     function setTimeOfDayForWave(w) {
         const idx = ((w - 1) % TIME_OF_DAY.length + TIME_OF_DAY.length) % TIME_OF_DAY.length;
         _timeOfDay = TIME_OF_DAY[idx];
-        if (typeof showStatus === 'function') showStatus(`🕒 ${_timeOfDay.name}`, '#feca57');
+        if (typeof showStatus === 'function' && !isIndoors()) showStatus(`🕒 ${_timeOfDay.name}`, '#feca57');
         applyTimeOfDayToScene();
     }
     // Backwards-compatible name (still called from generateBuildings on first map)
     function rollTimeOfDay() {
         setTimeOfDayForWave(typeof wave !== 'undefined' && wave > 0 ? wave : 1);
     }
+    // Under a ceiling there is no sun and no time of day: flat, neutral, overhead fluorescent light.
+    // (The warm Early Morning tint was turning grey office carpet and white hospital floors brown.)
+    const INDOOR_LIGHT = { name:'Indoors', skyTop:0x777777, skyBot:0x999999, sunCol:0xfffbea, sunInt:1.0, hemiTop:0xffffff, hemiBot:0x8c8c8c,
+                           hemiInt:1.05, exposure:1.15, bgFallback:0x888888, groundTint:0xffffff, sunPos:[120,950,90] };
+    const isIndoors = () => !!(typeof WORLD_CEILING !== 'undefined' && currentWorld && WORLD_CEILING[currentWorld.id]);
     function applyTimeOfDayToScene() {
         if (!_three) return; // 3D not initialized yet — init3D will pick up _timeOfDay
-        const tod = _timeOfDay;
+        const tod = isIndoors() ? Object.assign({}, _timeOfDay, INDOOR_LIGHT) : _timeOfDay;
         // Sky shader uniforms
         if (_three_sky && _three_sky.material && _three_sky.material.uniforms) {
             const _ws = worldSky(currentWorld, tod);
@@ -16323,7 +16328,7 @@ const col = b.color || BLDG_COLORS[0];
         backrooms:  { h: 110, art: 'droptiles', tile: 240 },
         backrooms2: { h: 110, art: 'garageslab', tile: 500 },
         ...Object.fromEntries(BACKROOMS_FLOORS.filter(f => f.ceiling).map(f => [f.id,
-            { h: 110, art: f.ceiling.art, tile: f.ceiling.art === 'droptiles' ? 240 : 500, tint: f.ceiling.tint }])),
+            { h: 110, art: f.ceiling.art, tile: f.ceiling.art === 'droptiles' ? 240 : f.ceiling.art === 'rock' ? 300 : 500, tint: f.ceiling.tint }])),
     };
     function makeCeilingTexture(art) {
         const S = 256, c = document.createElement('canvas'); c.width = S; c.height = S;
@@ -16340,6 +16345,16 @@ const col = b.color || BLDG_COLORS[0];
             x.fillStyle = '#fffbe2'; x.fillRect(66, 34, 60, 124);                // the light panel (2×4 tiles)
             x.strokeStyle = 'rgba(200,190,140,0.6)'; x.lineWidth = 1.5;
             for (let i = 42; i < 158; i += 8) { x.beginPath(); x.moveTo(68, i); x.lineTo(124, i); x.stroke(); }
+        } else if (art === 'rock') {
+            // A cave roof: rough dark rock, lumps and drips — and no lights at all.
+            x.fillStyle = '#2b241f'; x.fillRect(0, 0, S, S);
+            for (let i = 0; i < 60; i++) {
+                const gx = Math.random()*S, gy = Math.random()*S, r = 6 + Math.random()*22;
+                const g2 = x.createRadialGradient(gx - r*0.3, gy - r*0.3, 1, gx, gy, r);
+                g2.addColorStop(0, 'rgba(95,82,70,0.30)'); g2.addColorStop(1, 'rgba(10,8,6,0.45)');
+                x.fillStyle = g2; x.beginPath(); x.arc(gx, gy, r, 0, Math.PI*2); x.fill();
+            }
+            for (let i = 0; i < 25; i++) { x.fillStyle = 'rgba(180,200,210,0.35)'; x.beginPath(); x.arc(Math.random()*S, Math.random()*S, 1.5, 0, Math.PI*2); x.fill(); }
         } else {
             // A poured concrete slab: form lines, a deep beam, and a long tube light.
             x.fillStyle = '#6f7275'; x.fillRect(0, 0, S, S);
@@ -16353,6 +16368,7 @@ const col = b.color || BLDG_COLORS[0];
         }
         const t = new THREE.CanvasTexture(c);
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        if ('colorSpace' in t) t.colorSpace = THREE.SRGBColorSpace;   // without it the colours come out washed pale
         return t;
     }
     // The floor exit in 3D: a dark door frame around a glowing doorway, turned to face the player,
@@ -16376,6 +16392,32 @@ const col = b.color || BLDG_COLORS[0];
         g.visible = true;
         g.position.set(brExit.x, 0, brExit.y);
         if (player) g.rotation.y = Math.atan2(player.x - brExit.x, player.y - brExit.y);
+    }
+    // The hole a fallen ceiling tile leaves in the Lobby (only while the Floor 1 secret is live): a
+    // dark opening just under the lid, fading to the grey concrete of the floor above in the middle.
+    function updateTileHole3D() {
+        if (!_three) return;
+        let h = _three.tileHole;
+        const cfg = WORLD_CEILING[currentWorld && currentWorld.id];
+        const show = player && player._tileHole > 0 && player._holeAt && cfg;
+        if (!show) { if (h) h.visible = false; return; }
+        if (!h) {
+            const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+            const x = c.getContext('2d');
+            x.fillStyle = '#050505'; x.fillRect(0, 0, 128, 128);
+            const g = x.createRadialGradient(64, 64, 4, 64, 64, 60);
+            g.addColorStop(0, '#6f7275'); g.addColorStop(0.35, '#2a2b2c'); g.addColorStop(1, '#050505');
+            x.fillStyle = g; x.fillRect(10, 10, 108, 108);
+            x.fillStyle = '#f4f8ff'; x.fillRect(40, 60, 48, 5);                 // a tube light far above
+            x.strokeStyle = '#a99e70'; x.lineWidth = 6; x.strokeRect(3, 3, 122, 122); // the broken T-bar edge
+            const t = new THREE.CanvasTexture(c);
+            if ('colorSpace' in t) t.colorSpace = THREE.SRGBColorSpace;
+            h = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide }));
+            h.rotation.x = Math.PI/2;
+            _three.scene.add(h); _three.tileHole = h;
+        }
+        h.visible = true;
+        h.position.set(player._holeAt.x, cfg.h - 0.5, player._holeAt.y);
     }
     function updateCeiling3D() {
         if (!_three || !player) return;
@@ -20099,6 +20141,7 @@ const col = b.color || BLDG_COLORS[0];
                                 x.fillRect(lx - 3, (GARAGE_DEPTH + 30) * sz, 6, (GARAGE_DEPTH - 10) * sz); // south bays
                             }
                             const t = new THREE.CanvasTexture(c);
+                            if ('colorSpace' in t) t.colorSpace = THREE.SRGBColorSpace;
                             return new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false });
                         });
                         const lines = new THREE.Mesh(TG.Plane(LW, LD), lineM);
@@ -20165,6 +20208,7 @@ const col = b.color || BLDG_COLORS[0];
         if (ground && player) ground.position.set(Math.round(player.x/512)*512, 0, Math.round(player.y/512)*512);
         updateCeiling3D();
         updateExit3D();
+        updateTileHole3D();
         // Boss habitat — build it when a boss summons one, tear it down when the habitat clears
         if (bossHabitat) {
             if (!_three._habitatMesh || _three._habitatFor !== bossHabitat) {

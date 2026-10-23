@@ -161,6 +161,9 @@ the Map Maker. `FLOOR_IDS` is the chain 0→20. Unlock: on Floor N≥1 reach `fl
 (`brExit`, tickFloorExit) appears 1100–1600 away (minimap/2D/raycast/3D), touching it unlocks N+1.
 The 3D building signature includes `_worldSeed` + world id (a new run at the same chunk used to keep
 the previous world's 3D).
+Indoor worlds (`isIndoors()` = has a WORLD_CEILING) ignore the time of day and use INDOOR_LIGHT. Canvas
+textures need `colorSpace = SRGBColorSpace` or they render washed pale. The Lobby's fallen tile
+shows a hole in the ceiling (`player._holeAt`, updateTileHole3D) while the Floor 1 secret is live.
 
 ### Per-world structures
 Worlds contain STRUCTURES, not buildings-everywhere. Only a real town builds boxes; a jungle grows

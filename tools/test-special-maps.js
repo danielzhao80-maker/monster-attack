@@ -339,7 +339,7 @@ const tileRun = (cls, look, worldId) => JSON.parse(q(`(function(){
   for (var f = 0; f < 30; f++) { monsters = []; update(); }
   player.pitch = ${look};
   for (var f = 0; f < 5; f++) { monsters = []; update(); }
-  return JSON.stringify({ hit: hit, hole: hole, maps: getSpecialMaps() });
+  return JSON.stringify({ hit: hit, hole: hole, at: player._holeAt || null, maps: getSpecialMaps() });
 })()`));
 setArcade({ specialMaps: ['backrooms'] });
 check(q(`isWorldUnlocked(findWorld('backrooms2'))`) === false, 'Floor 1 starts locked');
@@ -347,6 +347,8 @@ let tr = tileRun('Scientist', 1.0);
 check(tr.hit && tr.hole === 0 && tr.maps.indexOf('backrooms2') < 0, 'a class that cannot build looks up and nothing happens');
 tr = tileRun('Builder', 0);
 check(tr.hit && tr.hole === 600 && tr.maps.indexOf('backrooms2') < 0, 'a Builder hit by a tile who does NOT look up gets nothing');
+check(!!tr.at, 'the tile leaves a hole in the ceiling where it fell (shown in 3D)');
+check(q(`isIndoors()`) === true && q(`(function(){ var was = currentWorld; currentWorld = findWorld('brfloor10'); var r = isIndoors(); currentWorld = was; return r; })()`) === false, 'indoor floors use flat indoor light; open-air floors keep the time of day');
 setArcade({ specialMaps: ['backrooms'] });
 tr = tileRun('Builder', 1.0);
 check(tr.maps.indexOf('backrooms2') > -1, 'a Builder hit by a falling tile who looks up unlocks Floor 1', JSON.stringify(tr.maps));
