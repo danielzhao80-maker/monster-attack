@@ -2097,7 +2097,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             city:'room',     ruins:'room',      boneyard:'room',  mansion:'room', dojo:'room',
             dream:'vacuum',  mirror:'vacuum',   astral:'vacuum',
             clockwork:'hum', grove:'jungle',    storybook:'room',
-            backrooms:'fluoro',
+            backrooms:'fluoro',   backrooms2:'hum',
         };
         let src = null, filt = null, gain = null, lfo = null, lfoGain = null, drone = null;
         let evTimer = null, current = null, running = false;
@@ -2417,7 +2417,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         casino:'petals',  dojo:'petals',
         dream:'stardust', mirror:'stardust', astral:'stardust',
         clockwork:'sparks', grove:'spores',  storybook:'petals',
-        backrooms:'motes',
+        backrooms:'motes',  backrooms2:'drips',
         city:null,                            // clear air over an ordinary city
     };
     function worldFxKind(w) { const k = w && WORLD_FX[w.id]; return k ? FX_KINDS[k] : null; }
@@ -2581,6 +2581,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         astral:    [['Starchill','❄️','#b39ddb'],['Comet','☄️','#d1c4e9'],['Warden Rune','🔯','#7e57c2'],['Wailing Oracle','🔮','#9575cd']],
         // ---- special maps ----
         backrooms: [['Smiler','😁','#f5f0d0'],['Partygoer','🎈','#ff9f43'],['Skin-Stealer','🧍','#b8a07a'],['Hound','🐕','#6b5b4a']],
+        backrooms2:[['Faceling','🫥','#c8c2b4'],['Death Moth','🦋','#7a6f5a'],['Clump','🫠','#8a5a4a'],['Wretch','🧟','#6e6a5e']],
     };
     // Which base each slot re-skins, in order.
     const MONSTER_BASES = ['Frost', 'Flame', 'Shield', 'Mad Mom'];
@@ -7278,6 +7279,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // laid on a grid, so the open floor reads as endless rooms and corridors. `maze` makes
         // buildChunk lay them out on that grid instead of scattering footprints (see buildMazeChunk).
         backroom: { body:'backroom',  w:[22,360],  h:[22,360],  hgt:[140,160], tall:0,    tallHgt:[160,160], facade:'wallpaper', gap:0, maze:true },
+        // Floor 2 (the one above): the same endless maze, but bare poured CONCRETE with pipes along the top.
+        concretemaze: { body:'concretewall', w:[22,360], h:[22,360], hgt:[180,200], tall:0, tallHgt:[200,200], facade:'concrete', gap:0, maze:true },
     };
     // Which archetype each world builds in. Anything unlisted falls back to 'tower'.
     const WORLD_BLDG_STYLE = {
@@ -7293,7 +7296,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         mushroom:'mushroom', void:'monolith',
         dream:'dreamdoor', clockwork:'gear',  mirror:'mirrorshard',
         grove:'fairytree', storybook:'popup', astral:'runestone',
-        backrooms:'backroom',
+        backrooms:'backroom', backrooms2:'concretemaze',
     };
 
     function worldStyleId(w) { return (w && WORLD_BLDG_STYLE[w.id]) || 'tower'; }
@@ -7317,6 +7320,7 @@ const col = b.color || BLDG_COLORS[0];
             skyscraper:'box', works:'box', pagoda:'box',
             dreamdoor:'box', popup:'box', gear:'dome',
             mirrorshard:'shard', runestone:'shard', fairytree:'tree',
+            concretewall:'backroom',
         })[_rawKind] || _rawKind;
         const mx = b.x + b.w/2, my = b.y + b.h/2;
         const msp = Math.min(b.w, b.h);
@@ -7579,6 +7583,7 @@ const col = b.color || BLDG_COLORS[0];
         { st:'popup',      emoji:'\ud83d\udcd6', name:'Pop-Up'     },
         { st:'runestone',  emoji:'\ud83d\udd2e', name:'Runestone'  },
         { st:'backroom',   emoji:'\ud83d\udfe8', name:'Office Wall' },
+        { st:'concretemaze', emoji:'\u2b1c', name:'Concrete Wall' },
     ];
     function mmActiveStyle() { return mmStyle || worldStyleId(currentWorld); }
 
@@ -12027,6 +12032,7 @@ const col = b.color || BLDG_COLORS[0];
         // out of the chunk you spawned in and the city simply stopped generating.
         refreshChunks();
         astralSecretTick();   // Astral Temple secret spot (invisible) — places it and drops a faint sparkle
+        tickTileHole();       // Backrooms: looking up through a fallen tile's hole unlocks Floor 2
 
         // Timers
         if (p.frozen > 0) { p.frozen--; if (p.frozen===0) p.disableImmune = 120; }
@@ -13071,9 +13077,13 @@ const col = b.color || BLDG_COLORS[0];
             // (no clamp: the world has no edges)
             refreshChunks(); // stream in the land around wherever they have walked to
         }
+        // 🕳️ Secret: a falling tile leaves a hole in the Backrooms ceiling. A class that BUILDS notices
+        // it — look up through it within 10 s and Floor 2 unlocks (checked in tickTileHole).
+        const _hole = trap.type === 'fallentile' && pl === player && currentWorld.id === 'backrooms' && buildsThings(pl.cls);
+        if (_hole) pl._tileHole = 600;
         // Visual + audio feedback (only show status text + flash for local player)
         if (pl === player) {
-            showStatus(trap.label, trap.color);
+            showStatus(_hole && !isWorldUnlocked(findWorld('backrooms2')) ? '⬜ CEILING TILE! …there is a hole up there.' : trap.label, trap.color);
             addShake(trap.effect==='knockback'?9:trap.effect==='freeze'?5:6);
             // Effect-tinted full-screen flash for cinematic feel
             const flashCol = trap.effect==='freeze'?'#74b9ff' : trap.effect==='stun'?'#feca57' : trap.effect==='poison'?'#26de81' : trap.effect==='knockback'?'#ff6b6b' : '#ff3838';
@@ -16167,6 +16177,19 @@ const col = b.color || BLDG_COLORS[0];
                 stain.addColorStop(0, 'rgba(90,70,30,0.35)'); stain.addColorStop(1, 'rgba(90,70,30,0)');
                 x.fillStyle = stain; x.fillRect(0, 170, 256, 86);
                 x.fillStyle = '#6b5434'; x.fillRect(0, 238, 256, 18);
+            } else if (facade === 'concrete') {
+                // Poured concrete: form-board seams, tie holes in a grid, and wet streaks running down.
+                x.strokeStyle = 'rgba(0,0,0,0.20)'; x.lineWidth = 2;
+                for (let row = 1; row < 4; row++) { x.beginPath(); x.moveTo(0, row*64); x.lineTo(256, row*64); x.stroke(); }
+                x.beginPath(); x.moveTo(128, 0); x.lineTo(128, 256); x.stroke();
+                x.fillStyle = 'rgba(0,0,0,0.35)';
+                for (let gy = 32; gy < 256; gy += 64) for (let gx = 32; gx < 256; gx += 64) { x.beginPath(); x.arc(gx, gy, 3, 0, Math.PI*2); x.fill(); }
+                for (let i = 0; i < 7; i++) {
+                    const sx = Math.random()*256, len = 60 + Math.random()*150;
+                    const g2 = x.createLinearGradient(0, 0, 0, len);
+                    g2.addColorStop(0, 'rgba(30,30,25,0.30)'); g2.addColorStop(1, 'rgba(30,30,25,0)');
+                    x.fillStyle = g2; x.fillRect(sx, 0, 4 + Math.random()*6, len);
+                }
             } else if (facade === 'planks') {
                 x.strokeStyle = 'rgba(0,0,0,0.3)'; x.lineWidth = 3;
                 for (let row = 0; row < 10; row++) { const y0 = row * 26; x.beginPath(); x.moveTo(0, y0); x.lineTo(256, y0); x.stroke(); }
@@ -16232,6 +16255,7 @@ const col = b.color || BLDG_COLORS[0];
         dream:'dreamhaze', clockwork:'brass', mirror:'mirrorfloor',
         grove:'mossglow',  storybook:'paper', astral:'runefloor',
         backrooms:'dampcarpet',   // the casino already owns 'carpet' (damask) — this is the moist office kind
+        backrooms2:'wetconcrete', // bare concrete with standing puddles
     };
     function groundArtOf(w) { return (w && WORLD_GROUND[w.id]) || 'asphalt'; }
 
@@ -16248,6 +16272,7 @@ const col = b.color || BLDG_COLORS[0];
         dream:  '#9a8ea8',   // dusty lavender, dim enough to read as ground
         mirror: '#aab8c2',   // silvered glass, not pale blue
         backrooms: '#a89468', // damp beige-brown office carpet
+        backrooms2:'#51575c', // wet grey concrete
     };
     function worldFloorColor(w) { return (w && (WORLD_FLOOR[w.id] || w.ground)) || '#7ec8e3'; }
 
@@ -16289,6 +16314,7 @@ const col = b.color || BLDG_COLORS[0];
         astral:     { top:0x160f33, bot:0x7e57c2, stars:true },
         // Not a sky at all: a low, flat, pale-yellow ceiling glow fading into yellow haze.
         backrooms:  { top:0xe6da9a, bot:0xf0e6b0 },
+        backrooms2: { top:0x3a3934, bot:0x6b675c },   // a dark concrete ceiling, dim yellowish haze
     };
     // Multiply a colour by the time-of-day tint so dawn and dusk still read on a custom sky.
     function _tintHex(hex, tintHex) {
@@ -16487,6 +16513,18 @@ const col = b.color || BLDG_COLORS[0];
                 const g = x.createRadialGradient(gx, gy, 2, gx, gy, r);
                 g.addColorStop(0, 'rgba(70,52,25,0.30)'); g.addColorStop(0.7, 'rgba(70,52,25,0.14)'); g.addColorStop(1, 'rgba(70,52,25,0)');
                 x.fillStyle = g; x.beginPath(); x.ellipse(gx, gy, r, r*0.7, Math.random()*3, 0, Math.PI*2); x.fill();
+            }
+        } else if (art === 'wetconcrete') {
+            // Bare slab: fine grain, saw-cut joints, and dark standing puddles with a light sheen.
+            grain(1600, 0.14);
+            x.strokeStyle = shade(0.22); x.lineWidth = 2;
+            x.beginPath(); x.moveTo(0, 128); x.lineTo(S, 128); x.moveTo(128, 0); x.lineTo(128, S); x.stroke();
+            for (let i = 0; i < 4; i++) {
+                const gx = Math.random()*S, gy = Math.random()*S, r = 16 + Math.random()*26;
+                x.fillStyle = 'rgba(25,28,30,0.40)';
+                x.beginPath(); x.ellipse(gx, gy, r, r*0.6, Math.random()*3, 0, Math.PI*2); x.fill();
+                x.strokeStyle = light(0.18); x.lineWidth = 1.5;
+                x.beginPath(); x.ellipse(gx - r*0.2, gy - r*0.15, r*0.5, r*0.2, 0, 0, Math.PI*2); x.stroke();
             }
         } else if (art === 'tatami') {
             x.strokeStyle = shade(0.30); x.lineWidth = 4;                 // mats with bound edges
@@ -17049,6 +17087,7 @@ const col = b.color || BLDG_COLORS[0];
         storybook:['crate','gumdrop','balloon'],
         astral:   ['crystalCluster','beacon','stoneLantern'],
         backrooms:['ceilingLight','officeChair','ceilingTile','exitSign'],
+        backrooms2:['ceilingLight','pipe','crate','barrel'],
     };
     function PROPS_FOR(w) { return (w && PROP_SETS[w.id]) || PROP_SETS.city; }
 
@@ -19736,12 +19775,14 @@ const col = b.color || BLDG_COLORS[0];
                         bg.add(ring);
                     }
                     bg.position.y = span*0.14;              // it does not rest on anything
-                } else if (kind === 'backroom') {          // the Backrooms — a wallpapered partition
+                } else if (kind === 'backroom' || kind === 'concretewall') {   // the Backrooms — a wallpapered (or, upstairs, concrete) partition
+                    const _conc = kind === 'concretewall';
                     // Repeat the wallpaper by real length so a 350-unit wall is not one stretched tile.
                     const along = Math.max(1, Math.round(Math.max(b.w, b.h) / 64));
                     const across = Math.max(1, Math.round(Math.min(b.w, b.h) / 64));
                     const rowsW = Math.max(1, Math.round(H / 80));
-                    const capM = flat('bkr-cap', () => new THREE.MeshStandardMaterial({ color: 0xcfc08a, roughness: 0.95 }));
+                    const capM = _conc ? flat('bkr2-cap', () => new THREE.MeshStandardMaterial({ color: 0x77746b, roughness: 0.95 }))
+                                       : flat('bkr-cap', () => new THREE.MeshStandardMaterial({ color: 0xcfc08a, roughness: 0.95 }));
                     const mats = b.w >= b.h
                         ? [face(across, rowsW), face(across, rowsW), capM, capM, face(along, rowsW), face(along, rowsW)]
                         : [face(along, rowsW), face(along, rowsW), capM, capM, face(across, rowsW), face(across, rowsW)];
@@ -19750,9 +19791,19 @@ const col = b.color || BLDG_COLORS[0];
                     if (!geo) { geo = TG.Box(Math.round(b.w/4)*4, H, Math.round(b.h/4)*4); _bldgGeoCache.set(gkey, geo); }
                     const wall = new THREE.Mesh(geo, mats);
                     wall.position.set(cX, H/2, cZ); wall.castShadow = true; wall.receiveShadow = true; bg.add(wall);
-                    const baseM = flat('bkr-base', () => new THREE.MeshStandardMaterial({ color: 0x5c4630, roughness: 0.8 }));
-                    const base = new THREE.Mesh(TG.Box(Math.round(b.w/4)*4 + 3, 8, Math.round(b.h/4)*4 + 3), baseM);   // baseboard
-                    base.position.set(cX, 4, cZ); bg.add(base);
+                    if (!_conc) {
+                        const baseM = flat('bkr-base', () => new THREE.MeshStandardMaterial({ color: 0x5c4630, roughness: 0.8 }));
+                        const base = new THREE.Mesh(TG.Box(Math.round(b.w/4)*4 + 3, 8, Math.round(b.h/4)*4 + 3), baseM);   // baseboard
+                        base.position.set(cX, 4, cZ); bg.add(base);
+                    } else if (Math.max(b.w, b.h) > 120) {
+                        // Upstairs: a rusty pipe runs along the top of each long wall.
+                        const pipeM = flat('bkr2-pipe', () => new THREE.MeshStandardMaterial({ color: 0x7a5236, roughness: 0.6, metalness: 0.5 }));
+                        const len = Math.round((Math.max(b.w, b.h) - 10) / 20) * 20;   // rounded so walls share geometry
+                        const pipe = new THREE.Mesh(TG.Cylinder(4, 4, len, 8), pipeM);
+                        if (b.w >= b.h) { pipe.rotation.z = Math.PI/2; pipe.position.set(cX, H - 14, cZ + b.h/2 + 5); }
+                        else            { pipe.rotation.x = Math.PI/2; pipe.position.set(cX + b.w/2 + 5, H - 14, cZ); }
+                        bg.add(pipe);
+                    }
                 }
                 scene.add(bg);
                 bmap.set(b, bg);
@@ -21841,6 +21892,18 @@ const col = b.color || BLDG_COLORS[0];
               { type:'noclip',    emoji:'🌀', color:'#c9b866', dmg:5,  effect:'slow', duration:200, label:'NOCLIPPED!', art:'sand' },
               { type:'fallentile',emoji:'⬜', color:'#e9e3cc', dmg:10, effect:'knockback', duration:0, label:'CEILING TILE!', art:'boom' },
           ] },
+        // Floor 2 is found from INSIDE the Backrooms, not another game: as a class that builds, get hit
+        // by a falling ceiling tile and then look up through the hole it left (see _tileHole).
+        { id:'backrooms2', name:'The Backrooms — Floor 2', emoji:'🕳️', special:true, wavesNeeded:20,
+          hint:'Something is above the Backrooms…',
+          ground:'#51575c', groundAlt:'#5e6469', fog:'#4d4a42', fogDensity:0.0013,
+          bldgColors:['#7c8186','#848a8f','#767b80','#80858a','#7a7f83'], shade:'rgba(20,20,15,0.12)',
+          bosses:['The Entity','Bacteria'],
+          trapTypes:[
+              { type:'puddle',    emoji:'💧', color:'#4a5560', dmg:4,  effect:'slow', duration:200, label:'DEEP PUDDLE!', art:'pit' },
+              { type:'steampipe', emoji:'♨️', color:'#c8c8c0', dmg:8,  effect:'stun', duration:90,  label:'BURST PIPE!', art:'electric' },
+              { type:'fallencrate',emoji:'📦', color:'#9c7b4f', dmg:12, effect:'knockback', duration:0, label:'FALLING CRATE!', art:'boom' },
+          ] },
     ];
     const ALL_WORLDS = WORLDS.concat(SPECIAL_WORLDS);
     function findWorld(id) { return ALL_WORLDS.find(w => w.id === id) || null; }
@@ -21859,6 +21922,36 @@ const col = b.color || BLDG_COLORS[0];
         if (!w) return false;
         if (w.special) return getSpecialMaps().indexOf(w.id) > -1;
         return highestWaveEver >= w.unlockWave;
+    }
+    // Write a special map into the shared arcade save. Returns true if it was new.
+    function unlockSpecialMap(id) {
+        let fresh = true;
+        const grant = (s) => {
+            if ((s.specialMaps || []).indexOf(id) > -1) { fresh = false; return; }
+            s.specialMaps = (s.specialMaps || []).concat([id]);
+        };
+        try {
+            if (window.ArcadeShop && window.ArcadeShop.update) window.ArcadeShop.update(grant);
+            else { const k = 'daniels-arcade-v1'; const s2 = JSON.parse(localStorage.getItem(k) || '{}'); grant(s2); localStorage.setItem(k, JSON.stringify(s2)); }
+        } catch (e) { return false; }
+        return fresh;
+    }
+    // Classes that build walls: the Builder ([E]) and The Iron (Iron Wall).
+    function buildsThings(cls) { return !!cls && (cls.canBuild || cls.name === 'The Iron'); }
+    // The Floor 2 secret, every frame: after a falling tile, look UP (first-person, pitch well above
+    // the horizon) while the hole is still there.
+    function tickTileHole() {
+        if (!player || !(player._tileHole > 0)) return;
+        player._tileHole--;
+        if (currentWorld.id !== 'backrooms') { player._tileHole = 0; return; }
+        if (aimsVertically() && (player.pitch || 0) > 0.6) {
+            player._tileHole = 0;
+            if (unlockSpecialMap('backrooms2')) {
+                showStatus('🕳️ You see another floor through the hole! FLOOR 2 of the Backrooms unlocked — Worlds → ⭐ Special Maps', '#e6da9a');
+                SFX.pickup && SFX.pickup();
+                addShake(6);
+            }
+        }
     }
     // A special map you no longer hold (the arcade save was reset) quietly drops you back in the City.
     function ensureWorldAllowed() {

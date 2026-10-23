@@ -320,11 +320,59 @@ const chase = JSON.parse(q(`(function(){
   m.x = (best[0]+0.5)*MAZE_CELL; m.y = (best[1]+0.5)*MAZE_CELL; m.phasing = false; m.hp = m.maxHp = 1e9;
   player.hp = player.maxHp = 1e9; player.invincible = 1e9;
   var start = Math.hypot(m.x-player.x, m.y-player.y), steps = 0;
-  for (; steps < 6000 && Math.hypot(m.x-player.x, m.y-player.y) > 120; steps++) {
+  for (; steps < 6000 && Math.hypot(m.x-player.x, m.y-player.y) > 200; steps++) {
     monstersSpawned = 0; monsters = [m]; player.x = (gx+0.5)*MAZE_CELL; player.y = (gy+0.5)*MAZE_CELL; update(); }
   return JSON.stringify({ rooms: best[2], start: Math.round(start), end: Math.round(Math.hypot(m.x-player.x, m.y-player.y)), steps: steps });
 })()`));
-check(chase.end <= 120, 'a monster ' + chase.rooms + ' rooms away finds its way through the maze', JSON.stringify(chase));
+// 200: a ranged monster stops at 180 to shoot, which still means it got through.
+check(chase.end <= 200, 'a monster ' + chase.rooms + ' rooms away finds its way through the maze', JSON.stringify(chase));
+
+// ---- Floor 2: a builder hit by a falling ceiling tile looks up through the hole ----
+const tileRun = (cls, look, worldId) => JSON.parse(q(`(function(){
+  selectWorld('${worldId || 'backrooms'}'); gameRunning=false; startGame(); monsters = [];
+  player.cls = CLASSES.find(function(c){ return c.name === '${cls}'; });
+  player.invincible = 0; player.hp = player.maxHp = 1000; setCameraMode('fp3d'); player.pitch = 0;
+  var t = { x: player.x, y: player.y, r: 20, type: 'fallentile', emoji: '⬜', color: '#e9e3cc', dmg: 10,
+            effect: 'knockback', duration: 0, label: 'CEILING TILE!', cooldown: 0 };
+  var hit = applyTrapToPlayer(t, player);
+  var hole = player._tileHole || 0;
+  for (var f = 0; f < 30; f++) { monsters = []; update(); }
+  player.pitch = ${look};
+  for (var f = 0; f < 5; f++) { monsters = []; update(); }
+  return JSON.stringify({ hit: hit, hole: hole, maps: getSpecialMaps() });
+})()`));
+setArcade({ specialMaps: ['backrooms'] });
+check(q(`isWorldUnlocked(findWorld('backrooms2'))`) === false, 'Floor 2 starts locked');
+let tr = tileRun('Scientist', 1.0);
+check(tr.hit && tr.hole === 0 && tr.maps.indexOf('backrooms2') < 0, 'a class that cannot build looks up and nothing happens');
+tr = tileRun('Builder', 0);
+check(tr.hit && tr.hole === 600 && tr.maps.indexOf('backrooms2') < 0, 'a Builder hit by a tile who does NOT look up gets nothing');
+setArcade({ specialMaps: ['backrooms'] });
+tr = tileRun('Builder', 1.0);
+check(tr.maps.indexOf('backrooms2') > -1, 'a Builder hit by a falling tile who looks up unlocks Floor 2', JSON.stringify(tr.maps));
+check(tr.maps.indexOf('backrooms') > -1, 'and keeps the Backrooms');
+setArcade({ specialMaps: ['backrooms'] });
+tr = tileRun('The Iron', 1.0);
+check(tr.maps.indexOf('backrooms2') > -1, 'The Iron (it builds Iron Walls) can find it too');
+// Looking up too late: the hole is gone after 10 s.
+setArcade({ specialMaps: ['backrooms'] });
+const late = JSON.parse(q(`(function(){
+  selectWorld('backrooms'); gameRunning=false; startGame(); monsters = [];
+  player.cls = CLASSES.find(function(c){ return c.name === 'Builder'; }); setCameraMode('fp3d'); player.pitch = 0;
+  player.invincible = 0; player.hp = player.maxHp = 1e6;
+  applyTrapToPlayer({ x: player.x, y: player.y, r: 20, type: 'fallentile', dmg: 0, effect: 'knockback', duration: 0, label: 'x', color: '#fff', cooldown: 0 }, player);
+  for (var f = 0; f < 620; f++) { monsters = []; update(); }
+  player.pitch = 1.0; for (var f = 0; f < 5; f++) { monsters = []; update(); }
+  return JSON.stringify(getSpecialMaps());
+})()`));
+check(late.indexOf('backrooms2') < 0, 'looking up after the hole is gone (10 s) does nothing');
+// Floor 2 is a playable concrete maze.
+setArcade({ specialMaps: ['backrooms', 'backrooms2'] });
+q(`selectWorld('backrooms2'); gameRunning=false; startGame();`);
+check(q(`currentWorld.id`) === 'backrooms2', 'Floor 2 can be selected and a run starts there');
+check(q(`buildings.every(function(b){ return b.st === 'concretemaze'; }) && buildings.length > 100`) === true, 'its walls are concrete maze walls');
+check(q(`BLDG_STYLES[worldStyleId(currentWorld)].maze`) === true && q(`groundArtOf(currentWorld)`) === 'wetconcrete', 'a maze, on wet concrete');
+check(q(`WORLDS.some(function(w){ return w.id === 'backrooms2'; })`) === false, 'and it is not on the wave ladder either');
 
 console.log('\n' + (ok ? 'SPECIAL MAPS PASS' : 'SPECIAL MAPS FAIL'));
 process.exit(ok ? 0 : 1);

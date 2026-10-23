@@ -152,7 +152,7 @@ const rows = q(`(function(){
 })()`);
 const data = JSON.parse(rows);
 
-check(data.length === 37 && data.some(d => d.id === 'backrooms'), 'all worlds generate, special maps included', data.length + ' worlds');
+check(data.length === 38 && data.some(d => d.id === 'backrooms') && data.some(d => d.id === 'backrooms2'), 'all worlds generate, special maps included', data.length + ' worlds');
 check(data.every(d => d.n > 100), 'every world fills its chunks', 'min ' + Math.min(...data.map(d=>d.n)) + ' buildings');
 check(data.every(d => d.styled), 'every building carries its style id');
 
@@ -321,7 +321,7 @@ const mons = JSON.parse(q(`(function(){
   currentWorld = ALL_WORLDS[0]; _themedCache.clear();
   return JSON.stringify(out);
 })()`));
-check(mons.length === 37, 'every world themes its monsters', mons.length + ' worlds');
+check(mons.length === 38, 'every world themes its monsters', mons.length + ' worlds');
 check(!mons.some(m => m.names.some(n => n.indexOf('MECHANICS-CHANGED') === 0)),
       'a re-skin changes the name and colour, never the mechanics');
 const allNames = mons.flatMap(m => m.names);
