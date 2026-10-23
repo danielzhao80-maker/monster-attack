@@ -385,5 +385,63 @@ check(q(`WORLD_CEILING.backrooms.h`) === 110 && q(`WORLD_CEILING.backrooms2.h`) 
       'both floors have a ceiling at about 3 m, and the walls reach it');
 check(q(`WORLDS.some(function(w){ return w.id === 'backrooms2'; })`) === false, 'and it is not on the wave ladder either');
 
+// ---- Floors 2–20 and the exits that unlock them ----
+check(q(`FLOOR_IDS.length`) === 21 && q(`FLOOR_IDS[0]`) === 'backrooms' && q(`FLOOR_IDS[20]`) === 'brfloor20', 'there are 21 Backrooms floors, 0 to 20');
+check(q(`FLOOR_IDS.every(function(id, n){ var w = findWorld(id); return w && w.special && w.floor === n && w.name.indexOf('Floor ' + n + ': ') === 0; })`) === true,
+      'each is a special map named "Floor N: ..."', q(`findWorld('brfloor7').name`) + ' / ' + q(`findWorld('brfloor20').name`));
+setArcade({ specialMaps: ['backrooms', 'backrooms2'] });
+check(q(`FLOOR_IDS.slice(2).every(function(id){ return !isWorldUnlocked(findWorld(id)); })`) === true, 'floors 2-20 start locked');
+check(q(`findWorld('brfloor5').hint`) === 'Find the exit on Floor 4', 'a locked floor says where its exit is');
+// Every floor plays.
+setArcade({ specialMaps: q(`JSON.stringify(FLOOR_IDS)`) && JSON.parse(q(`JSON.stringify(FLOOR_IDS)`)) });
+const plays = JSON.parse(q(`(function(){ var bad = [];
+  FLOOR_IDS.forEach(function(id){
+    try {
+      if (!selectWorld(id)) { bad.push(id + ': not selectable'); return; }
+      gameRunning = false; startGame(); monsters = [];
+      if (currentWorld.id !== id) bad.push(id + ': run is in ' + currentWorld.id);
+      if (buildings.length < 100) bad.push(id + ': only ' + buildings.length + ' pieces');
+      if (buildings.length > 4000) bad.push(id + ': ' + buildings.length + ' pieces');
+      if (ptInBld(player.x, player.y, player.r)) bad.push(id + ': starts inside a wall');
+      for (var f = 0; f < 20; f++) { update(); draw(); }
+    } catch (e) { bad.push(id + ': ' + e.message); }
+  });
+  return JSON.stringify(bad); })()`));
+check(plays.length === 0, 'every floor builds, starts clear and runs', plays.join('; ') || 'all 21');
+check(q(`BACKROOMS_FLOORS.filter(function(f){ return f.ceiling; }).every(function(f){ return WORLD_CEILING[f.id] && WORLD_CEILING[f.id].h === 110; })`) === true,
+      'the indoor floors have a ceiling');
+
+// The exit: Floor 1 -> Floor 2.
+setArcade({ specialMaps: ['backrooms', 'backrooms2'] });
+const ex = JSON.parse(q(`(function(){
+  selectWorld('backrooms2'); gameRunning = false; startGame(); monsters = []; __freezeMonsters = true;
+  var o = {};
+  wave = floorExitWave(1) - 1; tickFloorExit(); o.early = !!brExit;
+  wave = floorExitWave(1); tickFloorExit(); o.made = !!brExit;
+  if (brExit) { o.dist = Math.round(Math.hypot(brExit.x - player.x, brExit.y - player.y)); o.inWall = ptInBld(brExit.x, brExit.y, 30); o.next = brExit.next; }
+  player.x = brExit.x + 20; player.y = brExit.y; tickFloorExit();
+  o.done = brExit.done; o.maps = getSpecialMaps();
+  __freezeMonsters = false;
+  return JSON.stringify(o); })()`));
+check(ex.early === false, 'no exit before wave ' + q(`floorExitWave(1)`));
+check(ex.made && ex.dist >= 1100 && ex.dist <= 1600 && !ex.inWall, 'then an exit appears on open floor a walk away', ex.dist + ' units');
+check(ex.next === 'brfloor2' && ex.done && ex.maps.indexOf('brfloor2') > -1, 'walking into it unlocks Floor 2', JSON.stringify(ex.maps));
+// Higher floors need more waves, the top floor has no exit, and the Lobby keeps its tile secret.
+check(q(`floorExitWave(19)`) > q(`floorExitWave(2)`), 'higher floors need more waves', q(`floorExitWave(2)`) + ' -> ' + q(`floorExitWave(19)`));
+setArcade({ specialMaps: JSON.parse(q(`JSON.stringify(FLOOR_IDS)`)) });
+check(q(`(function(){ selectWorld('brfloor20'); gameRunning=false; startGame(); wave = 99; tickFloorExit(); return brExit; })()`) === null, 'Floor 20 is the top: no exit');
+check(q(`(function(){ selectWorld('backrooms'); gameRunning=false; startGame(); wave = 99; tickFloorExit(); return brExit; })()`) === null, 'the Lobby has no exit (its way up is the ceiling tile)');
+// An exit chain all the way up.
+setArcade({ specialMaps: ['backrooms', 'backrooms2'] });
+const chain = q(`(function(){ __freezeMonsters = true;
+  for (var n = 1; n < 20; n++) {
+    selectWorld(FLOOR_IDS[n]); gameRunning = false; startGame(); monsters = [];
+    wave = floorExitWave(n); tickFloorExit(); if (!brExit) return 'no exit on floor ' + n;
+    player.x = brExit.x; player.y = brExit.y; tickFloorExit();
+  }
+  __freezeMonsters = false;
+  return getSpecialMaps().length; })()`);
+check(chain === 21, 'climbing exit by exit reaches Floor 20', String(chain));
+
 console.log('\n' + (ok ? 'SPECIAL MAPS PASS' : 'SPECIAL MAPS FAIL'));
 process.exit(ok ? 0 : 1);

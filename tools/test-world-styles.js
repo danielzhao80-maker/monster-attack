@@ -152,7 +152,7 @@ const rows = q(`(function(){
 })()`);
 const data = JSON.parse(rows);
 
-check(data.length === 38 && data.some(d => d.id === 'backrooms') && data.some(d => d.id === 'backrooms2'), 'all worlds generate, special maps included', data.length + ' worlds');
+check(data.length === 57 && data.some(d => d.id === 'backrooms') && data.some(d => d.id === 'backrooms2') && data.some(d => d.id === 'brfloor20'), 'all worlds generate, special maps included', data.length + ' worlds');
 check(data.every(d => d.n > 100), 'every world fills its chunks', 'min ' + Math.min(...data.map(d=>d.n)) + ' buildings');
 check(data.every(d => d.styled), 'every building carries its style id');
 
@@ -166,8 +166,13 @@ const styleIds = data.map(d => d.style);
 const dupStyles = styleIds.filter((v,i) => styleIds.indexOf(v) !== i);
 check(dupStyles.length === 0, 'every world has its OWN structure style, none shared',
       dupStyles.length ? 'shared: ' + [...new Set(dupStyles)].join(', ') : '30 unique');
-const dupBodies = bodies.length;
-check(dupBodies === data.length, 'and its own 3D body', dupBodies + ' distinct bodies across ' + data.length + ' worlds');
+// Backrooms floors 2–20 are one building at different levels: they share the 'brwall' body and
+// differ by facade, colours, ground, ceiling and layout. Every OTHER world has its own body.
+const brFloors = data.filter(d => /^brfloor\d+$/.test(d.id));
+const others = data.filter(d => !/^brfloor\d+$/.test(d.id));
+const dupBodies = new Set(others.map(d => d.body)).size;
+check(dupBodies === others.length, 'and its own 3D body', dupBodies + ' distinct bodies across ' + others.length + ' worlds');
+check(brFloors.length === 19 && brFloors.every(d => d.body === 'brwall'), 'Backrooms floors 2-20 share the Backrooms wall body', brFloors.length + ' floors');
 
 // A body with no branch in the 3D dispatcher renders NOTHING - the structures simply vanish.
 const missing3D = [...new Set(data.map(d => d.body))].filter(bd => !new RegExp("kind === '" + bd + "'").test(code) && bd !== 'box');
@@ -321,7 +326,7 @@ const mons = JSON.parse(q(`(function(){
   currentWorld = ALL_WORLDS[0]; _themedCache.clear();
   return JSON.stringify(out);
 })()`));
-check(mons.length === 38, 'every world themes its monsters', mons.length + ' worlds');
+check(mons.length === 57, 'every world themes its monsters', mons.length + ' worlds');
 check(!mons.some(m => m.names.some(n => n.indexOf('MECHANICS-CHANGED') === 0)),
       'a re-skin changes the name and colour, never the mechanics');
 const allNames = mons.flatMap(m => m.names);
@@ -418,7 +423,9 @@ check(buildable === '', 'every prop a world asks for can actually be built',
       buildable ? 'MISSING: ' + buildable : 'all ' + allProps.length + ' build');
 // City furniture must not turn up where it makes no sense.
 const cityStuff = ['hydrant','mailbox','bench'];
-const wrong = pd.filter(p => p.id !== 'city' && p.set.some(k => cityStuff.indexOf(k) > -1));
+// ...or a Backrooms floor that IS a town (The Suburbs, The Endless City, Memory Lane).
+const towns = JSON.parse(q(`JSON.stringify(BACKROOMS_FLOORS.filter(function(f){ return f.layout === 'city'; }).map(function(f){ return f.id; }))`));
+const wrong = pd.filter(p => p.id !== 'city' && towns.indexOf(p.id) < 0 && p.set.some(k => cityStuff.indexOf(k) > -1));
 check(wrong.length === 0, 'no fire hydrants in the Arctic',
       wrong.length ? wrong.map(w => w.id).join(', ') : 'city furniture stays in the city');
 // Only lamps may claim one of the scene's three dynamic lights.

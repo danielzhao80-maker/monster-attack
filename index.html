@@ -1913,6 +1913,137 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     const W = canvas.width, H = canvas.height;
     // World is 10x bigger than the viewport — camera follows the player
     const WORLD_W = 9000, WORLD_H = 5500;
+
+    // ======================== THE BACKROOMS: FLOORS 2–20 ========================
+    // Floor 0 (The Lobby, 'backrooms') and Floor 1 (Parking Zone, 'backrooms2') are written out in
+    // full further down. Floors 2–20 are data: each one becomes a special map, and every per-world
+    // table (style, ground, sky, monsters, props, ambience, ceiling) picks its row up from here.
+    // layout: 'maze' (buildMazeChunk; `loops` knocks out extra walls — high = open office rooms),
+    //         'pillars' (buildGarageChunk with no cars), 'city' / 'open' (scattered blocks, no lid).
+    // Unlock: on Floor N (N ≥ 1) survive to wave floorExitWave(N); an EXIT appears nearby and
+    // walking into it unlocks Floor N+1 (tickFloorExit). Floor 0 → 1 is the falling-tile secret.
+    const BACKROOMS_FLOORS = [
+        { n:2,  name:'Pipe Dreams',        emoji:'🔧', layout:'maze', loops:0.12, facade:'metal',     cap:'#3d3f42', pipes:true,
+          walls:['#5b5d60','#55575a','#606366'], ground:'#3e3f41', groundAlt:'#4a4b4d', art:'grate',
+          ceiling:{ art:'garageslab', tint:0x9a7a66 }, fog:'#2a2622', fogDensity:0.0015, sky:{ top:0x1e1c1a, bot:0x3a302a }, fx:'drips', bed:'hum',
+          monsters:[['Hound','🐕','#5a4a3a'],['Steam Wraith','♨️','#d0d0d0'],['Pipe Crawler','🐛','#7a5236'],['Boiler Brute','🥵','#c0602a']],
+          traps:[['steam','♨️','#dfe6e9',8,'stun',90,'STEAM BURST!','electric'],['leak','💧','#4a5560',4,'slow',180,'BOILING LEAK!','pit']],
+          props:['pipe','barrel','crate'], bosses:['Furnace Titan','Scrap Swarm'], exit:['🪜','a maintenance ladder'] },
+        { n:3,  name:'Electrical Station', emoji:'⚡', layout:'maze', loops:0.10, facade:'metal',     cap:'#2f3236', pipes:true,
+          walls:['#6d7175','#73777b','#686c70'], ground:'#4a4d50', groundAlt:'#55585b', art:'grate',
+          ceiling:{ art:'garageslab', tint:0x8f9bb0 }, fog:'#1d2128', fogDensity:0.0014, sky:{ top:0x101418, bot:0x2a3038 }, fx:'sparks', bed:'reactor',
+          monsters:[['Spark','⚡','#ffe066'],['Wire Snake','🐍','#2d3436'],['Fuse Box','🔌','#7f8c8d'],['Live Wire','🧟','#74b9ff']],
+          traps:[['livewire','⚡','#ffe066',8,'stun',100,'ZAPPED!','electric'],['transformer','🔋','#74b9ff',10,'knockback',0,'TRANSFORMER BLOWS!','boom']],
+          props:['pipe','barrel','beacon'], bosses:['Firewall Titan','Thunder Roc'], exit:['🛗','a service lift'] },
+        { n:4,  name:'Abandoned Office',   emoji:'🗄️', layout:'maze', loops:0.38, facade:'smooth',    cap:'#a5a29a',
+          walls:['#c9c6bd','#d2cfc6','#bfbcb3'], ground:'#6b6f75', groundAlt:'#777b81', art:'carpet',
+          ceiling:{ art:'droptiles', tint:0xf2f2f2 }, fog:'#cfd2d6', fogDensity:0.0011, sky:{ top:0xd8dade, bot:0xeef0f2 }, fx:'dust', bed:'room',
+          monsters:[['Smiler','😁','#f5f0d0'],['Clerk','🧑‍💼','#8395a7'],['Shredder','📄','#dfe6e9'],['Printer Beast','🖨️','#576574']],
+          traps:[['papers','📄','#dfe6e9',3,'slow',160,'SLIPPED ON PAPERS!','sand'],['cabinet','🗄️','#7f8c8d',10,'knockback',0,'FILING CABINET!','boom']],
+          props:['officeChair','crate','ceilingTile'], bosses:['The Entity','Ink Blot'], exit:['🚪','an office door marked EXIT'] },
+        { n:5,  name:'Terror Hotel',       emoji:'🏨', layout:'maze', loops:0.15, facade:'wallpaper', cap:'#4a1418',
+          walls:['#6e1f24','#7a252b','#64191e'], ground:'#5a1a1c', groundAlt:'#682024', art:'carpet',
+          ceiling:{ art:'droptiles', tint:0x9a7050 }, fog:'#2a0f10', fogDensity:0.0016, sky:{ top:0x1a0808, bot:0x3a1414 }, fx:'mist', bed:'room',
+          monsters:[['Bellhop','🛎️','#c0392b'],['Maid','🧹','#2d3436'],['Room Service','🍽️','#dfe6e9'],['Guest','🧟','#6d214f']],
+          traps:[['luggage','🧳','#8e5a3c',8,'knockback',0,'RUNAWAY LUGGAGE!','boom'],['doorbell','🛎️','#feca57',5,'stun',90,'DING!','electric']],
+          props:['lantern','officeChair','pot'], bosses:['Mansion Wraith','Chandelier Spider'], exit:['🛗','the hotel lift'] },
+        { n:6,  name:'Lights Out',         emoji:'🌑', layout:'maze', loops:0.10, facade:'concrete',  cap:'#0e0e10',
+          walls:['#1a1a1c','#202022','#161618'], ground:'#151517', groundAlt:'#1c1c1e', art:'wetconcrete',
+          ceiling:{ art:'droptiles', tint:0x262626 }, fog:'#000000', fogDensity:0.0030, sky:{ top:0x000000, bot:0x050505 }, fx:'motes', bed:'vacuum',
+          monsters:[['Shadow','👤','#111111'],['Eyes','👀','#f1f2f6'],['Crawler','🕷️','#2f3542'],['Lurker','🌑','#57606f']],
+          traps:[['darkpit','🕳️','#111111',6,'slow',200,'SOMETHING GRABS YOU!','pit'],['flash','💡','#fff3b0',4,'stun',120,'BLINDED!','electric']],
+          props:['exitSign','crate','barrel'], bosses:['Night Terror','The Entity'], exit:['🔦','a lit doorway'] },
+        { n:7,  name:'Thalassophobia',     emoji:'🌊', layout:'pillars', facade:'concrete',            cap:'#1d4a5a',
+          walls:['#2f6f85','#2a6478','#357a92'], ground:'#1e5a73', groundAlt:'#246a86', art:'water',
+          ceiling:null, fog:'#0f3a4d', fogDensity:0.0016, sky:{ top:0x0b2230, bot:0x174a60 }, fx:'bubbles', bed:'surf',
+          monsters:[['Eel','🐍','#0984e3'],['Drowned','🧟','#2d6a7a'],['Jellyfish','🪼','#a29bfe'],['Deep One','🐟','#1e3799']],
+          traps:[['undertow','🌊','#0984e3',5,'slow',220,'UNDERTOW!','pit'],['jelly','🪼','#a29bfe',6,'poison',300,'STUNG!','sand']],
+          props:['kelp','shell','anemone'], bosses:['Kraken','Leviathan'], exit:['🛟','a hatch above the water'] },
+        { n:8,  name:'Cave System',        emoji:'🦇', layout:'maze', loops:0.28, facade:'stone',     cap:'#3a322b',
+          walls:['#5a4f45','#4e443b','#66594d'], ground:'#3e362f', groundAlt:'#4a4138', art:'rock',
+          ceiling:{ art:'garageslab', tint:0x5a4c40 }, fog:'#1c1814', fogDensity:0.0018, sky:{ top:0x0c0a08, bot:0x2a221c }, fx:'drips', bed:'cavern',
+          monsters:[['Bat','🦇','#2d3436'],['Mole Man','🐀','#6d4c41'],['Rock Crab','🦀','#8d6e63'],['Glowworm','🐛','#c6ff00']],
+          traps:[['rockfall','🪨','#8d6e63',10,'knockback',0,'ROCKFALL!','boom'],['sinkhole','🕳️','#3e362f',5,'slow',200,'SINKHOLE!','pit']],
+          props:['stalag','rock','oreRock'], bosses:['Cave Golem','Deep Crawler'], exit:['🪢','a rope up a crack'] },
+        { n:9,  name:'The Suburbs',        emoji:'🏡', layout:'city', w:[110,180], hgt:[80,120], gap:120, facade:'windows', cap:'#6d4c41',
+          walls:['#c8b89a','#a7b8c8','#c8a7a7','#b5c8a7'], ground:'#3d5a32', groundAlt:'#466a3a', art:'grass',
+          ceiling:null, fog:'#141a30', fogDensity:0.0012, sky:{ top:0x0a0f24, bot:0x23304f }, fx:'leaves', bed:'wind',
+          monsters:[['Neighbour','🧍','#7f8c8d'],['Lawn Gnome','🧙','#e74c3c'],['Mailman','📮','#2980b9'],['Stray Dog','🐕','#8d6e63']],
+          traps:[['sprinkler','💦','#74b9ff',3,'slow',150,'SPRINKLER!','pit'],['rake','🧹','#8d6e63',8,'stun',80,'STEPPED ON A RAKE!','spike']],
+          props:['mailbox','hydrant','lamppost'], bosses:['Scarecrow King','Night Terror'], exit:['🚪','a front door left open'] },
+        { n:10, name:'Field of Wheat',     emoji:'🌾', layout:'open', w:[50,90], hgt:[40,60], gap:140, facade:'planks', cap:'#a88a3a',
+          walls:['#d6b65a','#c9a94e','#e0c068'], ground:'#b89a40', groundAlt:'#c8aa50', art:'deadgrass',
+          ceiling:null, fog:'#cfc6a0', fogDensity:0.0010, sky:{ top:0x8fa3b5, bot:0xd8d0b0 }, fx:'dust', bed:'wind',
+          monsters:[['Scarecrow','🧑‍🌾','#a1887f'],['Crow','🐦‍⬛','#212121'],['Harvester','🚜','#c0392b'],['Field Rat','🐀','#6d4c41']],
+          traps:[['thresher','🌾','#d6b65a',9,'knockback',0,'THRESHER!','boom'],['burrow','🕳️','#6d4c41',4,'slow',180,'TRIPPED IN A BURROW!','pit']],
+          props:['haybale','deadbush','log'], bosses:['Scarecrow King','Hive Queen'], exit:['🏚️','a barn door'] },
+        { n:11, name:'The Endless City',   emoji:'🏙️', layout:'city', w:[160,300], hgt:[300,600], gap:110, facade:'windows', cap:'#3d4a55',
+          walls:['#5d6d7e','#85929e','#4d5656','#7b7d7d'], ground:'#3a3a3c', groundAlt:'#444446', art:'asphalt',
+          ceiling:null, fog:'#4a4a55', fogDensity:0.0009, sky:{ top:0x2c3e50, bot:0xe08e5a }, fx:'dust', bed:'room',
+          monsters:[['Commuter','🧍','#636e72'],['Taxi Ghost','🚕','#f1c40f'],['Pigeon','🐦','#95a5a6'],['Billboard','🪧','#e17055']],
+          traps:[['manhole','🕳️','#2d3436',6,'slow',180,'OPEN MANHOLE!','pit'],['traffic','🚦','#e74c3c',10,'knockback',0,'HONK!','boom']],
+          props:['lamppost','hydrant','bench'], bosses:['Crane Titan','Data Wraith'], exit:['🚇','a subway entrance'] },
+        { n:12, name:'Matrix',             emoji:'🟩', layout:'maze', loops:0.10, facade:'stripes',   cap:'#00ff41',
+          walls:['#0b1f0b','#0e2a0e','#081808'], ground:'#050f05', groundAlt:'#081a08', art:'grate',
+          ceiling:null, fog:'#001a00', fogDensity:0.0016, sky:{ top:0x000000, bot:0x002a0a }, fx:'sparks', bed:'reactor',
+          monsters:[['Agent','🕴️','#000000'],['Glitch','👾','#00ff41'],['Sentinel','🦑','#2d3436'],['Bug','🐞','#00b894']],
+          traps:[['glitch','👾','#00ff41',6,'stun',100,'GLITCHED!','electric'],['loop','🔁','#00b894',4,'slow',200,'DÉJÀ VU!','sand']],
+          props:['neonpost','beacon','crystalCluster'], bosses:['Data Wraith','Firewall Titan'], exit:['☎️','a ringing phone'] },
+        { n:13, name:'Infinite Apartments',emoji:'🏢', layout:'maze', loops:0.32, facade:'wallpaper', cap:'#a89880',
+          walls:['#d8c9b0','#cdbda3','#e0d2ba'], ground:'#7a5a3a', groundAlt:'#86664a', art:'carpet',
+          ceiling:{ art:'droptiles', tint:0xfff1d8 }, fog:'#d9cbb0', fogDensity:0.0011, sky:{ top:0xd9cbb0, bot:0xeee2cc }, fx:'dust', bed:'room',
+          monsters:[['Tenant','🧑','#a0522d'],['Landlord','🧔','#6c5ce7'],['Cockroach','🪳','#5d4037'],['TV Static','📺','#b2bec3']],
+          traps:[['lego','🧱','#e74c3c',5,'stun',80,'STEPPED ON A BRICK!','spike'],['spill','🥤','#6d4c41',3,'slow',160,'STICKY FLOOR!','pit']],
+          props:['officeChair','pot','lantern'], bosses:['Mansion Wraith','The Entity'], exit:['🚪','apartment 13B'] },
+        { n:14, name:'Paradise',           emoji:'🌤️', layout:'pillars', facade:'smooth',             cap:'#f1e3b0',
+          walls:['#f5f6fa','#ecf0f1','#ffffff'], ground:'#e8f4fb', groundAlt:'#f2f9fd', art:'cloudfloor',
+          ceiling:null, fog:'#eaf6ff', fogDensity:0.0008, sky:{ top:0x8fd3ff, bot:0xffffff }, fx:'petals', bed:'vacuum',
+          monsters:[['Angel','👼','#fff9c4'],['Dove','🕊️','#ffffff'],['Halo','😇','#ffeaa7'],['Cherub','🏹','#fab1a0']],
+          traps:[['cloud','☁️','#ffffff',3,'slow',160,'LOST IN A CLOUD!','sand'],['harp','🎵','#ffeaa7',4,'stun',90,'LULLED!','electric']],
+          props:['brokenPillar','fern','pot'], bosses:['Cloud Leviathan','Star Titan'], exit:['⛩️','a golden gate'] },
+        { n:15, name:'Concrete Halls',     emoji:'🧱', layout:'pillars', facade:'concrete',            cap:'#707070',
+          walls:['#9a9a96','#a3a39f','#8f8f8b'], ground:'#7a7a76', groundAlt:'#858581', art:'flagstone',
+          ceiling:{ art:'garageslab', tint:0xc0c0c0 }, fog:'#8a8a86', fogDensity:0.0012, sky:{ top:0x6a6a66, bot:0x9a9a96 }, fx:'dust', bed:'hum',
+          monsters:[['Statue','🗿','#95a5a6'],['Echo','🔊','#dfe6e9'],['Concrete Golem','🧱','#7f8c8d'],['Dust Wraith','🌫️','#b2bec3']],
+          traps:[['rebar','🔩','#7f8c8d',8,'stun',80,'REBAR!','spike'],['slab','🧱','#9a9a96',11,'knockback',0,'FALLING SLAB!','boom']],
+          props:['brokenPillar','crate','rock'], bosses:['Ancient Guardian','Peak Golem'], exit:['🪜','a stairwell'] },
+        { n:16, name:'Neon Arcade',        emoji:'🕹️', layout:'maze', loops:0.22, facade:'stripes',   cap:'#ff2fd0',
+          walls:['#2b1055','#3a0ca3','#240046'], ground:'#1a0a2e', groundAlt:'#240f3e', art:'starfield',
+          ceiling:{ art:'droptiles', tint:0x7a3cff }, fog:'#1a0033', fogDensity:0.0013, sky:{ top:0x0d001a, bot:0x2a0050 }, fx:'confetti', bed:'carnival',
+          monsters:[['Pac Ghost','👻','#ff6b81'],['Claw Machine','🦾','#a29bfe'],['Ticket Eater','🎟️','#feca57'],['Mascot','🐻','#e17055']],
+          traps:[['tokens','🪙','#feca57',3,'slow',150,'SLIPPED ON TOKENS!','sand'],['gameover','💥','#ff2fd0',9,'knockback',0,'GAME OVER!','boom']],
+          props:['neonpost','chipstack','balloon'], bosses:['High Roller','Jack-in-the-Box'], exit:['🕹️','an arcade cabinet that opens'] },
+        { n:17, name:'The Hospital',       emoji:'🏥', layout:'maze', loops:0.12, facade:'smooth',    cap:'#b8c8c6',
+          walls:['#e8f0ef','#dfe9e8','#f0f6f5'], ground:'#cfd8d6', groundAlt:'#d9e2e0', art:'mirrorfloor',
+          ceiling:{ art:'droptiles', tint:0xffffff }, fog:'#d8e4e2', fogDensity:0.0012, sky:{ top:0xd8e4e2, bot:0xf0f6f5 }, fx:'motes', bed:'fluoro',
+          monsters:[['Patient','🧟','#b2bec3'],['Nurse','👩‍⚕️','#fd79a8'],['Gurney','🛏️','#dfe6e9'],['Surgeon','🔪','#00b894']],
+          traps:[['syringe','💉','#74b9ff',6,'poison',300,'INJECTED!','spike'],['wetfloor','⚠️','#feca57',3,'slow',170,'WET FLOOR!','pit']],
+          props:['officeChair','crate','exitSign'], bosses:['Test Subject X','Prototype 9'], exit:['🛗','a stretcher lift'] },
+        { n:18, name:'Memory Lane',        emoji:'🎞️', layout:'city', w:[100,170], hgt:[70,120], gap:130, facade:'planks', cap:'#8d6e63',
+          walls:['#d4a373','#ccd5ae','#e9edc9','#faedcd'], ground:'#6b705c', groundAlt:'#777c68', art:'grass',
+          ceiling:null, fog:'#e8c8b8', fogDensity:0.0013, sky:{ top:0xffb4a2, bot:0xffe5d9 }, fx:'petals', bed:'wind',
+          monsters:[['Old Friend','🧒','#ffd166'],['Lost Toy','🧸','#ff9f9f'],['Faded Photo','🖼️','#d4a373'],['Ice Cream Van','🍦','#a8dadc']],
+          traps:[['nostalgia','🎞️','#d4a373',3,'stun',100,'LOST IN A MEMORY!','sand'],['hopscotch','🔢','#ffd166',3,'slow',140,'HOPSCOTCH!','pit']],
+          props:['bench','lamppost','mailbox'], bosses:['The Sandman','Wind-Up Titan'], exit:['🎈','a red balloon'] },
+        { n:19, name:'The Library',        emoji:'📚', layout:'maze', loops:0.18, facade:'planks',    cap:'#3a2414',
+          walls:['#5c3a21','#6b4428','#4e311b'], ground:'#5a2e2e', groundAlt:'#663636', art:'carpet',
+          ceiling:{ art:'droptiles', tint:0x9a7a50 }, fog:'#2a1a10', fogDensity:0.0014, sky:{ top:0x1a100a, bot:0x3a2a1a }, fx:'dust', bed:'room',
+          monsters:[['Bookworm','🐛','#a3cb38'],['Librarian','🤫','#6c5ce7'],['Flying Book','📖','#f5e8cc'],['Ink Spirit','🖋️','#2d3436']],
+          traps:[['shush','🤫','#6c5ce7',4,'stun',100,'SHHHH!','electric'],['bookfall','📚','#6b4428',9,'knockback',0,'BOOKS FALL!','boom']],
+          props:['lantern','stoneLantern','crate'], bosses:['The Author','Ink Blot'], exit:['📕','a book that is a door'] },
+        { n:20, name:'The Void',           emoji:'🌌', layout:'open', w:[40,80], hgt:[200,400], gap:150, facade:'smooth', cap:'#1a1a24',
+          walls:['#0d0d12','#14141c','#101018'], ground:'#05050a', groundAlt:'#0a0a12', art:'starfield',
+          ceiling:null, fog:'#000000', fogDensity:0.0010, sky:{ top:0x000000, bot:0x0b0b1a }, fx:'stardust', bed:'vacuum',
+          monsters:[['Nothing','⬛','#0d0d0d'],['Wanderer','🚶','#636e72'],['Star Eater','🌠','#a29bfe'],['Last One','👁️','#dfe6e9']],
+          traps:[['nullzone','⬛','#000000',6,'slow',220,'NOTHING!','pit'],['blink','✨','#dfe6e9',5,'stun',100,'BLINK!','electric']],
+          props:['obsidian','crystalCluster','beacon'], bosses:['Null Titan','The Devourer'], exit:null },
+    ].map(f => Object.assign(f, { id: 'brfloor' + f.n }));
+    // Every Backrooms floor in order, Floor 0 first. FLOOR_EXITS: what the way up looks like.
+    const FLOOR_IDS = ['backrooms', 'backrooms2'].concat(BACKROOMS_FLOORS.map(f => f.id));
+    const FLOOR_EXITS = Object.assign({ backrooms2: ['🪜', 'a stairwell door'] },
+        Object.fromEntries(BACKROOMS_FLOORS.filter(f => f.exit).map(f => [f.id, f.exit])));
+    const _brRows = (pick) => Object.fromEntries(BACKROOMS_FLOORS.map(f => [f.id, pick(f)]));
+
     let camera = { x: 0, y: 0 };
     function updateCamera() {
         if (!player) return;
@@ -2098,6 +2229,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             dream:'vacuum',  mirror:'vacuum',   astral:'vacuum',
             clockwork:'hum', grove:'jungle',    storybook:'room',
             backrooms:'fluoro',   backrooms2:'hum',
+            ..._brRows(f => f.bed),
         };
         let src = null, filt = null, gain = null, lfo = null, lfoGain = null, drone = null;
         let evTimer = null, current = null, running = false;
@@ -2418,6 +2550,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         dream:'stardust', mirror:'stardust', astral:'stardust',
         clockwork:'sparks', grove:'spores',  storybook:'petals',
         backrooms:'motes',  backrooms2:'drips',
+        ..._brRows(f => f.fx),
         city:null,                            // clear air over an ordinary city
     };
     function worldFxKind(w) { const k = w && WORLD_FX[w.id]; return k ? FX_KINDS[k] : null; }
@@ -2581,6 +2714,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         astral:    [['Starchill','❄️','#b39ddb'],['Comet','☄️','#d1c4e9'],['Warden Rune','🔯','#7e57c2'],['Wailing Oracle','🔮','#9575cd']],
         // ---- special maps ----
         backrooms: [['Smiler','😁','#f5f0d0'],['Partygoer','🎈','#ff9f43'],['Skin-Stealer','🧍','#b8a07a'],['Hound','🐕','#6b5b4a']],
+        ..._brRows(f => f.monsters),
         backrooms2:[['Faceling','🫥','#c8c2b4'],['Death Moth','🦋','#7a6f5a'],['Clump','🫠','#8a5a4a'],['Wretch','🧟','#6e6a5e']],
     };
     // Which base each slot re-skins, in order.
@@ -7065,8 +7199,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         }
         // Loops.
         for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
-            if (i < nx-1 && rnd() < 0.10) east[i][j] = true;
-            if (j < ny-1 && rnd() < 0.10) south[i][j] = true;
+            if (i < nx-1 && rnd() < (S.loops ?? 0.10)) east[i][j] = true;
+            if (j < ny-1 && rnd() < (S.loops ?? 0.10)) south[i][j] = true;
         }
         // The starting hall: the 3×3 rooms around the middle of the chunk.
         const ci = Math.floor(nx / 2), cj = Math.floor(ny / 2);
@@ -7117,7 +7251,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             // Leave the middle, where a run starts, free of cars.
             if (Math.abs(px + C/2 - WORLD_W/2) < C * 1.5 && Math.abs(py - WORLD_H/2) < C * 1.5) continue;
             for (const side of [-1, 1]) for (let k = 0; k < 4; k++) {
-                if (rnd() >= 0.05) continue;
+                if (rnd() >= (S.cars ?? 0.05)) continue;
                 const bx = px + 28 + k * GARAGE_BAY + 20;
                 add(bx, side < 0 ? py - GARAGE_DEPTH : py + 20, 70, 150,
                     { car: true, carColor: CAR_COLS[Math.floor(rnd() * CAR_COLS.length)], carFacing: side });
@@ -7312,6 +7446,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Floor 1, the Parking Zone: an endless underground car park — a grid of concrete pillars,
         // parked cars in painted bays, the odd dividing wall (buildGarageChunk). Not a maze.
         concretemaze: { body:'concretewall', w:[22,360], h:[22,360], hgt:[110,110], tall:0, tallHgt:[110,110], facade:'concrete', gap:0, garage:true },
+        // Floors 2–20 ('br2'…'br20'), built from BACKROOMS_FLOORS. Indoor layouts reach the 110 ceiling.
+        ...Object.fromEntries(BACKROOMS_FLOORS.map(f => ['br' + f.n,
+            f.layout === 'maze'    ? { body:'brwall', w:[22,360], h:[22,360], hgt:[110,110], tall:0, tallHgt:[110,110], facade:f.facade, gap:0, maze:true, loops:f.loops, cap:f.cap, pipes:!!f.pipes } :
+            f.layout === 'pillars' ? { body:'brwall', w:[44,44],  h:[44,44],  hgt:[110,110], tall:0, tallHgt:[110,110], facade:f.facade, gap:0, garage:true, cars:0, cap:f.cap } :
+                                     { body:'brwall', w:f.w, h:f.w, hgt:f.hgt, tall:0.12, tallHgt:[Math.round(f.hgt[1]*1.5), Math.round(f.hgt[1]*2)], facade:f.facade, gap:f.gap, cap:f.cap }])),
     };
     // Which archetype each world builds in. Anything unlisted falls back to 'tower'.
     const WORLD_BLDG_STYLE = {
@@ -7328,6 +7467,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         dream:'dreamdoor', clockwork:'gear',  mirror:'mirrorshard',
         grove:'fairytree', storybook:'popup', astral:'runestone',
         backrooms:'backroom', backrooms2:'concretemaze',
+        ..._brRows(f => 'br' + f.n),
     };
 
     function worldStyleId(w) { return (w && WORLD_BLDG_STYLE[w.id]) || 'tower'; }
@@ -7351,7 +7491,7 @@ const col = b.color || BLDG_COLORS[0];
             skyscraper:'box', works:'box', pagoda:'box',
             dreamdoor:'box', popup:'box', gear:'dome',
             mirrorshard:'shard', runestone:'shard', fairytree:'tree',
-            concretewall:'backroom',
+            concretewall:'backroom', brwall:'backroom',
         })[_rawKind] || _rawKind;
         const mx = b.x + b.w/2, my = b.y + b.h/2;
         const msp = Math.min(b.w, b.h);
@@ -7624,6 +7764,7 @@ const col = b.color || BLDG_COLORS[0];
         { st:'runestone',  emoji:'\ud83d\udd2e', name:'Runestone'  },
         { st:'backroom',   emoji:'\ud83d\udfe8', name:'Office Wall' },
         { st:'concretemaze', emoji:'\u2b1c', name:'Concrete Wall' },
+        ...BACKROOMS_FLOORS.map(f => ({ st: 'br' + f.n, emoji: f.emoji, name: f.name })),   // Backrooms floors 2–20
     ];
     function mmActiveStyle() { return mmStyle || worldStyleId(currentWorld); }
 
@@ -12073,6 +12214,7 @@ const col = b.color || BLDG_COLORS[0];
         refreshChunks();
         astralSecretTick();   // Astral Temple secret spot (invisible) — places it and drops a faint sparkle
         tickTileHole();       // The Lobby: looking up through a fallen tile's hole unlocks Floor 1
+        tickFloorExit();      // Floors 1–19: survive, then reach the exit to unlock the next floor
 
         // Timers
         if (p.frozen > 0) { p.frozen--; if (p.frozen===0) p.disableImmune = 120; }
@@ -15840,6 +15982,7 @@ const col = b.color || BLDG_COLORS[0];
             sprites.push({ x:pk.x, y:pk.y, size: 22, emoji: e, hover: 6 });
         }
         for (const t of traps) sprites.push({ x:t.x, y:t.y, size: t.r*1.8, emoji: t.emoji, color: t.color });
+        if (brExit && !brExit.done) sprites.push({ x:brExit.x, y:brExit.y, size: 60, emoji: brExit.emoji, color: '#feca57' });
         for (const a of allies)   sprites.push({ x:a.x, y:a.y, size: 34, emoji: SUMMON_EMOJI[summonKind(a)], color: FRIEND_COL });
         for (const tu of turrets) sprites.push({ x:tu.x, y:tu.y, size: 34, emoji: '🤖' });
         for (const b of bullets)  sprites.push({ x:b.x, y:b.y, size: 14, emoji: b.bemoji || '•', color: b.color || '#ffcc00', hover: 22 });
@@ -16179,6 +16322,8 @@ const col = b.color || BLDG_COLORS[0];
     const WORLD_CEILING = {
         backrooms:  { h: 110, art: 'droptiles', tile: 240 },
         backrooms2: { h: 110, art: 'garageslab', tile: 500 },
+        ...Object.fromEntries(BACKROOMS_FLOORS.filter(f => f.ceiling).map(f => [f.id,
+            { h: 110, art: f.ceiling.art, tile: f.ceiling.art === 'droptiles' ? 240 : 500, tint: f.ceiling.tint }])),
     };
     function makeCeilingTexture(art) {
         const S = 256, c = document.createElement('canvas'); c.width = S; c.height = S;
@@ -16210,19 +16355,42 @@ const col = b.color || BLDG_COLORS[0];
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
         return t;
     }
+    // The floor exit in 3D: a dark door frame around a glowing doorway, turned to face the player,
+    // with a faint shaft of light so it shows down a corridor. Self-lit; no real lights.
+    function updateExit3D() {
+        if (!_three) return;
+        let g = _three.exitMesh;
+        const show = brExit && !brExit.done;
+        if (!show) { if (g) g.visible = false; return; }
+        if (!g) {
+            g = new THREE.Group();
+            const frameM = new THREE.MeshStandardMaterial({ color: 0x2d2a26, roughness: 0.8 });
+            const glowM = new THREE.MeshBasicMaterial({ color: 0xfff2a8 });
+            const beamM = new THREE.MeshBasicMaterial({ color: 0xfff2a8, transparent: true, opacity: 0.18, depthWrite: false });
+            for (const sx of [-30, 30]) { const post = new THREE.Mesh(new THREE.BoxGeometry(8, 90, 8), frameM); post.position.set(sx, 45, 0); g.add(post); }
+            const lintel = new THREE.Mesh(new THREE.BoxGeometry(68, 8, 8), frameM); lintel.position.set(0, 94, 0); g.add(lintel);
+            const door = new THREE.Mesh(new THREE.PlaneGeometry(52, 88), glowM); door.position.set(0, 45, 0); g.add(door);
+            const beam = new THREE.Mesh(new THREE.CylinderGeometry(40, 40, 400, 16, 1, true), beamM); beam.position.set(0, 200, 0); g.add(beam);
+            _three.scene.add(g); _three.exitMesh = g;
+        }
+        g.visible = true;
+        g.position.set(brExit.x, 0, brExit.y);
+        if (player) g.rotation.y = Math.atan2(player.x - brExit.x, player.y - brExit.y);
+    }
     function updateCeiling3D() {
         if (!_three || !player) return;
         const cfg = WORLD_CEILING[currentWorld && currentWorld.id];
         let mesh = _three.ceiling;
         if (!cfg) { if (mesh) mesh.visible = false; return; }
-        if (!mesh || _three._ceilArt !== cfg.art) {
+        const ceilKey = cfg.art + '|' + (cfg.tint ?? '');
+        if (!mesh || _three._ceilArt !== ceilKey) {
             if (mesh) { _three.scene.remove(mesh); mesh.material.map && mesh.material.map.dispose(); mesh.material.dispose(); }
             const size = 12000;
             const tex = makeCeilingTexture(cfg.art); tex.repeat.set(size / cfg.tile, size / cfg.tile);
-            mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+            mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, color: cfg.tint ?? 0xffffff }));
             mesh.rotation.x = Math.PI/2;                 // facing down at the player
             _three.scene.add(mesh);
-            _three.ceiling = mesh; _three._ceilArt = cfg.art;
+            _three.ceiling = mesh; _three._ceilArt = ceilKey;
         }
         mesh.visible = true;
         // Snap by whole tiles so the pattern stays put on the world as the lid follows the player.
@@ -16354,6 +16522,7 @@ const col = b.color || BLDG_COLORS[0];
         grove:'mossglow',  storybook:'paper', astral:'runefloor',
         backrooms:'dampcarpet',   // the casino already owns 'carpet' (damask) — this is the moist office kind
         backrooms2:'wetconcrete', // bare concrete with standing puddles
+        ..._brRows(f => f.art),
     };
     function groundArtOf(w) { return (w && WORLD_GROUND[w.id]) || 'asphalt'; }
 
@@ -16371,6 +16540,7 @@ const col = b.color || BLDG_COLORS[0];
         mirror: '#aab8c2',   // silvered glass, not pale blue
         backrooms: '#a89468', // damp beige-brown office carpet
         backrooms2:'#51575c', // wet grey concrete
+        ..._brRows(f => f.ground),
     };
     function worldFloorColor(w) { return (w && (WORLD_FLOOR[w.id] || w.ground)) || '#7ec8e3'; }
 
@@ -16413,6 +16583,7 @@ const col = b.color || BLDG_COLORS[0];
         // Not a sky at all: a low, flat, pale-yellow ceiling glow fading into yellow haze.
         backrooms:  { top:0xe6da9a, bot:0xf0e6b0 },
         backrooms2: { top:0x3a3934, bot:0x6b675c },   // a dark concrete ceiling, dim yellowish haze
+        ..._brRows(f => f.sky),
     };
     // Multiply a colour by the time-of-day tint so dawn and dusk still read on a custom sky.
     function _tintHex(hex, tintHex) {
@@ -17186,6 +17357,7 @@ const col = b.color || BLDG_COLORS[0];
         astral:   ['crystalCluster','beacon','stoneLantern'],
         backrooms:['officeChair','ceilingTile','exitSign'],   // the lights are in the ceiling now
         backrooms2:['pipe','crate','barrel'],
+        ..._brRows(f => f.props),
     };
     function PROPS_FOR(w) { return (w && PROP_SETS[w.id]) || PROP_SETS.city; }
 
@@ -19340,9 +19512,12 @@ const col = b.color || BLDG_COLORS[0];
         // the signature from those directly. It used to scan all ~630 streamed buildings every single
         // frame just to compute a length for the signature, then throw the list away; now the scan only
         // happens on the rare frame where the answer can actually have changed.
-        const bldgSig = `${_cellX},${_cellY},${_loadedChunkKey},${buildings.length}`;
+        // The chunk key alone is not enough: a new run (new seed) or another world can load the SAME
+        // chunk coordinates with the same building count, and the last world's 3D stayed standing.
+        const _chunkSig = `${_loadedChunkKey}|${_worldSeed}|${currentWorld && currentWorld.id}`;
+        const bldgSig = `${_cellX},${_cellY},${_chunkSig},${buildings.length}`;
         if (_three._bldgSig !== bldgSig) {
-            const chunkChanged = _three._propChunk !== _loadedChunkKey;
+            const chunkChanged = _three._propChunk !== _chunkSig;
             _three._bldgSig = bldgSig;
             const visibleBuildings = [];
             for (const b of buildings) {
@@ -19873,13 +20048,15 @@ const col = b.color || BLDG_COLORS[0];
                         bg.add(ring);
                     }
                     bg.position.y = span*0.14;              // it does not rest on anything
-                } else if (kind === 'backroom' || kind === 'concretewall') {   // the Backrooms — a wallpapered (or, upstairs, concrete) partition
+                } else if (kind === 'backroom' || kind === 'concretewall' || kind === 'brwall') {   // the Backrooms — a wallpapered (or, upstairs, concrete) partition
                     const _conc = kind === 'concretewall';
                     // Repeat the wallpaper by real length so a 350-unit wall is not one stretched tile.
                     const along = Math.max(1, Math.round(Math.max(b.w, b.h) / 64));
                     const across = Math.max(1, Math.round(Math.min(b.w, b.h) / 64));
                     const rowsW = Math.max(1, Math.round(H / 80));
-                    const capM = _conc ? flat('bkr2-cap', () => new THREE.MeshStandardMaterial({ color: 0x77746b, roughness: 0.95 }))
+                    const _brS = bldgStyleOf(b), _br = kind === 'brwall';
+                    const capM = _br ? flat('brcap-' + _brS.cap, () => new THREE.MeshStandardMaterial({ color: _hex(_brS.cap || '#777777'), roughness: 0.9 }))
+                               : _conc ? flat('bkr2-cap', () => new THREE.MeshStandardMaterial({ color: 0x77746b, roughness: 0.95 }))
                                        : flat('bkr-cap', () => new THREE.MeshStandardMaterial({ color: 0xcfc08a, roughness: 0.95 }));
                     const mats = b.w >= b.h
                         ? [face(across, rowsW), face(across, rowsW), capM, capM, face(along, rowsW), face(along, rowsW)]
@@ -19927,7 +20104,18 @@ const col = b.color || BLDG_COLORS[0];
                         const lines = new THREE.Mesh(TG.Plane(LW, LD), lineM);
                         lines.rotation.x = -Math.PI/2; lines.position.set(cX + 24 + LW/2, 0.8, cZ); bg.add(lines);
                     }
-                    if (_conc && (b.car || b.pillar)) {
+                    if (_br) {
+                        if (_brS.pipes && Math.max(b.w, b.h) > 120) {
+                            const pipeM = flat('bkr2-pipe', () => new THREE.MeshStandardMaterial({ color: 0x7a5236, roughness: 0.6, metalness: 0.5 }));
+                            const len = Math.round((Math.max(b.w, b.h) - 10) / 20) * 20;
+                            for (const dy of [14, 26]) {
+                                const pipe = new THREE.Mesh(TG.Cylinder(4, 4, len, 8), pipeM);
+                                if (b.w >= b.h) { pipe.rotation.z = Math.PI/2; pipe.position.set(cX, H - dy, cZ + b.h/2 + 5); }
+                                else            { pipe.rotation.x = Math.PI/2; pipe.position.set(cX + b.w/2 + 5, H - dy, cZ); }
+                                bg.add(pipe);
+                            }
+                        }
+                    } else if (_conc && (b.car || b.pillar)) {
                         // nothing else: no pipes on a car or a pillar
                     } else if (!_conc) {
                         const baseM = flat('bkr-base', () => new THREE.MeshStandardMaterial({ color: 0x5c4630, roughness: 0.8 }));
@@ -19948,7 +20136,7 @@ const col = b.color || BLDG_COLORS[0];
             }
             // Street props are tied to the chunk, not the cell — regenerating them on every cell
             // crossing was pure waste (and they carry point lights).
-            _three._propChunk = _loadedChunkKey;
+            _three._propChunk = _chunkSig;
             const propPositions = [];
             let lampLightsUsed = 0;
             const MAX_LAMP_LIGHTS = 3; // hard cap so PBR shaders stay fast
@@ -19976,6 +20164,7 @@ const col = b.color || BLDG_COLORS[0];
         // Snap to a coarse grid so the ground texture doesn't visibly slide as you walk.
         if (ground && player) ground.position.set(Math.round(player.x/512)*512, 0, Math.round(player.y/512)*512);
         updateCeiling3D();
+        updateExit3D();
         // Boss habitat — build it when a boss summons one, tear it down when the habitat clears
         if (bossHabitat) {
             if (!_three._habitatMesh || _three._habitatFor !== bossHabitat) {
@@ -20513,6 +20702,16 @@ const col = b.color || BLDG_COLORS[0];
         // Walls — brick for the Builder, riveted steel for The Iron
         for (const w of walls) drawWall2D(w);
 
+        // Backrooms floor exit — a pulsing glow with its emoji (see tickFloorExit)
+        if (brExit && !brExit.done) {
+            const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 250);
+            const g = ctx.createRadialGradient(brExit.x, brExit.y, 4, brExit.x, brExit.y, 70);
+            g.addColorStop(0, 'rgba(255,240,150,' + (0.55 + 0.3 * pulse) + ')'); g.addColorStop(1, 'rgba(255,240,150,0)');
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(brExit.x, brExit.y, 70, 0, Math.PI * 2); ctx.fill();
+            ctx.font = '40px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(brExit.emoji, brExit.x, brExit.y);
+            ctx.textBaseline = 'alphabetic';
+        }
         // Traps — viewport culled
         const _cvx0 = _vx0 - 40, _cvy0 = _vy0 - 40;
         const _cvx1 = _vx1 + 40, _cvy1 = _vy1 + 40;
@@ -21257,6 +21456,13 @@ const col = b.color || BLDG_COLORS[0];
         // Traps — orange dots (active only)
         mctx.fillStyle = '#ff9f43';
         for (const t of traps) { if (t.cooldown <= 0) { mctx.beginPath(); mctx.arc(px2(t.x), py2(t.y), 1.6, 0, Math.PI*2); mctx.fill(); } }
+        // Backrooms exit — a yellow star, pinned to the edge when it is off the map
+        if (brExit && !brExit.done) {
+            const ex = Math.max(6, Math.min(MW - 6, px2(brExit.x))), ey = Math.max(6, Math.min(MH - 6, py2(brExit.y)));
+            mctx.font = '12px serif'; mctx.textAlign = 'center'; mctx.textBaseline = 'middle';
+            mctx.fillStyle = '#feca57'; mctx.beginPath(); mctx.arc(ex, ey, 6, 0, Math.PI*2); mctx.fill();
+            mctx.fillText(brExit.emoji, ex, ey); mctx.textBaseline = 'alphabetic';
+        }
         // Monsters — bigger red dots with white outline for visibility
         for (const m of monsters) {
             const mr = m.isBoss ? 6 : 4.5;
@@ -22020,7 +22226,7 @@ const col = b.color || BLDG_COLORS[0];
     // shift normal progress. No `unlockWave` on purpose — `wave >= undefined` is always false.
     // Lookups by id (saves, Continue, multiplayer) go through findWorld(), which sees both lists.
     const SPECIAL_WORLDS = [
-        { id:'backrooms', name:'Floor 0: The Lobby', emoji:'🌀', special:true, wavesNeeded:20,
+        { id:'backrooms', name:'Floor 0: The Lobby', emoji:'🌀', special:true, floor:0, wavesNeeded:20,
           hint:'Find the secret in another game',
           ground:'#a89468', groundAlt:'#d8cc8a', fog:'#e3d698', fogDensity:0.0011,
           bldgColors:['#d9c77a','#d2bf6c','#e0cf88','#cbb964','#d6c578'], shade:'rgba(80,70,20,0.08)',
@@ -22033,7 +22239,7 @@ const col = b.color || BLDG_COLORS[0];
           ] },
         // Floor 1 (Parking Zone) is found from INSIDE the Lobby, not another game: as a class that builds, get hit
         // by a falling ceiling tile and then look up through the hole it left (see _tileHole).
-        { id:'backrooms2', name:'Floor 1: Parking Zone', emoji:'🅿️', special:true, wavesNeeded:20,
+        { id:'backrooms2', name:'Floor 1: Parking Zone', emoji:'🅿️', special:true, floor:1, wavesNeeded:20,
           hint:'Something is above the Backrooms…',
           ground:'#51575c', groundAlt:'#5e6469', fog:'#4d4a42', fogDensity:0.0013,
           bldgColors:['#7c8186','#848a8f','#767b80','#80858a','#7a7f83'], shade:'rgba(20,20,15,0.12)',
@@ -22043,6 +22249,11 @@ const col = b.color || BLDG_COLORS[0];
               { type:'steampipe', emoji:'♨️', color:'#c8c8c0', dmg:8,  effect:'stun', duration:90,  label:'BURST PIPE!', art:'electric' },
               { type:'fallencrate',emoji:'📦', color:'#9c7b4f', dmg:12, effect:'knockback', duration:0, label:'FALLING CRATE!', art:'boom' },
           ] },
+        ...BACKROOMS_FLOORS.map(f => ({ id: f.id, name: 'Floor ' + f.n + ': ' + f.name, emoji: f.emoji, special: true, floor: f.n,
+          wavesNeeded: 20, hint: 'Find the exit on Floor ' + (f.n - 1),
+          ground: f.ground, groundAlt: f.groundAlt, fog: f.fog, fogDensity: f.fogDensity,
+          bldgColors: f.walls, shade: 'rgba(0,0,0,0.10)', bosses: f.bosses,
+          trapTypes: f.traps.map(t => ({ type: t[0], emoji: t[1], color: t[2], dmg: t[3], effect: t[4], duration: t[5], label: t[6], art: t[7] })) })),
     ];
     const ALL_WORLDS = WORLDS.concat(SPECIAL_WORLDS);
     function findWorld(id) { return ALL_WORLDS.find(w => w.id === id) || null; }
@@ -22090,6 +22301,40 @@ const col = b.color || BLDG_COLORS[0];
                 SFX.pickup && SFX.pickup();
                 addShake(6);
             }
+        }
+    }
+    // ---- Backrooms floor exits: how Floor N unlocks Floor N+1 (N ≥ 1) ----
+    // Survive to floorExitWave(N) and an exit appears 1100–1600 units away (always on open floor, and
+    // every maze room is reachable). It shows on the minimap, in top-down and in 3D. Walk into it.
+    let brExit = null;
+    function floorExitWave(n) { return 3 + Math.ceil(n / 2); }
+    function tickFloorExit() {
+        if (!player || NET.mode === 'client') return;
+        const w = currentWorld;
+        const next = (w && w.floor >= 1 && !usingCustomMap) ? FLOOR_IDS[w.floor + 1] : null;
+        if (!next) { brExit = null; return; }
+        if (brExit && brExit.world !== w.id) brExit = null;
+        if (!brExit) {
+            if (wave < floorExitWave(w.floor) || isWorldUnlocked(findWorld(next))) return;
+            const ex = FLOOR_EXITS[w.id] || ['🚪', 'a door'];
+            for (let k = 0; k < 60; k++) {
+                const a = Math.random() * Math.PI * 2, d = 1100 + Math.random() * 500;
+                const x = player.x + Math.cos(a) * d, y = player.y + Math.sin(a) * d;
+                if (ptInBld(x, y, 40)) continue;
+                brExit = { world: w.id, next, x, y, emoji: ex[0], name: ex[1], done: false };
+                showStatus(ex[0] + ' A way up appeared — ' + ex[1] + '! Find it (look on the minimap).', '#feca57');
+                SFX.pickup && SFX.pickup();
+                break;
+            }
+            return;
+        }
+        if (brExit.done) return;
+        if (Math.hypot(player.x - brExit.x, player.y - brExit.y) < 45) {
+            brExit.done = true;
+            unlockSpecialMap(next);
+            showStatus(brExit.emoji + ' You found the way up! ' + findWorld(next).name + ' unlocked — Worlds → ⭐ Special Maps', '#26de81');
+            SFX.pickup && SFX.pickup();
+            addShake(6);
         }
     }
     // A special map you no longer hold (the arcade save was reset) quietly drops you back in the City.
@@ -23769,6 +24014,7 @@ const col = b.color || BLDG_COLORS[0];
 
     function startGame() {
         if (!chosenClass) return;
+        brExit = null;
         ensureWorldAllowed();
         if (isPlayerBanned(playerName)) { alert('You are BANNED! Contact an Admin or Owner.'); return; }
         document.getElementById('roll-screen').style.display = 'none';

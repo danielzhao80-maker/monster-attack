@@ -155,6 +155,12 @@ Floor 0: The Lobby is `backrooms`; Floor 1: Parking Zone (`backrooms2`, `concret
 (`buildsThings`: Builder, The Iron) hit by a `fallentile` trap gets `_tileHole` (10 s); looking up
 (`pitch > 0.6` in first person) during it calls `unlockSpecialMap('backrooms2')` (tickTileHole). Indoor floors get a self-lit ceiling
 (`WORLD_CEILING`, updateCeiling3D; fp3d only) at 110 = ~3 m, and their walls are 110 tall.
+Floors 2–20 are DATA: `BACKROOMS_FLOORS` (near WORLD_W) feeds every per-world table via `_brRows`,
+styles 'br2'…'br20' (shared body `brwall`; layout maze/pillars/city/open), SPECIAL_WORLDS, ceilings and
+the Map Maker. `FLOOR_IDS` is the chain 0→20. Unlock: on Floor N≥1 reach `floorExitWave(N)`, an exit
+(`brExit`, tickFloorExit) appears 1100–1600 away (minimap/2D/raycast/3D), touching it unlocks N+1.
+The 3D building signature includes `_worldSeed` + world id (a new run at the same chunk used to keep
+the previous world's 3D).
 
 ### Per-world structures
 Worlds contain STRUCTURES, not buildings-everywhere. Only a real town builds boxes; a jungle grows
