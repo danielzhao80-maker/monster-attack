@@ -150,9 +150,11 @@ walks `ALL_WORLDS`. The Backrooms (`maze:true`) is a real maze: `buildMazeChunk`
 with a recursive backtracker (plus a few loops), each chunk owns its west/north edge with doorways,
 and the open edges are kept on the chunk (`chunk.maze`). Monsters there walk the maze via
 `mazeStep` (a BFS field from the target's room) — straight-line chasing gets stuck on walls.
-Floor 2 (`backrooms2`, concrete `concretemaze`) is unlocked IN the Backrooms: a building class
+Floor 0: The Lobby is `backrooms`; Floor 1: Parking Zone (`backrooms2`, `concretemaze`, `garage:true`
+→ buildGarageChunk: pillars, solid parked cars, bay lines) is unlocked IN the Lobby: a building class
 (`buildsThings`: Builder, The Iron) hit by a `fallentile` trap gets `_tileHole` (10 s); looking up
-(`pitch > 0.6` in first person) during it calls `unlockSpecialMap('backrooms2')` (tickTileHole).
+(`pitch > 0.6` in first person) during it calls `unlockSpecialMap('backrooms2')` (tickTileHole). Indoor floors get a self-lit ceiling
+(`WORLD_CEILING`, updateCeiling3D; fp3d only) at 110 = ~3 m, and their walls are 110 tall.
 
 ### Per-world structures
 Worlds contain STRUCTURES, not buildings-everywhere. Only a real town builds boxes; a jungle grows

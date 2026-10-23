@@ -172,8 +172,8 @@ setArcade({ coins: 5, specialMaps: ['backrooms'], titles: ['dimension'] });
 q(`openWorldScreen();`);                         // re-read on open
 sc = JSON.parse(specialCards());
 const openCard = sc.cards.find(c => c.id === 'backrooms');
-check(!!openCard && !/locked/.test(openCard.cls) && openCard.html.indexOf('The Backrooms') > -1 && openCard.html.indexOf('🌀') > -1,
-      'after the secret is found it shows as 🌀 The Backrooms');
+check(!!openCard && !/locked/.test(openCard.cls) && openCard.html.indexOf('Floor 0: The Lobby') > -1 && openCard.html.indexOf('🌀') > -1,
+      'after the secret is found it shows as 🌀 Floor 0: The Lobby');
 check(clickSpecial('backrooms') === true && q(`currentWorld.id`) === 'backrooms', 'clicking it selects it');
 check(JSON.parse(q(`localStorage.getItem('monster_city_worlds')`)).currentWorldId === 'backrooms', 'and the choice is saved');
 sc = JSON.parse(specialCards());
@@ -327,7 +327,7 @@ const chase = JSON.parse(q(`(function(){
 // 200: a ranged monster stops at 180 to shoot, which still means it got through.
 check(chase.end <= 200, 'a monster ' + chase.rooms + ' rooms away finds its way through the maze', JSON.stringify(chase));
 
-// ---- Floor 2: a builder hit by a falling ceiling tile looks up through the hole ----
+// ---- Floor 1 (Parking Zone): a builder hit by a falling ceiling tile looks up through the hole ----
 const tileRun = (cls, look, worldId) => JSON.parse(q(`(function(){
   selectWorld('${worldId || 'backrooms'}'); gameRunning=false; startGame(); monsters = [];
   player.cls = CLASSES.find(function(c){ return c.name === '${cls}'; });
@@ -342,14 +342,14 @@ const tileRun = (cls, look, worldId) => JSON.parse(q(`(function(){
   return JSON.stringify({ hit: hit, hole: hole, maps: getSpecialMaps() });
 })()`));
 setArcade({ specialMaps: ['backrooms'] });
-check(q(`isWorldUnlocked(findWorld('backrooms2'))`) === false, 'Floor 2 starts locked');
+check(q(`isWorldUnlocked(findWorld('backrooms2'))`) === false, 'Floor 1 starts locked');
 let tr = tileRun('Scientist', 1.0);
 check(tr.hit && tr.hole === 0 && tr.maps.indexOf('backrooms2') < 0, 'a class that cannot build looks up and nothing happens');
 tr = tileRun('Builder', 0);
 check(tr.hit && tr.hole === 600 && tr.maps.indexOf('backrooms2') < 0, 'a Builder hit by a tile who does NOT look up gets nothing');
 setArcade({ specialMaps: ['backrooms'] });
 tr = tileRun('Builder', 1.0);
-check(tr.maps.indexOf('backrooms2') > -1, 'a Builder hit by a falling tile who looks up unlocks Floor 2', JSON.stringify(tr.maps));
+check(tr.maps.indexOf('backrooms2') > -1, 'a Builder hit by a falling tile who looks up unlocks Floor 1', JSON.stringify(tr.maps));
 check(tr.maps.indexOf('backrooms') > -1, 'and keeps the Backrooms');
 setArcade({ specialMaps: ['backrooms'] });
 tr = tileRun('The Iron', 1.0);
@@ -366,12 +366,23 @@ const late = JSON.parse(q(`(function(){
   return JSON.stringify(getSpecialMaps());
 })()`));
 check(late.indexOf('backrooms2') < 0, 'looking up after the hole is gone (10 s) does nothing');
-// Floor 2 is a playable concrete maze.
+// Floor 1 is a playable underground car park.
 setArcade({ specialMaps: ['backrooms', 'backrooms2'] });
 q(`selectWorld('backrooms2'); gameRunning=false; startGame();`);
-check(q(`currentWorld.id`) === 'backrooms2', 'Floor 2 can be selected and a run starts there');
-check(q(`buildings.every(function(b){ return b.st === 'concretemaze'; }) && buildings.length > 100`) === true, 'its walls are concrete maze walls');
-check(q(`BLDG_STYLES[worldStyleId(currentWorld)].maze`) === true && q(`groundArtOf(currentWorld)`) === 'wetconcrete', 'a maze, on wet concrete');
+check(q(`currentWorld.id`) === 'backrooms2', 'Floor 1: Parking Zone can be selected and a run starts there');
+const gar = JSON.parse(q(`(function(){ var o = { n: buildings.length, st: 0, pillars: 0, cars: 0, walls: 0 };
+  buildings.forEach(function(b){ if (b.st === 'concretemaze') o.st++; if (b.pillar) o.pillars++; if (b.car) o.cars++; if (b.divider) o.walls++; });
+  o.inside = ptInBld(player.x, player.y, player.r); o.name = currentWorld.name; return JSON.stringify(o); })()`));
+check(gar.st === gar.n && gar.pillars > 500, 'rows of concrete pillars', gar.pillars + ' pillars');
+check(gar.cars > 30, 'with cars parked in the bays (solid, like the pillars)', gar.cars + ' cars');
+check(gar.n < 4000, 'kept small enough for collision', gar.n + ' pieces');
+check(!gar.inside, 'the player does not start inside a pillar or a car');
+check(gar.name === 'Floor 1: Parking Zone' && q(`findWorld('backrooms').name`) === 'Floor 0: The Lobby', 'named Floor 0: The Lobby and Floor 1: Parking Zone');
+check(q(`BLDG_STYLES[worldStyleId(currentWorld)].maze`) !== true && q(`mazeStep(player.x, player.y, player.x + 2000, player.y)`) === null
+      && q(`groundArtOf(currentWorld)`) === 'wetconcrete', 'an open car park (no maze steering) on wet concrete');
+check(q(`WORLD_CEILING.backrooms.h`) === 110 && q(`WORLD_CEILING.backrooms2.h`) === 110
+      && q(`BLDG_STYLES.backroom.hgt[1]`) === 110 && q(`BLDG_STYLES.concretemaze.hgt[1]`) === 110,
+      'both floors have a ceiling at about 3 m, and the walls reach it');
 check(q(`WORLDS.some(function(w){ return w.id === 'backrooms2'; })`) === false, 'and it is not on the wave ladder either');
 
 console.log('\n' + (ok ? 'SPECIAL MAPS PASS' : 'SPECIAL MAPS FAIL'));

@@ -6981,7 +6981,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const styleId = worldStyleId(currentWorld);
         const S = BLDG_STYLES[styleId] || BLDG_STYLES.tower;
         const maze = S.maze ? buildMazeChunk(bs, rnd, ox, oy, S, styleId) : null;
-        for (let i = 0; !S.maze && i < 70; i++) {
+        if (S.garage) buildGarageChunk(bs, rnd, ox, oy, S, styleId);
+        for (let i = 0; !S.maze && !S.garage && i < 70; i++) {
             // Footprint and height come from the world's archetype, so a Desert block is genuinely
             // low and wide while a Crystal spire is narrow and enormous — not the same box repainted.
             const w = S.w[0] + rnd()*(S.w[1]-S.w[0]), h = S.h[0] + rnd()*(S.h[1]-S.h[0]);
@@ -7099,6 +7100,35 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             }
         }
         return { east, south, west, north };
+    }
+
+    // The Parking Zone. A pillar at every MAZE_CELL lattice point (so the grid lines up across
+    // chunks); along each pillar row, bays on both sides with the odd parked car (a real obstacle);
+    // drive aisles between the rows; a couple of dividing walls per chunk. Cars are kept rare
+    // because collision walks the whole building list.
+    const GARAGE_BAY = 111, GARAGE_DEPTH = 170;
+    function buildGarageChunk(bs, rnd, ox, oy, S, styleId) {
+        const C = MAZE_CELL, nx = MAZE_NX, ny = MAZE_NY, H = S.hgt[0];
+        const add = (x, y, w, h, extra) => bs.push(Object.assign({ lx: x, ly: y, x: ox + x, y: oy + y, w, h, hgt: H, st: styleId }, extra));
+        const CAR_COLS = ['#b03a2e','#2e4a7d','#d8d8d8','#2b2b2b','#7d7f80','#c9a227','#3f6b4a','#8e5a3c'];
+        for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+            const px = i * C, py = j * C;
+            add(px - 22, py - 22, 44, 44, { pillar: true });
+            // Leave the middle, where a run starts, free of cars.
+            if (Math.abs(px + C/2 - WORLD_W/2) < C * 1.5 && Math.abs(py - WORLD_H/2) < C * 1.5) continue;
+            for (const side of [-1, 1]) for (let k = 0; k < 4; k++) {
+                if (rnd() >= 0.05) continue;
+                const bx = px + 28 + k * GARAGE_BAY + 20;
+                add(bx, side < 0 ? py - GARAGE_DEPTH : py + 20, 70, 150,
+                    { car: true, carColor: CAR_COLS[Math.floor(rnd() * CAR_COLS.length)], carFacing: side });
+            }
+        }
+        // Dividing walls: run along a pillar row for two or three spans, always with open ends.
+        for (let n = 0; n < 2; n++) {
+            const i = 1 + Math.floor(rnd() * (nx - 5)), j = 1 + Math.floor(rnd() * (ny - 2));
+            if (Math.abs(j * C - WORLD_H/2) < C * 1.5) continue;
+            add(i * C + 22, j * C - 11, (2 + Math.floor(rnd() * 2)) * C - 44, 22, { divider: true });
+        }
     }
 
     // ---- finding the way through the maze ----
@@ -7278,9 +7308,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // The Backrooms: not buildings at all but WALLS — long thin wallpapered partitions and pillars
         // laid on a grid, so the open floor reads as endless rooms and corridors. `maze` makes
         // buildChunk lay them out on that grid instead of scattering footprints (see buildMazeChunk).
-        backroom: { body:'backroom',  w:[22,360],  h:[22,360],  hgt:[140,160], tall:0,    tallHgt:[160,160], facade:'wallpaper', gap:0, maze:true },
-        // Floor 2 (the one above): the same endless maze, but bare poured CONCRETE with pipes along the top.
-        concretemaze: { body:'concretewall', w:[22,360], h:[22,360], hgt:[180,200], tall:0, tallHgt:[200,200], facade:'concrete', gap:0, maze:true },
+        backroom: { body:'backroom',  w:[22,360],  h:[22,360],  hgt:[110,110], tall:0,    tallHgt:[110,110], facade:'wallpaper', gap:0, maze:true },
+        // Floor 1, the Parking Zone: an endless underground car park — a grid of concrete pillars,
+        // parked cars in painted bays, the odd dividing wall (buildGarageChunk). Not a maze.
+        concretemaze: { body:'concretewall', w:[22,360], h:[22,360], hgt:[110,110], tall:0, tallHgt:[110,110], facade:'concrete', gap:0, garage:true },
     };
     // Which archetype each world builds in. Anything unlisted falls back to 'tower'.
     const WORLD_BLDG_STYLE = {
@@ -7328,7 +7359,16 @@ const col = b.color || BLDG_COLORS[0];
         // Seen from above, each structure draws its own SILHOUETTE. A tree is a canopy, not a
         // rounded box with a cross scratched on it — the plan view has to agree with what you
         // walked past in 3D or the minimap stops being readable.
-        if (kind2 === 'backroom') {
+        if (kind2 === 'backroom' && b.car) {
+            // A parked car seen from above: body, windscreen and rear window.
+            c2.fillStyle = 'rgba(0,0,0,0.25)'; c2.fillRect(b.x + 4, b.y + 4, b.w, b.h);
+            c2.fillStyle = b.carColor || '#7d7f80';
+            c2.beginPath(); c2.roundRect ? c2.roundRect(b.x, b.y, b.w, b.h, 14) : c2.rect(b.x, b.y, b.w, b.h); c2.fill();
+            c2.fillStyle = 'rgba(30,40,50,0.75)';
+            const fr = (b.carFacing || 1) > 0;
+            c2.fillRect(b.x + 8, b.y + (fr ? 30 : b.h - 52), b.w - 16, 22);
+            c2.fillRect(b.x + 10, b.y + (fr ? b.h - 40 : 18), b.w - 20, 16);
+        } else if (kind2 === 'backroom') {
             // The Backrooms: the top edge of a wallpapered partition — a thin yellow strip with a
             // dark cap line and a faint shadow, so the map reads as rooms and corridors.
             c2.fillStyle = 'rgba(60,45,10,0.18)';
@@ -12032,7 +12072,7 @@ const col = b.color || BLDG_COLORS[0];
         // out of the chunk you spawned in and the city simply stopped generating.
         refreshChunks();
         astralSecretTick();   // Astral Temple secret spot (invisible) — places it and drops a faint sparkle
-        tickTileHole();       // Backrooms: looking up through a fallen tile's hole unlocks Floor 2
+        tickTileHole();       // The Lobby: looking up through a fallen tile's hole unlocks Floor 1
 
         // Timers
         if (p.frozen > 0) { p.frozen--; if (p.frozen===0) p.disableImmune = 120; }
@@ -13078,7 +13118,7 @@ const col = b.color || BLDG_COLORS[0];
             refreshChunks(); // stream in the land around wherever they have walked to
         }
         // 🕳️ Secret: a falling tile leaves a hole in the Backrooms ceiling. A class that BUILDS notices
-        // it — look up through it within 10 s and Floor 2 unlocks (checked in tickTileHole).
+        // it — look up through it within 10 s and Floor 1 unlocks (checked in tickTileHole).
         const _hole = trap.type === 'fallentile' && pl === player && currentWorld.id === 'backrooms' && buildsThings(pl.cls);
         if (_hole) pl._tileHole = 600;
         // Visual + audio feedback (only show status text + flash for local player)
@@ -16131,6 +16171,64 @@ const col = b.color || BLDG_COLORS[0];
     }
     function _hex(c) { if (typeof c !== 'string' || c[0] !== '#') return 0xff8800; return parseInt(c.slice(1).padStart(6,'0').slice(0,6), 16); }
 
+    // ----- Indoor worlds have a CEILING -----
+    // The Backrooms floors are rooms, not outdoors: a lid at real ceiling height (36 units = 1 m, so
+    // 110 ≈ 3 m) with the lights painted into it. Self-lit (MeshBasic) on purpose: fluorescent panels
+    // glow, and it adds no real lights (see CLAUDE.md). Only the fp3d view uses THREE, so the
+    // overhead cameras never see it. `tile` = world units one texture repeat covers.
+    const WORLD_CEILING = {
+        backrooms:  { h: 110, art: 'droptiles', tile: 240 },
+        backrooms2: { h: 110, art: 'garageslab', tile: 500 },
+    };
+    function makeCeilingTexture(art) {
+        const S = 256, c = document.createElement('canvas'); c.width = S; c.height = S;
+        const x = c.getContext('2d');
+        if (art === 'droptiles') {
+            // Stained off-white drop-ceiling tiles on a T-bar grid, one fluorescent panel per repeat.
+            x.fillStyle = '#d8cfa0'; x.fillRect(0, 0, S, S);
+            for (let i = 0; i < 900; i++) { x.fillStyle = 'rgba(90,75,30,' + (Math.random()*0.10) + ')'; x.fillRect(Math.random()*S, Math.random()*S, 2, 2); }
+            const st = x.createRadialGradient(190, 200, 4, 190, 200, 40);
+            st.addColorStop(0, 'rgba(120,95,40,0.35)'); st.addColorStop(1, 'rgba(120,95,40,0)');
+            x.fillStyle = st; x.fillRect(140, 150, 100, 100);                     // a water stain
+            x.strokeStyle = '#a99e70'; x.lineWidth = 3;
+            for (let i = 0; i <= S; i += 32) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, S); x.moveTo(0, i); x.lineTo(S, i); x.stroke(); }
+            x.fillStyle = '#fffbe2'; x.fillRect(66, 34, 60, 124);                // the light panel (2×4 tiles)
+            x.strokeStyle = 'rgba(200,190,140,0.6)'; x.lineWidth = 1.5;
+            for (let i = 42; i < 158; i += 8) { x.beginPath(); x.moveTo(68, i); x.lineTo(124, i); x.stroke(); }
+        } else {
+            // A poured concrete slab: form lines, a deep beam, and a long tube light.
+            x.fillStyle = '#6f7275'; x.fillRect(0, 0, S, S);
+            for (let i = 0; i < 1400; i++) { x.fillStyle = (Math.random() < 0.5 ? 'rgba(0,0,0,' : 'rgba(255,255,255,') + (Math.random()*0.10) + ')'; x.fillRect(Math.random()*S, Math.random()*S, 2, 2); }
+            x.strokeStyle = 'rgba(0,0,0,0.18)'; x.lineWidth = 2;
+            for (let i = 0; i <= S; i += 64) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, S); x.stroke(); }
+            x.fillStyle = '#55585b'; x.fillRect(0, 0, S, 22);                    // beam over the pillar row
+            x.fillStyle = '#3a3d40'; x.fillRect(40, 120, 176, 10);               // the light's housing
+            x.fillStyle = '#f4f8ff'; x.fillRect(44, 122, 168, 6);                // the tube
+            x.fillStyle = 'rgba(70,40,25,0.8)'; x.fillRect(0, 70, S, 5);         // a rusty pipe
+        }
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        return t;
+    }
+    function updateCeiling3D() {
+        if (!_three || !player) return;
+        const cfg = WORLD_CEILING[currentWorld && currentWorld.id];
+        let mesh = _three.ceiling;
+        if (!cfg) { if (mesh) mesh.visible = false; return; }
+        if (!mesh || _three._ceilArt !== cfg.art) {
+            if (mesh) { _three.scene.remove(mesh); mesh.material.map && mesh.material.map.dispose(); mesh.material.dispose(); }
+            const size = 12000;
+            const tex = makeCeilingTexture(cfg.art); tex.repeat.set(size / cfg.tile, size / cfg.tile);
+            mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+            mesh.rotation.x = Math.PI/2;                 // facing down at the player
+            _three.scene.add(mesh);
+            _three.ceiling = mesh; _three._ceilArt = cfg.art;
+        }
+        mesh.visible = true;
+        // Snap by whole tiles so the pattern stays put on the world as the lid follows the player.
+        mesh.position.set(Math.round(player.x / cfg.tile) * cfg.tile, cfg.h, Math.round(player.y / cfg.tile) * cfg.tile);
+    }
+
     // ----- Procedural canvas textures (cached per color so we don't recreate them per frame) -----
     const _texCache = new Map();
     const _bldgGeoCache = new Map(); // building box geometries, shared by rounded size
@@ -17086,8 +17184,8 @@ const col = b.color || BLDG_COLORS[0];
         grove:    ['shroom','fern','crystalCluster'],
         storybook:['crate','gumdrop','balloon'],
         astral:   ['crystalCluster','beacon','stoneLantern'],
-        backrooms:['ceilingLight','officeChair','ceilingTile','exitSign'],
-        backrooms2:['ceilingLight','pipe','crate','barrel'],
+        backrooms:['officeChair','ceilingTile','exitSign'],   // the lights are in the ceiling now
+        backrooms2:['pipe','crate','barrel'],
     };
     function PROPS_FOR(w) { return (w && PROP_SETS[w.id]) || PROP_SETS.city; }
 
@@ -19789,14 +19887,54 @@ const col = b.color || BLDG_COLORS[0];
                     const gkey = 'bkr' + Math.round(b.w/4)*4 + 'x' + H + 'x' + Math.round(b.h/4)*4;
                     let geo = _bldgGeoCache.get(gkey);
                     if (!geo) { geo = TG.Box(Math.round(b.w/4)*4, H, Math.round(b.h/4)*4); _bldgGeoCache.set(gkey, geo); }
+                    if (_conc && b.car) {
+                        // A parked car: body, cabin with dark glass, four wheels.
+                        const bodyM = flat('car-' + b.carColor, () => new THREE.MeshStandardMaterial({ color: _hex(b.carColor || '#7d7f80'), roughness: 0.35, metalness: 0.6 }));
+                        const glassM = flat('car-glass', () => new THREE.MeshStandardMaterial({ color: 0x1c2630, roughness: 0.15, metalness: 0.3 }));
+                        const tyreM = flat('car-tyre', () => new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.9 }));
+                        const body = new THREE.Mesh(TG.Box(b.w, 24, b.h), bodyM); body.position.set(cX, 22, cZ); body.castShadow = true; bg.add(body);
+                        const cab = new THREE.Mesh(TG.Box(b.w - 10, 20, b.h * 0.5), glassM);
+                        cab.position.set(cX, 44, cZ + (b.carFacing || 1) * b.h * 0.04); bg.add(cab);
+                        const roof = new THREE.Mesh(TG.Box(b.w - 12, 3, b.h * 0.42), bodyM);
+                        roof.position.set(cX, 55, cZ + (b.carFacing || 1) * b.h * 0.04); bg.add(roof);
+                        for (const [wx, wz] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+                            const t = new THREE.Mesh(TG.Cylinder(12, 12, 8, 12), tyreM);
+                            t.rotation.z = Math.PI/2; t.position.set(cX + wx * (b.w/2 - 2), 12, cZ + wz * (b.h/2 - 28)); bg.add(t);
+                        }
+                    } else {
                     const wall = new THREE.Mesh(geo, mats);
                     wall.position.set(cX, H/2, cZ); wall.castShadow = true; wall.receiveShadow = true; bg.add(wall);
-                    if (!_conc) {
+                    }
+                    if (_conc && b.pillar) {
+                        // Yellow-and-black hazard band at bumper height, and a painted bay number.
+                        const bandM = flat('bkr2-band', () => new THREE.MeshStandardMaterial({ color: 0xe0b020, roughness: 0.7 }));
+                        const band = new THREE.Mesh(TG.Box(b.w + 2, 26, b.h + 2), bandM); band.position.set(cX, 18, cZ); bg.add(band);
+                        // Painted bay lines on the floor, both sides of this pillar's row.
+                        // One transparent plane per pillar carries all ten lines (one draw call, not ten).
+                        const LW = 4 * GARAGE_BAY + 8, LD = 2 * GARAGE_DEPTH + 20;
+                        const lineM = flat('bkr2-lines', () => {
+                            const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+                            const x = c.getContext('2d'); x.fillStyle = 'rgba(235,230,210,0.9)';
+                            const sx = 512 / LW, sz = 512 / LD;
+                            for (let k = 0; k <= 4; k++) {
+                                const lx = (4 + k * GARAGE_BAY) * sx;
+                                x.fillRect(lx - 3, 0, 6, (GARAGE_DEPTH - 10) * sz);                 // north bays
+                                x.fillRect(lx - 3, (GARAGE_DEPTH + 30) * sz, 6, (GARAGE_DEPTH - 10) * sz); // south bays
+                            }
+                            const t = new THREE.CanvasTexture(c);
+                            return new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false });
+                        });
+                        const lines = new THREE.Mesh(TG.Plane(LW, LD), lineM);
+                        lines.rotation.x = -Math.PI/2; lines.position.set(cX + 24 + LW/2, 0.8, cZ); bg.add(lines);
+                    }
+                    if (_conc && (b.car || b.pillar)) {
+                        // nothing else: no pipes on a car or a pillar
+                    } else if (!_conc) {
                         const baseM = flat('bkr-base', () => new THREE.MeshStandardMaterial({ color: 0x5c4630, roughness: 0.8 }));
                         const base = new THREE.Mesh(TG.Box(Math.round(b.w/4)*4 + 3, 8, Math.round(b.h/4)*4 + 3), baseM);   // baseboard
                         base.position.set(cX, 4, cZ); bg.add(base);
                     } else if (Math.max(b.w, b.h) > 120) {
-                        // Upstairs: a rusty pipe runs along the top of each long wall.
+                        // A rusty pipe runs along the top of each long concrete wall.
                         const pipeM = flat('bkr2-pipe', () => new THREE.MeshStandardMaterial({ color: 0x7a5236, roughness: 0.6, metalness: 0.5 }));
                         const len = Math.round((Math.max(b.w, b.h) - 10) / 20) * 20;   // rounded so walls share geometry
                         const pipe = new THREE.Mesh(TG.Cylinder(4, 4, len, 8), pipeM);
@@ -19837,6 +19975,7 @@ const col = b.color || BLDG_COLORS[0];
         // Infinite world — keep the ground slab centred under the player so it never runs out.
         // Snap to a coarse grid so the ground texture doesn't visibly slide as you walk.
         if (ground && player) ground.position.set(Math.round(player.x/512)*512, 0, Math.round(player.y/512)*512);
+        updateCeiling3D();
         // Boss habitat — build it when a boss summons one, tear it down when the habitat clears
         if (bossHabitat) {
             if (!_three._habitatMesh || _three._habitatFor !== bossHabitat) {
@@ -21881,7 +22020,7 @@ const col = b.color || BLDG_COLORS[0];
     // shift normal progress. No `unlockWave` on purpose — `wave >= undefined` is always false.
     // Lookups by id (saves, Continue, multiplayer) go through findWorld(), which sees both lists.
     const SPECIAL_WORLDS = [
-        { id:'backrooms', name:'The Backrooms', emoji:'🌀', special:true, wavesNeeded:20,
+        { id:'backrooms', name:'Floor 0: The Lobby', emoji:'🌀', special:true, wavesNeeded:20,
           hint:'Find the secret in another game',
           ground:'#a89468', groundAlt:'#d8cc8a', fog:'#e3d698', fogDensity:0.0011,
           bldgColors:['#d9c77a','#d2bf6c','#e0cf88','#cbb964','#d6c578'], shade:'rgba(80,70,20,0.08)',
@@ -21892,9 +22031,9 @@ const col = b.color || BLDG_COLORS[0];
               { type:'noclip',    emoji:'🌀', color:'#c9b866', dmg:5,  effect:'slow', duration:200, label:'NOCLIPPED!', art:'sand' },
               { type:'fallentile',emoji:'⬜', color:'#e9e3cc', dmg:10, effect:'knockback', duration:0, label:'CEILING TILE!', art:'boom' },
           ] },
-        // Floor 2 is found from INSIDE the Backrooms, not another game: as a class that builds, get hit
+        // Floor 1 (Parking Zone) is found from INSIDE the Lobby, not another game: as a class that builds, get hit
         // by a falling ceiling tile and then look up through the hole it left (see _tileHole).
-        { id:'backrooms2', name:'The Backrooms — Floor 2', emoji:'🕳️', special:true, wavesNeeded:20,
+        { id:'backrooms2', name:'Floor 1: Parking Zone', emoji:'🅿️', special:true, wavesNeeded:20,
           hint:'Something is above the Backrooms…',
           ground:'#51575c', groundAlt:'#5e6469', fog:'#4d4a42', fogDensity:0.0013,
           bldgColors:['#7c8186','#848a8f','#767b80','#80858a','#7a7f83'], shade:'rgba(20,20,15,0.12)',
@@ -21938,7 +22077,7 @@ const col = b.color || BLDG_COLORS[0];
     }
     // Classes that build walls: the Builder ([E]) and The Iron (Iron Wall).
     function buildsThings(cls) { return !!cls && (cls.canBuild || cls.name === 'The Iron'); }
-    // The Floor 2 secret, every frame: after a falling tile, look UP (first-person, pitch well above
+    // The Floor 1 (Parking Zone) secret, every frame: after a falling tile, look UP (first-person, pitch well above
     // the horizon) while the hole is still there.
     function tickTileHole() {
         if (!player || !(player._tileHole > 0)) return;
@@ -21947,7 +22086,7 @@ const col = b.color || BLDG_COLORS[0];
         if (aimsVertically() && (player.pitch || 0) > 0.6) {
             player._tileHole = 0;
             if (unlockSpecialMap('backrooms2')) {
-                showStatus('🕳️ You see another floor through the hole! FLOOR 2 of the Backrooms unlocked — Worlds → ⭐ Special Maps', '#e6da9a');
+                showStatus('🕳️ You see another floor through the hole! FLOOR 1: PARKING ZONE unlocked — Worlds → ⭐ Special Maps', '#e6da9a');
                 SFX.pickup && SFX.pickup();
                 addShake(6);
             }
