@@ -266,5 +266,65 @@ q(`selectWorld('city'); gameRunning=false; startGame(); wave = 60;
    for (var f = 0; f < 400 && wave === 60; f++) { monsters = []; monstersSpawned = monstersToSpawn; __clock += 16.7; gameLoop(__clock); }`);
 check(q('highestWaveEver') === 61, 'while clearing it in a normal world still does', q('highestWaveEver'));
 
+// ---- it is a real maze ----
+q(`selectWorld('backrooms'); gameRunning=false; startGame();`);
+const maze = JSON.parse(q(`(function(){
+  // Every room in a 3x3 block of chunks is reachable from the start room.
+  var gx0 = Math.floor(player.x / MAZE_CELL), gy0 = Math.floor(player.y / MAZE_CELL);
+  var cx = Math.floor(gx0 / MAZE_NX), cy = Math.floor(gy0 / MAZE_NY);
+  var lo = [(cx-1)*MAZE_NX, (cy-1)*MAZE_NY], hi = [(cx+2)*MAZE_NX, (cy+2)*MAZE_NY];
+  var seen = {}, q2 = [[gx0, gy0]], D = [[1,0],[0,1],[-1,0],[0,-1]], open = 0, edges = 0;
+  seen[gx0+','+gy0] = 1;
+  for (var h = 0; h < q2.length; h++) {
+    var x = q2[h][0], y = q2[h][1];
+    for (var k = 0; k < 4; k++) {
+      var x2 = x + D[k][0], y2 = y + D[k][1];
+      if (x2 < lo[0] || y2 < lo[1] || x2 >= hi[0] || y2 >= hi[1]) continue;
+      var pass = mazeCanPass(x, y, k);
+      if (k < 2) { edges++; if (pass) open++; }
+      if (!pass || seen[x2+','+y2]) continue;
+      seen[x2+','+y2] = 1; q2.push([x2, y2]);
+    }
+  }
+  // A wall really stands on every closed edge: the middle of a closed edge is inside a wall.
+  var bad = 0, checked = 0;
+  for (var i = 0; i < 60; i++) {
+    var ex = lo[0] + 3 + (i * 7) % (MAZE_NX*3 - 6), ey = lo[1] + 3 + (i * 5) % (MAZE_NY*3 - 6);
+    if (!mazeCanPass(ex, ey, 0)) { checked++; refreshChunks(true);
+      if (!ptInBld((ex+1)*MAZE_CELL, (ey+0.5)*MAZE_CELL, 2)) {
+        player.x = (ex+1)*MAZE_CELL; player.y = (ey+0.5)*MAZE_CELL; refreshChunks(true);
+        if (!ptInBld((ex+1)*MAZE_CELL, (ey+0.5)*MAZE_CELL, 2)) bad++; }
+    }
+    if (mazeCanPass(ex, ey, 0)) { player.x = (ex+1)*MAZE_CELL; player.y = (ey+0.5)*MAZE_CELL; refreshChunks(true);
+      if (ptInBld((ex+1)*MAZE_CELL, (ey+0.5)*MAZE_CELL, 2)) bad++; }
+  }
+  return JSON.stringify({ reached: q2.length, total: MAZE_NX*MAZE_NY*9, open: open, edges: edges, bad: bad, checked: checked });
+})()`));
+check(maze.reached === maze.total, 'every room in the maze can be reached', maze.reached + '/' + maze.total);
+check(maze.open / maze.edges < 0.7, 'and most of the room edges are walls, so it is a maze', Math.round(100*maze.open/maze.edges) + '% open');
+check(maze.checked > 5 && maze.bad === 0, 'walls stand exactly where the maze says, and doorways are clear', maze.checked + ' walls, ' + maze.bad + ' wrong');
+
+// A monster on the far side of walls walks the maze to the player instead of sticking to a wall.
+const chase = JSON.parse(q(`(function(){
+  gameRunning=false; startGame(); __freezeMonsters = false;
+  var gx = Math.floor(player.x / MAZE_CELL), gy = Math.floor(player.y / MAZE_CELL);
+  // Find a room 6+ steps away by the maze.
+  var f = mazeField(gx, gy), W = MAZE_REACH*2+1, best = null;
+  for (var ix = 0; ix < W; ix++) for (var iy = 0; iy < W; iy++) {
+    var d = f.dist[ix*W+iy]; if (d >= 6 && d <= 9 && !best) best = [gx+ix-MAZE_REACH, gy+iy-MAZE_REACH, d];
+  }
+  player.x = (gx+0.5)*MAZE_CELL; player.y = (gy+0.5)*MAZE_CELL; refreshChunks(true);
+  spawnMonster && spawnMonster();
+  var m = monsters[0]; if (!m) return JSON.stringify({ err: 'no monster' });
+  monsters = [m]; monstersSpawned = 0; monstersToSpawn = 99;
+  m.x = (best[0]+0.5)*MAZE_CELL; m.y = (best[1]+0.5)*MAZE_CELL; m.phasing = false; m.hp = m.maxHp = 1e9;
+  player.hp = player.maxHp = 1e9; player.invincible = 1e9;
+  var start = Math.hypot(m.x-player.x, m.y-player.y), steps = 0;
+  for (; steps < 6000 && Math.hypot(m.x-player.x, m.y-player.y) > 120; steps++) {
+    monstersSpawned = 0; monsters = [m]; player.x = (gx+0.5)*MAZE_CELL; player.y = (gy+0.5)*MAZE_CELL; update(); }
+  return JSON.stringify({ rooms: best[2], start: Math.round(start), end: Math.round(Math.hypot(m.x-player.x, m.y-player.y)), steps: steps });
+})()`));
+check(chase.end <= 120, 'a monster ' + chase.rooms + ' rooms away finds its way through the maze', JSON.stringify(chase));
+
 console.log('\n' + (ok ? 'SPECIAL MAPS PASS' : 'SPECIAL MAPS FAIL'));
 process.exit(ok ? 0 : 1);

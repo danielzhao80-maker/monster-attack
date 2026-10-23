@@ -146,8 +146,10 @@ when another arcade game puts their id in `specialMaps` in the shared `daniels-a
 with `findWorld()` (it sees both lists), check access with `isWorldUnlocked()`, and
 `ensureWorldAllowed()` drops a special map whose unlock is gone back to the City. Per-world tables
 (BLDG_STYLES, WORLD_GROUND, ...) take special maps like any other world; `test-world-styles.js`
-walks `ALL_WORLDS`. The Backrooms' `backroom` body is laid out on a grid by `buildMazeChunk`
-(`maze:true`), not scattered.
+walks `ALL_WORLDS`. The Backrooms (`maze:true`) is a real maze: `buildMazeChunk` carves each chunk
+with a recursive backtracker (plus a few loops), each chunk owns its west/north edge with doorways,
+and the open edges are kept on the chunk (`chunk.maze`). Monsters there walk the maze via
+`mazeStep` (a BFS field from the target's room) — straight-line chasing gets stuck on walls.
 
 ### Per-world structures
 Worlds contain STRUCTURES, not buildings-everywhere. Only a real town builds boxes; a jungle grows

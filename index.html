@@ -6979,7 +6979,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const bs = [];
         const styleId = worldStyleId(currentWorld);
         const S = BLDG_STYLES[styleId] || BLDG_STYLES.tower;
-        if (S.maze) buildMazeChunk(bs, rnd, ox, oy, S, styleId);
+        const maze = S.maze ? buildMazeChunk(bs, rnd, ox, oy, S, styleId) : null;
         for (let i = 0; !S.maze && i < 70; i++) {
             // Footprint and height come from the world's archetype, so a Desert block is genuinely
             // low and wide while a Crystal spire is narrow and enormous — not the same box repainted.
@@ -7024,37 +7024,146 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             while (inBs(tx, ty, 15) && attempts < 50);
             ts.push({ x: ox + tx, y: oy + ty, r: 28, type:'pebble', emoji:'🪨', color:'#26de81', dmg: 0, effect:'poison', duration: 600, label:'POISONED 10s!', cooldown: 0 });
         }
-        return { buildings: bs, traps: ts };
+        return { buildings: bs, traps: ts, maze };
     }
 
-    // The Backrooms' walls. A lattice every MAZE_CELL units (it divides both WORLD_W and WORLD_H, so
-    // the grid lines up across chunk edges and the rooms never shear). At some lattice points a wall
-    // runs east and/or south, always stopping short to leave a doorway; a few points get a lone
-    // pillar. Kept to roughly the same building count as other worlds (~70-90 per chunk) because
-    // collision walks the whole list.
+    // The Backrooms is a real MAZE. Each chunk is a grid of MAZE_CELL rooms (it divides both WORLD_W
+    // and WORLD_H, so the grid lines up across chunk edges). A recursive backtracker carves a maze
+    // through them, so every room in the chunk is reachable; then a few extra walls are knocked out
+    // (loops, so a chase isn't always a dead end). Each chunk owns its WEST and NORTH edge — a solid
+    // wall with a few doorways — so neighbouring chunks agree about the wall between them and the
+    // endless maze stays connected. The middle of the chunk, where a run starts, is one open hall.
+    // Runs of closed edges merge into one long wall, which keeps the collision list short.
+    // The open/closed edges are kept on the chunk (`maze`) so monsters can find their way (mazeStep).
     const MAZE_CELL = 500, MAZE_THICK = 22;
+    const MAZE_NX = Math.floor(WORLD_W / MAZE_CELL), MAZE_NY = Math.floor(WORLD_H / MAZE_CELL);
     function buildMazeChunk(bs, rnd, ox, oy, S, styleId) {
-        const nx = Math.floor(WORLD_W / MAZE_CELL), ny = Math.floor(WORLD_H / MAZE_CELL);
+        const nx = MAZE_NX, ny = MAZE_NY, C = MAZE_CELL, T = MAZE_THICK;
         const hgtOf = () => Math.round((S.hgt[0] + rnd() * (S.hgt[1] - S.hgt[0])) / 20) * 20;
         const add = (x, y, w, h) => bs.push({ lx: x, ly: y, x: ox + x, y: oy + y, w, h, hgt: hgtOf(), st: styleId });
+        // east[i][j]: open between (i,j) and (i+1,j); south[i][j]: open between (i,j) and (i,j+1).
+        const east = [], south = [];
+        for (let i = 0; i < nx; i++) { east.push(new Array(ny).fill(false)); south.push(new Array(ny).fill(false)); }
+        // Carve.
+        const seen = new Uint8Array(nx * ny);
+        const stack = [[Math.floor(rnd() * nx), Math.floor(rnd() * ny)]];
+        seen[stack[0][0] * ny + stack[0][1]] = 1;
+        while (stack.length) {
+            const [i, j] = stack[stack.length - 1];
+            const nb = [];
+            if (i > 0 && !seen[(i-1)*ny + j]) nb.push([i-1, j]);
+            if (i < nx-1 && !seen[(i+1)*ny + j]) nb.push([i+1, j]);
+            if (j > 0 && !seen[i*ny + j-1]) nb.push([i, j-1]);
+            if (j < ny-1 && !seen[i*ny + j+1]) nb.push([i, j+1]);
+            if (!nb.length) { stack.pop(); continue; }
+            const [a, b2] = nb[Math.floor(rnd() * nb.length)];
+            if (a !== i) east[Math.min(a, i)][j] = true; else south[i][Math.min(b2, j)] = true;
+            seen[a*ny + b2] = 1;
+            stack.push([a, b2]);
+        }
+        // Loops.
         for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
-            const px = i * MAZE_CELL, py = j * MAZE_CELL;
-            // The middle of the chunk is where a run starts — leave a clear room there.
-            if (Math.abs(px + MAZE_CELL/2 - WORLD_W/2) < MAZE_CELL * 1.5 && Math.abs(py + MAZE_CELL/2 - WORLD_H/2) < MAZE_CELL * 1.5) continue;
-            const r = rnd();
-            if (r < 0.27) {
-                const shape = rnd();                      // L, east-only, or south-only
-                const door = 150 + rnd() * 70;            // every wall leaves a doorway
-                const len = MAZE_CELL - door;
-                const atStart = rnd() < 0.5;              // doorway at the near or far end
-                if (shape < 0.75 && i < nx - 1)            // east
-                    add(px + (atStart ? door : 0), py, Math.round(len), MAZE_THICK);
-                if (shape >= 0.5 && j < ny - 1)            // south
-                    add(px, py + (atStart ? 0 : door), MAZE_THICK, Math.round(len));
-            } else if (r < 0.33) {
-                add(px - 14, py - 14, 50, 50);             // a lone square pillar
+            if (i < nx-1 && rnd() < 0.10) east[i][j] = true;
+            if (j < ny-1 && rnd() < 0.10) south[i][j] = true;
+        }
+        // The starting hall: the 3×3 rooms around the middle of the chunk.
+        const ci = Math.floor(nx / 2), cj = Math.floor(ny / 2);
+        for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+            if (i < ci + 1) east[i][j] = true;
+            if (j < cj + 1) south[i][j] = true;
+        }
+        // Doorways in the chunk's own west and north edges (at least two each).
+        const doors = (n) => {
+            const d = new Array(n).fill(false);
+            for (let k = 0; k < n; k++) if (rnd() < 0.28) d[k] = true;
+            for (let tries = 0; d.filter(Boolean).length < 2 && tries < 20; tries++) d[Math.floor(rnd() * n)] = true;
+            return d;
+        };
+        const west = doors(ny), north = doors(nx);
+        // Lay the walls. Vertical lines at x = i*C (i=0 is the west edge), horizontal at y = j*C.
+        for (let i = 0; i < nx; i++) {
+            let run = -1;
+            for (let j = 0; j <= ny; j++) {
+                const closed = j < ny && (i === 0 ? !west[j] : !east[i-1][j]);
+                if (closed && run < 0) run = j;
+                if (!closed && run >= 0) { add(i*C - T/2, run*C - T/2, T, (j - run)*C + T); run = -1; }
             }
         }
+        for (let j = 0; j < ny; j++) {
+            let run = -1;
+            for (let i = 0; i <= nx; i++) {
+                const closed = i < nx && (j === 0 ? !north[i] : !south[i][j-1]);
+                if (closed && run < 0) run = i;
+                if (!closed && run >= 0) { add(run*C - T/2, j*C - T/2, (i - run)*C + T, T); run = -1; }
+            }
+        }
+        return { east, south, west, north };
+    }
+
+    // ---- finding the way through the maze ----
+    // Rooms are numbered across the whole endless world (gx, gy). canPass asks the chunk that owns
+    // an edge whether it is open. A breadth-first search from the target's room gives every room
+    // nearby its distance to the target; a monster walks to the neighbouring room that is closer.
+    const _mazeOf = (cx, cy) => getChunk(cx, cy).maze || null;
+    function mazeCanPass(gx, gy, dir) {               // dir: 0 east, 1 south, 2 west, 3 north
+        if (dir === 2) return mazeCanPass(gx - 1, gy, 0);
+        if (dir === 3) return mazeCanPass(gx, gy - 1, 1);
+        const cx = Math.floor(gx / MAZE_NX), cy = Math.floor(gy / MAZE_NY);
+        const i = gx - cx * MAZE_NX, j = gy - cy * MAZE_NY;
+        if (dir === 0) {
+            if (i < MAZE_NX - 1) { const m = _mazeOf(cx, cy); return !!(m && m.east[i][j]); }
+            const m = _mazeOf(cx + 1, cy); return !!(m && m.west[j]);
+        }
+        if (j < MAZE_NY - 1) { const m = _mazeOf(cx, cy); return !!(m && m.south[i][j]); }
+        const m = _mazeOf(cx, cy + 1); return !!(m && m.north[i]);
+    }
+    const MAZE_REACH = 16;                            // rooms searched each way from the target
+    const _mazeFields = new Map();                    // "gx,gy" → { gx, gy, dist }
+    function mazeField(gx, gy) {
+        const key = _worldSeed + ':' + gx + ',' + gy;   // a new run is a new maze
+        let f = _mazeFields.get(key);
+        if (f) return f;
+        const W = MAZE_REACH * 2 + 1, dist = new Int16Array(W * W).fill(-1);
+        const q = [[gx, gy]]; dist[MAZE_REACH * W + MAZE_REACH] = 0;
+        const D = [[1,0],[0,1],[-1,0],[0,-1]];
+        for (let h = 0; h < q.length; h++) {
+            const [x, y] = q[h], d = dist[(x - gx + MAZE_REACH) * W + (y - gy + MAZE_REACH)];
+            for (let k = 0; k < 4; k++) {
+                const x2 = x + D[k][0], y2 = y + D[k][1];
+                const ix = x2 - gx + MAZE_REACH, iy = y2 - gy + MAZE_REACH;
+                if (ix < 0 || iy < 0 || ix >= W || iy >= W || dist[ix * W + iy] >= 0) continue;
+                if (!mazeCanPass(x, y, k)) continue;
+                dist[ix * W + iy] = d + 1; q.push([x2, y2]);
+            }
+        }
+        f = { gx, gy, dist };
+        _mazeFields.set(key, f);
+        if (_mazeFields.size > 8) _mazeFields.delete(_mazeFields.keys().next().value);
+        return f;
+    }
+    // Where a monster at (x,y) should head to reach (tx,ty), or null to go straight at it (same room,
+    // next door, not a maze world, or too far to have been searched).
+    function mazeStep(x, y, tx, ty) {
+        if (usingCustomMap || !BLDG_STYLES[worldStyleId(currentWorld)].maze) return null;
+        const gx = Math.floor(x / MAZE_CELL), gy = Math.floor(y / MAZE_CELL);
+        const tgx = Math.floor(tx / MAZE_CELL), tgy = Math.floor(ty / MAZE_CELL);
+        if (gx === tgx && gy === tgy) return null;
+        const f = mazeField(tgx, tgy), W = MAZE_REACH * 2 + 1;
+        const at = (x2, y2) => {
+            const ix = x2 - tgx + MAZE_REACH, iy = y2 - tgy + MAZE_REACH;
+            return (ix < 0 || iy < 0 || ix >= W || iy >= W) ? -1 : f.dist[ix * W + iy];
+        };
+        const here = at(gx, gy);
+        if (here <= 0) return null;
+        const D = [[1,0],[0,1],[-1,0],[0,-1]];
+        for (let k = 0; k < 4; k++) {
+            const x2 = gx + D[k][0], y2 = gy + D[k][1];
+            if (at(x2, y2) === here - 1 && mazeCanPass(gx, gy, k)) {
+                if (here === 1) return null;                     // the target's room is next door
+                return { x: (x2 + 0.5) * MAZE_CELL, y: (y2 + 0.5) * MAZE_CELL };
+            }
+        }
+        return null;
     }
 
     function getChunk(cx, cy) {
@@ -12379,7 +12488,9 @@ const col = b.color || BLDG_COLORS[0];
             const playerInvisible = p.invisible;
 
             // If player invisible, monsters wander randomly
-            const angle = playerInvisible ? (Math.sin(Date.now()/500 + m.x) * Math.PI) : Math.atan2(p.y - m.y, p.x - m.x);
+            let angle = playerInvisible ? (Math.sin(Date.now()/500 + m.x) * Math.PI) : Math.atan2(p.y - m.y, p.x - m.x);
+            // In the Backrooms, walk the maze instead of pushing into the wall between you and the player.
+            if (!playerInvisible && !m.phasing) { const st = mazeStep(m.x, m.y, p.x, p.y); if (st) angle = Math.atan2(st.y - m.y, st.x - m.x); }
 
             // Ranged monsters keep distance
             let moveToward = true;
