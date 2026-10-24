@@ -5120,7 +5120,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         else if (m.isBoss) { for (let i = 0; i < 5; i++) drop(3); }
         else if (Math.random() < 0.3) drop(1);
     }
-    window.addEventListener('load', refreshHalloweenButton);
+    window.addEventListener('load', () => {
+        refreshHalloweenButton();
+        // The arcade's 🎃 Halloween button opens the game with ?open=halloween — go straight to the event menu.
+        try { if (new URLSearchParams(location.search).get('open') === 'halloween' && isHalloween()) openHalloweenScreen(); } catch (e) {}
+    });
     function applySeasonPrize(prize) {
         if (!prize) return;
         if (prize.type === 'coins') addCoins(prize.amount);
