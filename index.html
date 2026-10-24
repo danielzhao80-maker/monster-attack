@@ -475,6 +475,7 @@
             <button id="artifacts-btn" onclick="openArtifactsScreen()" style="margin-top:5px;background:linear-gradient(180deg,#a55eea,#8854d0);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #5f27cd;transition:all 0.2s;">🏺 Artifacts</button>
             <button id="abilities-btn" onclick="openAbilitiesScreen()" style="margin-top:5px;background:linear-gradient(180deg,#a29bfe,#6c5ce7);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #4834b5;transition:all 0.2s;">⚡ Abilities</button>
             <button id="season-btn" onclick="openSeasonScreen()" style="margin-top:5px;background:linear-gradient(180deg,#feca57,#ff9f43);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #b33939;transition:all 0.2s;">Season Pass</button>
+            <button id="halloween-btn" onclick="openHalloweenScreen()" style="display:none;margin-top:5px;background:linear-gradient(180deg,#ff8c1a,#d35400);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #5a1a8a;transition:all 0.2s;">🎃 Halloween<span id="halloween-badge"></span></button>
             <button id="pets-btn" onclick="openPetsScreen()" style="margin-top:5px;background:linear-gradient(180deg,#fd79a8,#c44569);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #7d1f3d;transition:all 0.2s;">🐾 Pets</button>
             <button id="music-btn" onclick="toggleMusic()" style="margin-top:5px;background:linear-gradient(180deg,#74b9ff,#0984e3);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #05528f;transition:all 0.2s;">🎵 Music: On</button>
             <button id="mapmaker-btn" onclick="openMapMaker()" style="margin-top:5px;background:linear-gradient(180deg,#00b894,#00806a);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #005c4c;transition:all 0.2s;">🗺️ Map Maker</button>
@@ -662,6 +663,20 @@
             <button class="btn" style="padding:10px 25px;font-size:0.85em;background:linear-gradient(180deg,#636e72,#2d3436);box-shadow:0 4px 0 #000,0 6px 15px rgba(0,0,0,0.15);" onclick="closeSeasonScreen()">Back</button>
         </div>
         <div id="season-tiers" style="display:flex;flex-direction:column;gap:6px;align-items:center;width:100%;max-width:520px;"></div>
+    </div>
+
+    <!-- 🎃 HALLOWEEN EVENT (only shown while the event is on — see isHalloween) -->
+    <div id="halloween-screen" style="position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(circle at 50% 0%,#5a1a8a,#1a0b2e 60%,#0b0614);display:none;flex-direction:column;align-items:center;z-index:16;overflow-y:auto;padding:20px 14px;color:#ffe6c7;">
+        <h2 style="font-family:'Fredoka One',cursive;font-size:2.2em;color:#ff8c1a;text-shadow:2px 2px 0 #000,0 0 18px #ff6a00;margin-bottom:2px;">🎃 Halloween Event 🦇</h2>
+        <div id="halloween-days" style="font-weight:800;font-size:0.9em;color:#d6a2ff;margin-bottom:10px;"></div>
+        <div id="halloween-candy" style="font-family:'Fredoka One',cursive;font-size:1.6em;color:#ff9ff3;margin-bottom:8px;">🍬 0</div>
+        <div style="max-width:520px;text-align:center;font-size:0.85em;line-height:1.5;margin-bottom:14px;color:#f3d9ff;">
+            Monsters drop <b>🍬 candy</b> while the event is on. Bosses drop a whole bag.<br>
+            Every boss wave might be the <b>🎃 Pumpkin King</b> — beat him for <b>25 extra candy</b>.<br>
+            Jack-o'-lanterns light up every world. Spend candy below before the event ends!
+        </div>
+        <div id="halloween-shop" style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:520px;"></div>
+        <button class="btn" style="margin-top:16px;padding:10px 30px;font-size:0.9em;background:linear-gradient(180deg,#636e72,#2d3436);box-shadow:0 4px 0 #000;" onclick="closeHalloweenScreen()">Back</button>
     </div>
 
     <div id="mp-menu" style="position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#a8e6cf,#88d8f7,#fcbad3);display:none;flex-direction:column;justify-content:center;align-items:center;z-index:20;">
@@ -2465,6 +2480,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         { name:'The Devourer', emoji:'🌀', accessory:'👑', armorColor:'#5f27cd', rarity:'legendary', rarityColor:'#f1c40f', color:'#5f27cd', hp:70, speed:1.1, damage:20, score:160, isBossOnly:true, body:'kraken', habitat:'void', canSwallow:true, phasing:true, enrage:true, desc:'Boss only!' },
         { name:'Null Titan', emoji:'⬛', accessory:'👑', armorColor:'#2d3436', rarity:'legendary', rarityColor:'#f1c40f', color:'#2d3436', hp:95, speed:0.75, damage:21, score:170, isBossOnly:true, body:'titan', habitat:'void', hasShield:true, phasing:true, isRanged:true, desc:'Boss only!' },
         // ---- SPECIAL MAP BOSSES (The Backrooms) — mid-level numbers, existing bodies ----
+        // 🎃 Halloween-only boss (rollMonsterClass): may take any boss wave while the event is on.
+        { name:'Pumpkin King', emoji:'🎃', accessory:'👑', armorColor:'#ff7f00', rarity:'legendary', rarityColor:'#f1c40f', color:'#ff7f00', hp:60, speed:1.15, damage:16, score:120, isBossOnly:true, body:'titan', habitat:'lava', isRanged:true, enrage:true, canScream:true, desc:'Boss only! Halloween — hurls flaming pumpkins and shrieks' },
         { name:'The Entity', emoji:'👤', accessory:'👑', armorColor:'#3d3526', rarity:'legendary', rarityColor:'#f1c40f', color:'#3d3526', hp:46, speed:1.3, damage:15, score:108, isBossOnly:true, body:'wraith', habitat:'void', phasing:true, teleports:true, desc:'Boss only! Drifts straight through the walls' },
         { name:'Bacteria', emoji:'🦠', accessory:'👑', armorColor:'#8a8f3a', rarity:'legendary', rarityColor:'#f1c40f', color:'#8a8f3a', hp:64, speed:0.95, damage:15, score:108, isBossOnly:true, body:'blob', habitat:'toxic', splits:true, poisonTrail:true, desc:'Boss only! Splits into more of itself' },
         // ---- MAGICAL WORLD BOSSES ----
@@ -2741,6 +2758,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Boss waves summon one of the CURRENT WORLD's two bosses — a straight 50/50 coin flip,
         // so you never know which of the pair is waiting for you.
         if (typeof wave !== 'undefined' && wave > 0 && wave % 10 === 0) {
+            if (isHalloween() && Math.random() < 0.35) return MONSTER_CLASSES.find(c => c.name === 'Pumpkin King');
             const pool = (currentWorld && currentWorld.bosses) || ['Dragon', 'Crane Titan'];
             const pick = pool[Math.random() < 0.5 ? 0 : 1] || pool[0];
             return MONSTER_CLASSES.find(c => c.name === pick) || MONSTER_CLASSES.find(c => c.isBossOnly);
@@ -4871,6 +4889,113 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         document.getElementById('season-screen').style.display = 'none';
         document.getElementById('start-screen').style.display = 'flex';
     }
+
+    // ======================== 🎃 HALLOWEEN EVENT ========================
+    // On by itself from 1 October to 7 November, every year. While it is on: monsters drop candy
+    // (bosses drop a bag), boss waves can be the Pumpkin King, jack-o'-lanterns stand in every world,
+    // and the 🎃 menu button opens a candy shop. Candy is kept (monster_attack_ key, so it syncs to
+    // the arcade account) but can only be spent during the event. 'monster_attack_event_force' =
+    // 'halloween' / 'off' overrides the date (tests, and an owner showing it off early).
+    const CANDY_KEY = 'monster_attack_candy';
+    const EVENT_FORCE_KEY = 'monster_attack_event_force';
+    function isHalloween(d) {
+        try {
+            const f = localStorage.getItem(EVENT_FORCE_KEY);
+            if (f === 'halloween') return true;
+            if (f === 'off') return false;
+        } catch (e) {}
+        d = d || new Date();
+        return d.getMonth() === 9 || (d.getMonth() === 10 && d.getDate() <= 7);
+    }
+    function halloweenDaysLeft(d) {
+        d = d || new Date();
+        const end = new Date(d.getFullYear(), 10, 8);            // the morning after 7 November
+        return Math.max(0, Math.ceil((end - d) / 86400000));
+    }
+    let candy = 0;
+    function loadCandy() { try { candy = Math.max(0, parseInt(localStorage.getItem(CANDY_KEY)) || 0); } catch (e) { candy = 0; } }
+    function saveCandy() { try { localStorage.setItem(CANDY_KEY, String(candy)); } catch (e) {} }
+    function addCandy(n) { candy += n; saveCandy(); }
+    loadCandy();
+    // arcade: an item in the shared arcade shop (arcade-shop.js) that the candy unlocks for good.
+    const HALLOWEEN_SHOP = [
+        { id: 'flesh', name: '🍖 100 Flesh',               cost: 10,  give: () => addCoins(100) },
+        { id: 'xp',    name: '🎟️ 250 Season Pass XP',      cost: 20,  give: () => addSeasonXP(250) },
+        { id: 'gun',   name: "🔫 Jack-o'-Lantern gun skin", cost: 50,  arcade: 'gun-jack-o-lantern' },
+        { id: 'title', name: '🎃 Pumpkin King title',       cost: 100, arcade: 'pumpkin' },
+    ];
+    function arcadeOwns(id) {
+        try {
+            const s = (window.ArcadeShop && window.ArcadeShop.load) ? window.ArcadeShop.load() : JSON.parse(localStorage.getItem('daniels-arcade-v1') || '{}');
+            return (s.owned || []).indexOf(id) > -1;
+        } catch (e) { return false; }
+    }
+    function grantArcadeItem(id) {
+        const grant = (s) => { s.owned = (s.owned || []).filter(x => x !== id).concat([id]); };
+        try {
+            if (window.ArcadeShop && window.ArcadeShop.update) window.ArcadeShop.update(grant);
+            else { const k = 'daniels-arcade-v1'; const s2 = JSON.parse(localStorage.getItem(k) || '{}'); grant(s2); localStorage.setItem(k, JSON.stringify(s2)); }
+            return true;
+        } catch (e) { return false; }
+    }
+    function buyHalloween(id) {
+        const it = HALLOWEEN_SHOP.find(x => x.id === id);
+        if (!it || !isHalloween()) return false;
+        if (it.arcade && arcadeOwns(it.arcade)) return false;
+        if (candy < it.cost) { showStatus(`🍬 You need ${it.cost - candy} more candy`, '#ff9ff3'); return false; }
+        candy -= it.cost; saveCandy();
+        if (it.arcade) grantArcadeItem(it.arcade); else it.give();
+        SFX.pickup && SFX.pickup();
+        renderHalloweenScreen();
+        return true;
+    }
+    function renderHalloweenScreen() {
+        const days = halloweenDaysLeft();
+        const $ = (i) => document.getElementById(i);
+        $('halloween-days').textContent = isHalloween() ? (days > 1 ? `Ends in ${days} days` : 'Last day!') : 'The event is over — see you next October';
+        $('halloween-candy').textContent = `🍬 ${candy} candy`;
+        const box = $('halloween-shop'); box.innerHTML = '';
+        for (const it of HALLOWEEN_SHOP) {
+            const owned = it.arcade && arcadeOwns(it.arcade);
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-radius:14px;background:rgba(255,140,26,0.12);border:2px solid #ff8c1a;';
+            row.innerHTML = `<span style="font-weight:800;">${it.name}${it.arcade ? ' <span style="font-size:0.75em;color:#d6a2ff;">(arcade, every game)</span>' : ''}</span>`;
+            const b = document.createElement('button');
+            b.className = 'btn'; b.dataset.hw = it.id;
+            b.style.cssText = 'padding:6px 16px;font-size:0.8em;background:linear-gradient(180deg,#ff8c1a,#d35400);box-shadow:0 3px 0 #5a1a8a;';
+            b.textContent = owned ? '✅ Owned' : `🍬 ${it.cost}`;
+            b.disabled = owned || !isHalloween() || candy < it.cost;
+            b.onclick = () => buyHalloween(it.id);
+            row.appendChild(b); box.appendChild(row);
+        }
+    }
+    function openHalloweenScreen() {
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('halloween-screen').style.display = 'flex';
+        renderHalloweenScreen();
+    }
+    function closeHalloweenScreen() {
+        document.getElementById('halloween-screen').style.display = 'none';
+        document.getElementById('start-screen').style.display = 'flex';
+        refreshHalloweenButton();
+    }
+    // The menu button only exists while the event is on; the badge shows your candy.
+    function refreshHalloweenButton() {
+        const b = document.getElementById('halloween-btn'); if (!b) return;
+        b.style.display = isHalloween() ? '' : 'none';
+        const badge = document.getElementById('halloween-badge');
+        if (badge) badge.textContent = candy > 0 ? ` 🍬${candy}` : '';
+    }
+    // Candy from a kill. Normal monsters: 30% for one piece. Bosses: a bag of 5 (×3 each), and the
+    // Pumpkin King spills 5 pieces worth 5 each — 25 candy.
+    function halloweenOnKill(m) {
+        if (!isHalloween() || !m) return;
+        const drop = (n) => pickups.push({ x: m.x + (Math.random() - 0.5) * 50, y: m.y + (Math.random() - 0.5) * 50, type: 'candy', n, life: 900 });
+        if (m.name === 'Pumpkin King') { for (let i = 0; i < 5; i++) drop(5); }
+        else if (m.isBoss) { for (let i = 0; i < 5; i++) drop(3); }
+        else if (Math.random() < 0.3) drop(1);
+    }
+    window.addEventListener('load', refreshHalloweenButton);
     function applySeasonPrize(prize) {
         if (!prize) return;
         if (prize.type === 'coins') addCoins(prize.amount);
@@ -8483,6 +8608,7 @@ const col = b.color || BLDG_COLORS[0];
             awardXP(xpForKill(m));
             explodeMonster(m);
             spawnPickup(m.x, m.y);
+            halloweenOnKill(m);   // 🎃 candy while the Halloween event is on
             revengeOnKill(m);   // ⚔️ the Reaper that killed you last match — after the XP, so its banner wins
             if (player.cls.canCopy && bySelf) { player.copiedPower = true; player.copyTimer = 600; player.copySpeedBonus = 1.5; player.copiedMonsterName = m.name || ''; showStatus(`COPIED: ${m.name}`, '#ffeaa7'); }
             // Sikuna: every 10 kills spawns a Sikuna finger (up to 30 lifetime)
@@ -12991,6 +13117,9 @@ const col = b.color || BLDG_COLORS[0];
                     if (picker===player && stowItem('finger')) { SFX.pickup(); showStatus('🎒 Sikuna Finger stowed', '#26de81'); }
                     else { picker.hp = picker.maxHp; picker.sikunaBuff = 600; picker.invincible = Math.max(picker.invincible,60); if(picker===player){SFX.pickup(); showStatus(`🖐️ SIKUNA FINGER EATEN! +50% SPD/DMG 10s (${picker.sikunaFingersUsed}/30)`, '#ff2d55');} }
                 }
+                else if (pk.type==='candy') {
+                    if (picker===player) { addCandy(pk.n||1); SFX.coin(); showStatus(`🍬 +${pk.n||1} candy (${candy})`, '#ff9ff3'); }
+                }
                 // Everything else that lives in the backpack: chili, bomb, freeze, shield, power.
                 // These are all "save it for the right moment" items, so they stow by default — but a
                 // full pack fires them off immediately rather than letting the pickup go to waste.
@@ -15978,7 +16107,7 @@ const col = b.color || BLDG_COLORS[0];
         for (const m of monsters)     sprites.push({ x:m.x, y:m.y, size: m.r*2.4, emoji: m.emoji, color: m.color, hpBar: m.hp/m.maxHp });
         for (const pk of pickups) {
             // Emoji comes from the backpack item table so a new item only has to be defined once.
-            const e = pk.type==='sikunaFinger' ? '🖐️' : (BP_ITEM[pk.type] ? BP_ITEM[pk.type].emoji : '🪙');
+            const e = pk.type==='sikunaFinger' ? '🖐️' : pk.type==='candy' ? '🍬' : (BP_ITEM[pk.type] ? BP_ITEM[pk.type].emoji : '🪙');
             sprites.push({ x:pk.x, y:pk.y, size: 22, emoji: e, hover: 6 });
         }
         for (const t of traps) sprites.push({ x:t.x, y:t.y, size: t.r*1.8, emoji: t.emoji, color: t.color });
@@ -17401,7 +17530,10 @@ const col = b.color || BLDG_COLORS[0];
         backrooms2:['pipe','crate','barrel'],
         ..._brRows(f => f.props),
     };
-    function PROPS_FOR(w) { return (w && PROP_SETS[w.id]) || PROP_SETS.city; }
+    function PROPS_FOR(w) {
+        const set = (w && PROP_SETS[w.id]) || PROP_SETS.city;
+        return isHalloween() ? set.concat(['jackolantern', 'jackolantern']) : set;   // 🎃 every world, while the event is on
+    }
 
     function buildProp(kind, takeLight) {
         const g = new THREE.Group();
@@ -17650,6 +17782,17 @@ const col = b.color || BLDG_COLORS[0];
                 const stainM = M('bkr-stain', { color: 0x9c8350, roughness: 0.95 });
                 const t = put(TG.Box(22, 1, 22), tileM, 0.6); t.rotation.z = 0.04;
                 put(TG.Cylinder(6, 6, 0.4, 10), stainM, 1.3, 3, -2).scale.set(1, 1, 0.7);
+                break;
+            }
+            case 'jackolantern': {
+                // 🎃 A carved pumpkin with a glowing face (Halloween event). Self-lit; no real light.
+                const pumpM = M('jack', { color: 0xff7a00, roughness: 0.6, emissive: 0x6a2200, emissiveIntensity: 0.4 });
+                const stemM = M('jack-stem', { color: 0x4e7a1e, roughness: 0.8 });
+                const glowM = _pf('prop-jack-glow', () => new THREE.MeshBasicMaterial({ color: 0xffd23a }));
+                const body = put(TG.Sphere(10, 16, 12), pumpM, 9); body.scale.set(1.15, 0.85, 1.15);
+                put(TG.Cylinder(1.4, 1.8, 5, 8), stemM, 18.5);
+                for (const ex of [-4, 4]) { const e = put(TG.Cone(2.2, 3.5, 3), glowM, 11, ex, 10.6); e.rotation.x = Math.PI/2; }
+                put(TG.Box(9, 2.2, 1), glowM, 6.5, 0, 10.4);
                 break;
             }
             case 'exitSign': {
@@ -18662,7 +18805,7 @@ const col = b.color || BLDG_COLORS[0];
 
     function makePickupMesh(pk) {
         const g = new THREE.Group();
-        const colHex = pk.type==='sikunaFinger' ? '#ff2d55' : (BP_ITEM[pk.type] ? BP_ITEM[pk.type].color : '#feca57');
+        const colHex = pk.type==='sikunaFinger' ? '#ff2d55' : pk.type==='candy' ? '#ff9ff3' : (BP_ITEM[pk.type] ? BP_ITEM[pk.type].color : '#feca57');
         const col = _hex(colHex);
         // Glowing halo disc on the ground
         const halo = new THREE.Mesh(TG.Ring(8, 14, 28), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
@@ -18682,6 +18825,12 @@ const col = b.color || BLDG_COLORS[0];
             // White shine highlight
             const shine = new THREE.Mesh(TG.Sphere(1.2, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
             shine.position.set(-3, 4, 2.2); g.add(shine);
+        } else if (pk.type === 'candy') {
+            // A wrapped sweet — round middle, twisted wrapper ends.
+            const sweet = new THREE.MeshStandardMaterial({ color: 0xff6bcb, roughness: 0.25, metalness: 0.2, emissive: 0xff6bcb, emissiveIntensity: 0.3 });
+            const wrap = new THREE.MeshStandardMaterial({ color: 0xffe066, roughness: 0.4, metalness: 0.3 });
+            g.add(new THREE.Mesh(TG.Sphere(4, 14, 10), sweet));
+            for (const sx of [-1, 1]) { const c = new THREE.Mesh(TG.Cone(3, 5, 10), wrap); c.rotation.z = sx * Math.PI/2; c.position.x = sx * 6; g.add(c); }
         } else if (pk.type === 'ammo') {
             // Bullet cartridge — brass body + pointed copper tip
             const brass = new THREE.MeshStandardMaterial({ color: 0xfeca57, metalness: 0.95, roughness: 0.18, envMapIntensity: 1.8 });
@@ -20831,8 +20980,8 @@ const col = b.color || BLDG_COLORS[0];
         ctx.font='16px serif';ctx.textAlign='center';
         for (const pk of pickups) {
             if (pk.x < _cvx0 || pk.x > _cvx1 || pk.y < _cvy0 || pk.y > _cvy1) continue;
-            const tColor = pk.type==='health'?'#ff3838':pk.type==='ammo'?'#48dbfb':pk.type==='chili'?'#e17055':pk.type==='sikunaFinger'?'#ff2d55':'#feca57';
-            const tEmoji = pk.type==='health'?'❤️':pk.type==='ammo'?'🔫':pk.type==='chili'?'🌶️':pk.type==='sikunaFinger'?'🖐️':'🪙';
+            const tColor = pk.type==='health'?'#ff3838':pk.type==='ammo'?'#48dbfb':pk.type==='chili'?'#e17055':pk.type==='sikunaFinger'?'#ff2d55':pk.type==='candy'?'#ff9ff3':'#feca57';
+            const tEmoji = pk.type==='health'?'❤️':pk.type==='ammo'?'🔫':pk.type==='chili'?'🌶️':pk.type==='sikunaFinger'?'🖐️':pk.type==='candy'?'🍬':'🪙';
             const fade = pk.life < 60 ? pk.life/60 : 1;
             const t = Date.now()/200;
             const bob = Math.sin(t + pk.x*0.01) * 4;

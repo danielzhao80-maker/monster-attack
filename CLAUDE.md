@@ -117,6 +117,7 @@ node tools/test-ultimates.js index.html     # ultimate forms: enter, transform, 
 node tools/test-world-styles.js index.html  # per-world architecture across all 30 worlds
 node tools/test-summons-look.js index.html  # summons: one 2D+3D look per kind, mechanics unchanged
 node tools/test-special-maps.js index.html  # ⭐ Special Maps: lock/unlock, Backrooms run, save, City fallback
+node tools/test-halloween.js index.html     # 🎃 Halloween: dates, candy, Pumpkin King, jack-o'-lanterns, candy shop
 ```
 
 ### Saves
@@ -485,3 +486,12 @@ Allies carry a `kind` stamped where they are created (skeleton, wolf, clone, dec
 them; all stand on a green friendly ring. A summon with no kind falls back to the skeleton. New
 summon? Give it a kind, a 2D case and a 3D builder — `test-summons-look.js` checks all three and
 compares mechanics against a recorded baseline.
+
+### 🎃 Halloween event
+`isHalloween()` is on 1 Oct – 7 Nov (override: localStorage `monster_attack_event_force` = 'halloween'/'off').
+While on: `halloweenOnKill` drops `candy` pickups (30%; bosses 15, Pumpkin King 25), boss waves are the
+Pumpkin King 35% of the time (rollMonsterClass), PROPS_FOR adds `jackolantern`, and the 🎃 menu button
+opens a candy shop (HALLOWEEN_SHOP; two items are secret arcade-shop items: title `pumpkin`, gun skin
+`gun-jack-o-lantern`). Candy is `monster_attack_candy` (synced). Tests that care about the normal boss
+pair must force the event off. `node tools/test-halloween.js` covers it.
+

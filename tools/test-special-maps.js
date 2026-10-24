@@ -193,7 +193,8 @@ check(q(`worldSky(currentWorld, TIME_OF_DAY[2]).top`) === 0xe6da9a && q(`groundA
       'pale-yellow ceiling sky and damp carpet underfoot');
 check(q(`worldFxName(currentWorld)`) === 'motes' && q(`AMBIENCE.bedFor('backrooms')`) === 'fluoro', 'dust motes and fluorescent hum');
 check(q(`currentWorld.fogDensity > 0.00042`) === true, 'the haze is thicker than an ordinary world');
-check(q(`(function(){ wave = 10; var b = rollMonsterClass(); wave = 1; return currentWorld.bosses.indexOf(b.name) > -1; })()`) === true,
+// (Halloween off: during the event the Pumpkin King may take any boss wave.)
+check(q(`(function(){ localStorage.setItem('monster_attack_event_force', 'off'); wave = 10; var b = rollMonsterClass(); wave = 1; localStorage.removeItem('monster_attack_event_force'); return currentWorld.bosses.indexOf(b.name) > -1; })()`) === true,
       'boss waves summon a Backrooms boss');
 check(q(`themeMonster(MONSTER_CLASSES.find(function(c){return c.name==='Frost';})).name`) === 'Smiler', 'Frost is re-skinned as the Smiler');
 
