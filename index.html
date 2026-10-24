@@ -671,10 +671,17 @@
         <div id="halloween-days" style="font-weight:800;font-size:0.9em;color:#d6a2ff;margin-bottom:10px;"></div>
         <div id="halloween-candy" style="font-family:'Fredoka One',cursive;font-size:1.6em;color:#ff9ff3;margin-bottom:8px;">🍬 0</div>
         <div style="max-width:520px;text-align:center;font-size:0.85em;line-height:1.5;margin-bottom:14px;color:#f3d9ff;">
-            Monsters drop <b>🍬 candy</b> while the event is on. Bosses drop a whole bag.<br>
-            Every boss wave might be the <b>🎃 Pumpkin King</b> — beat him for <b>25 extra candy</b>.<br>
-            Jack-o'-lanterns light up every world. Spend candy below before the event ends!
+            <b>🍬 Candy</b> is this event's points. Get it by: killing monsters (bosses drop a bag) ·
+            beating the <b>🎃 Pumpkin King</b> on boss waves (25) · clearing waves · knocking on the glowing
+            <b>🚪 trick-or-treat door</b> each wave (watch the minimap!) · the <b>🎁 daily treat</b> · the code <b>TRICKORTREAT</b> (once a day).<br>
+            Candy fills the <b>Halloween Pass</b> (spending never takes progress away) and buys things in the shop.
         </div>
+        <div id="halloween-daily" style="margin-bottom:12px;"></div>
+        <div id="halloween-pass-head" style="font-family:'Fredoka One',cursive;color:#ff8c1a;margin:4px 0;"></div>
+        <div style="width:100%;max-width:520px;height:14px;background:rgba(255,255,255,0.12);border-radius:10px;overflow:hidden;margin-bottom:8px;"><div id="halloween-pass-fill" style="width:0%;height:100%;background:linear-gradient(90deg,#ff8c1a,#ff9ff3);"></div></div>
+        <button class="btn" style="padding:6px 20px;font-size:0.8em;margin-bottom:8px;background:linear-gradient(180deg,#a55eea,#5a1a8a);box-shadow:0 3px 0 #2a0a4a;" onclick="claimAllHw()">Claim all</button>
+        <div id="halloween-pass" style="display:flex;flex-direction:column;gap:6px;width:100%;max-width:520px;margin-bottom:16px;"></div>
+        <div style="font-family:'Fredoka One',cursive;color:#ff8c1a;margin:4px 0 8px;">🍬 Candy Shop</div>
         <div id="halloween-shop" style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:520px;"></div>
         <button class="btn" style="margin-top:16px;padding:10px 30px;font-size:0.9em;background:linear-gradient(180deg,#636e72,#2d3436);box-shadow:0 4px 0 #000;" onclick="closeHalloweenScreen()">Back</button>
     </div>
@@ -4912,18 +4919,122 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const end = new Date(d.getFullYear(), 10, 8);            // the morning after 7 November
         return Math.max(0, Math.ceil((end - d) / 86400000));
     }
-    let candy = 0;
-    function loadCandy() { try { candy = Math.max(0, parseInt(localStorage.getItem(CANDY_KEY)) || 0); } catch (e) { candy = 0; } }
-    function saveCandy() { try { localStorage.setItem(CANDY_KEY, String(candy)); } catch (e) {} }
-    function addCandy(n) { candy += n; saveCandy(); }
+    // Candy is the event's points. Two numbers: `candy` is your wallet (spent in the candy shop),
+    // `candyEarned` is everything you have collected THIS year's event — it is what fills the
+    // 🎃 Halloween Pass, so spending candy never loses you pass progress.
+    let candy = 0, candyEarned = 0, hwClaimed = [];
+    const hwYear = (d) => (d || new Date()).getFullYear();
+    const HW_EARNED_KEY = () => 'monster_attack_hw_earned_' + hwYear();
+    const HW_CLAIMED_KEY = () => 'monster_attack_hw_claimed_' + hwYear();
+    const HW_DAILY_KEY = 'monster_attack_hw_daily';
+    function loadCandy() {
+        try {
+            candy = Math.max(0, parseInt(localStorage.getItem(CANDY_KEY)) || 0);
+            candyEarned = Math.max(0, parseInt(localStorage.getItem(HW_EARNED_KEY())) || 0);
+            hwClaimed = JSON.parse(localStorage.getItem(HW_CLAIMED_KEY()) || '[]');
+            if (!Array.isArray(hwClaimed)) hwClaimed = [];
+        } catch (e) { candy = 0; candyEarned = 0; hwClaimed = []; }
+    }
+    function saveCandy() {
+        try {
+            localStorage.setItem(CANDY_KEY, String(candy));
+            localStorage.setItem(HW_EARNED_KEY(), String(candyEarned));
+            localStorage.setItem(HW_CLAIMED_KEY(), JSON.stringify(hwClaimed));
+        } catch (e) {}
+    }
+    function addCandy(n) { candy += n; candyEarned += n; saveCandy(); refreshHalloweenButton(); }
     loadCandy();
-    // arcade: an item in the shared arcade shop (arcade-shop.js) that the candy unlocks for good.
-    const HALLOWEEN_SHOP = [
-        { id: 'flesh', name: '🍖 100 Flesh',               cost: 10,  give: () => addCoins(100) },
-        { id: 'xp',    name: '🎟️ 250 Season Pass XP',      cost: 20,  give: () => addSeasonXP(250) },
-        { id: 'gun',   name: "🔫 Jack-o'-Lantern gun skin", cost: 50,  arcade: 'gun-jack-o-lantern' },
-        { id: 'title', name: '🎃 Pumpkin King title',       cost: 100, arcade: 'pumpkin' },
+
+    // 🎃 HALLOWEEN PASS — tiers unlock at candy EARNED; claim each once per year's event.
+    // arcade: an item in the shared arcade shop (arcade-shop.js) that the tier unlocks for good.
+    const HW_PASS = [
+        { at: 10,  name: '🍖 200 Flesh',                 type: 'coins',  amount: 200 },
+        { at: 25,  name: '🎟️ 300 Season Pass XP',        type: 'xp',     amount: 300 },
+        { at: 50,  name: '🏆 5 Points',                   type: 'points', amount: 5 },
+        { at: 75,  name: '🍖 500 Flesh',                 type: 'coins',  amount: 500 },
+        { at: 100, name: "🔫 Jack-o'-Lantern gun skin",  type: 'arcade', id: 'gun-jack-o-lantern' },
+        { at: 150, name: '🎟️ 600 Season Pass XP',        type: 'xp',     amount: 600 },
+        { at: 200, name: '🏆 15 Points',                  type: 'points', amount: 15 },
+        { at: 275, name: '🍖 1500 Flesh',                type: 'coins',  amount: 1500 },
+        { at: 350, name: '🏆 25 Points',                  type: 'points', amount: 25 },
+        { at: 500, name: '🎃 Pumpkin King title',         type: 'arcade', id: 'pumpkin' },
     ];
+    function hwTierReached(t) { return candyEarned >= HW_PASS[t].at; }
+    function claimHwTier(t) {
+        const tier = HW_PASS[t];
+        if (!tier || !isHalloween() || !hwTierReached(t) || hwClaimed.indexOf(t) > -1) return false;
+        hwClaimed.push(t);
+        if (tier.type === 'coins') addCoins(tier.amount);
+        else if (tier.type === 'xp') addSeasonXP(tier.amount);
+        else if (tier.type === 'points') { points += tier.amount; savePoints(); }
+        else if (tier.type === 'arcade') grantArcadeItem(tier.id);
+        saveCandy();
+        SFX.coin && SFX.coin();
+        return true;
+    }
+    function claimAllHw() {
+        let n = 0;
+        for (let t = 0; t < HW_PASS.length; t++) if (claimHwTier(t)) n++;
+        renderHalloweenScreen();
+        return n;
+    }
+    function hwUnclaimed() { let n = 0; for (let t = 0; t < HW_PASS.length; t++) if (hwTierReached(t) && hwClaimed.indexOf(t) < 0) n++; return n; }
+
+    // The candy shop: spend the wallet. (The arcade rewards live in the pass now.)
+    const HALLOWEEN_SHOP = [
+        { id: 'flesh',  name: '🍖 100 Flesh',          cost: 10, give: () => addCoins(100) },
+        { id: 'xp',     name: '🎟️ 250 Season Pass XP', cost: 20, give: () => addSeasonXP(250) },
+        { id: 'points', name: '🏆 3 Points',            cost: 30, give: () => { points += 3; savePoints(); } },
+    ];
+    // 🎁 Daily treat: 10 candy once a day, from the Halloween menu.
+    const hwToday = () => new Date().toISOString().slice(0, 10);
+    function hwDailyReady() { try { return isHalloween() && localStorage.getItem(HW_DAILY_KEY) !== hwToday(); } catch (e) { return false; } }
+    function claimHwDaily() {
+        if (!hwDailyReady()) return false;
+        try { localStorage.setItem(HW_DAILY_KEY, hwToday()); } catch (e) {}
+        addCandy(10); SFX.pickup && SFX.pickup();
+        renderHalloweenScreen();
+        return true;
+    }
+    // Clearing a wave: 2 candy, +1 more for every 5 waves you are in.
+    function halloweenOnWaveClear(w) {
+        if (!isHalloween()) return 0;
+        const n = 2 + Math.floor(w / 5);
+        addCandy(n);
+        return n;
+    }
+    // 🚪 TRICK-OR-TREAT DOORS: each wave a glowing door appears a walk away (on the minimap, in
+    // top-down and in 3D). Knock on it: usually a treat (3–8 candy), sometimes a trick (a scare and a
+    // slow — and still 1 candy).
+    let hwDoor = null;
+    function tickHwDoor() {
+        if (!player || NET.mode === 'client' || !isHalloween() || usingCustomMap) { hwDoor = null; return; }
+        if (!hwDoor || hwDoor.wave !== wave) {
+            hwDoor = null;
+            for (let k = 0; k < 60; k++) {
+                const a = Math.random() * Math.PI * 2, d = 600 + Math.random() * 500;
+                const x = player.x + Math.cos(a) * d, y = player.y + Math.sin(a) * d;
+                if (ptInBld(x, y, 40)) continue;
+                hwDoor = { x, y, wave, done: false };
+                break;
+            }
+            return;
+        }
+        if (hwDoor.done || Math.hypot(player.x - hwDoor.x, player.y - hwDoor.y) >= 45) return;
+        hwDoor.done = true;
+        if (Math.random() < 0.7) {
+            const n = 3 + Math.floor(Math.random() * 6);
+            addCandy(n);
+            showStatus(`🚪 Trick or treat? TREAT! 🍬 +${n} candy`, '#ff9ff3');
+            SFX.pickup && SFX.pickup();
+        } else {
+            addCandy(1);
+            player.slow = Math.max(player.slow || 0, 120);
+            showStatus('👻 TRICK! BOO! (🍬 +1 anyway)', '#a29bfe');
+            addShake(8);
+            SFX.scream && SFX.scream();
+        }
+    }
     function arcadeOwns(id) {
         try {
             const s = (window.ArcadeShop && window.ArcadeShop.load) ? window.ArcadeShop.load() : JSON.parse(localStorage.getItem('daniels-arcade-v1') || '{}');
@@ -4941,10 +5052,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function buyHalloween(id) {
         const it = HALLOWEEN_SHOP.find(x => x.id === id);
         if (!it || !isHalloween()) return false;
-        if (it.arcade && arcadeOwns(it.arcade)) return false;
         if (candy < it.cost) { showStatus(`🍬 You need ${it.cost - candy} more candy`, '#ff9ff3'); return false; }
         candy -= it.cost; saveCandy();
-        if (it.arcade) grantArcadeItem(it.arcade); else it.give();
+        it.give();
         SFX.pickup && SFX.pickup();
         renderHalloweenScreen();
         return true;
@@ -4954,19 +5064,33 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const $ = (i) => document.getElementById(i);
         $('halloween-days').textContent = isHalloween() ? (days > 1 ? `Ends in ${days} days` : 'Last day!') : 'The event is over — see you next October';
         $('halloween-candy').textContent = `🍬 ${candy} candy`;
+        const on = isHalloween();
+        const rowCss = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;border-radius:14px;background:rgba(255,140,26,0.12);border:2px solid #ff8c1a;';
+        const btnCss = 'padding:6px 16px;font-size:0.8em;background:linear-gradient(180deg,#ff8c1a,#d35400);box-shadow:0 3px 0 #5a1a8a;';
+        const mkBtn = (label, disabled, onclick, tag) => { const b = document.createElement('button'); b.className = 'btn'; b.style.cssText = btnCss; b.textContent = label; b.disabled = disabled; b.onclick = onclick; if (tag) b.dataset.hw = tag; return b; };
+        // Daily treat
+        const daily = $('halloween-daily'); daily.innerHTML = '';
+        daily.appendChild(mkBtn(hwDailyReady() ? '🎁 Daily treat: +10 🍬' : '🎁 Daily treat collected — come back tomorrow', !hwDailyReady(), claimHwDaily, 'daily'));
+        // The pass
+        const next = HW_PASS.find(t => candyEarned < t.at);
+        $('halloween-pass-head').textContent = `🎃 Halloween Pass — ${candyEarned} candy collected` + (next ? ` · next reward at ${next.at}` : ' · all unlocked!');
+        $('halloween-pass-fill').style.width = Math.min(100, candyEarned / HW_PASS[HW_PASS.length - 1].at * 100) + '%';
+        const pass = $('halloween-pass'); pass.innerHTML = '';
+        HW_PASS.forEach((t, i) => {
+            const row = document.createElement('div'); row.style.cssText = rowCss + (hwTierReached(i) ? '' : 'opacity:0.55;');
+            row.innerHTML = `<span style="font-weight:800;"><span style="color:#ff9ff3;">🍬 ${t.at}</span> &nbsp;${t.name}${t.type === 'arcade' ? ' <span style="font-size:0.75em;color:#d6a2ff;">(arcade, every game)</span>' : ''}</span>`;
+            const claimed = hwClaimed.indexOf(i) > -1;
+            row.appendChild(mkBtn(claimed ? '✅ Claimed' : hwTierReached(i) ? 'Claim' : '🔒', claimed || !hwTierReached(i) || !on,
+                () => { claimHwTier(i); renderHalloweenScreen(); }, 'tier' + i));
+            pass.appendChild(row);
+        });
+        // The shop
         const box = $('halloween-shop'); box.innerHTML = '';
         for (const it of HALLOWEEN_SHOP) {
-            const owned = it.arcade && arcadeOwns(it.arcade);
-            const row = document.createElement('div');
-            row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-radius:14px;background:rgba(255,140,26,0.12);border:2px solid #ff8c1a;';
-            row.innerHTML = `<span style="font-weight:800;">${it.name}${it.arcade ? ' <span style="font-size:0.75em;color:#d6a2ff;">(arcade, every game)</span>' : ''}</span>`;
-            const b = document.createElement('button');
-            b.className = 'btn'; b.dataset.hw = it.id;
-            b.style.cssText = 'padding:6px 16px;font-size:0.8em;background:linear-gradient(180deg,#ff8c1a,#d35400);box-shadow:0 3px 0 #5a1a8a;';
-            b.textContent = owned ? '✅ Owned' : `🍬 ${it.cost}`;
-            b.disabled = owned || !isHalloween() || candy < it.cost;
-            b.onclick = () => buyHalloween(it.id);
-            row.appendChild(b); box.appendChild(row);
+            const row = document.createElement('div'); row.style.cssText = rowCss;
+            row.innerHTML = `<span style="font-weight:800;">${it.name}</span>`;
+            row.appendChild(mkBtn(`🍬 ${it.cost}`, !on || candy < it.cost, () => buyHalloween(it.id), it.id));
+            box.appendChild(row);
         }
     }
     function openHalloweenScreen() {
@@ -4984,7 +5108,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const b = document.getElementById('halloween-btn'); if (!b) return;
         b.style.display = isHalloween() ? '' : 'none';
         const badge = document.getElementById('halloween-badge');
-        if (badge) badge.textContent = candy > 0 ? ` 🍬${candy}` : '';
+        const ready = hwUnclaimed() + (hwDailyReady() ? 1 : 0);
+        if (badge) badge.textContent = (candy > 0 ? ` 🍬${candy}` : '') + (ready ? ` (${ready})` : '');
     }
     // Candy from a kill. Normal monsters: 30% for one piece. Bosses: a bag of 5 (×3 each), and the
     // Pumpkin King spills 5 pieces worth 5 each — 25 candy.
@@ -12341,6 +12466,7 @@ const col = b.color || BLDG_COLORS[0];
         astralSecretTick();   // Astral Temple secret spot (invisible) — places it and drops a faint sparkle
         tickTileHole();       // The Lobby: looking up through a fallen tile's hole unlocks Floor 1
         tickFloorExit();      // Floors 1–19: survive, then reach the exit to unlock the next floor
+        tickHwDoor();         // 🎃 the trick-or-treat door
 
         // Timers
         if (p.frozen > 0) { p.frozen--; if (p.frozen===0) p.disableImmune = 120; }
@@ -13145,6 +13271,7 @@ const col = b.color || BLDG_COLORS[0];
 
         // Wave complete — roll new monster class + auto save
         if (monstersSpawned >= monstersToSpawn && monsters.length === 0) {
+            halloweenOnWaveClear(wave);   // 🎃 candy for clearing it
             wave++; monstersSpawned = 0; spawnTimer = 90;
             bossHabitat = null; // the last boss's arena drains away with it
             setTimeOfDayForWave(wave);
@@ -16112,6 +16239,7 @@ const col = b.color || BLDG_COLORS[0];
         }
         for (const t of traps) sprites.push({ x:t.x, y:t.y, size: t.r*1.8, emoji: t.emoji, color: t.color });
         if (brExit && !brExit.done) sprites.push({ x:brExit.x, y:brExit.y, size: 60, emoji: brExit.emoji, color: '#feca57' });
+        if (hwDoor && !hwDoor.done) sprites.push({ x:hwDoor.x, y:hwDoor.y, size: 50, emoji: '🚪', color: '#ff8c1a' });
         for (const a of allies)   sprites.push({ x:a.x, y:a.y, size: 34, emoji: SUMMON_EMOJI[summonKind(a)], color: FRIEND_COL });
         for (const tu of turrets) sprites.push({ x:tu.x, y:tu.y, size: 34, emoji: '🤖' });
         for (const b of bullets)  sprites.push({ x:b.x, y:b.y, size: 14, emoji: b.bemoji || '•', color: b.color || '#ffcc00', hover: 22 });
@@ -16502,25 +16630,30 @@ const col = b.color || BLDG_COLORS[0];
     }
     // The floor exit in 3D: a dark door frame around a glowing doorway, turned to face the player,
     // with a faint shaft of light so it shows down a corridor. Self-lit; no real lights.
+    function makeGlowDoor3D(glow, frame) {
+        const g = new THREE.Group();
+        const frameM = new THREE.MeshStandardMaterial({ color: frame, roughness: 0.8 });
+        const glowM = new THREE.MeshBasicMaterial({ color: glow });
+        const beamM = new THREE.MeshBasicMaterial({ color: glow, transparent: true, opacity: 0.18, depthWrite: false });
+        for (const sx of [-30, 30]) { const post = new THREE.Mesh(new THREE.BoxGeometry(8, 90, 8), frameM); post.position.set(sx, 45, 0); g.add(post); }
+        const lintel = new THREE.Mesh(new THREE.BoxGeometry(68, 8, 8), frameM); lintel.position.set(0, 94, 0); g.add(lintel);
+        const door = new THREE.Mesh(new THREE.PlaneGeometry(52, 88), glowM); door.position.set(0, 45, 0); g.add(door);
+        const beam = new THREE.Mesh(new THREE.CylinderGeometry(40, 40, 400, 16, 1, true), beamM); beam.position.set(0, 200, 0); g.add(beam);
+        _three.scene.add(g);
+        return g;
+    }
+    function placeGlowDoor3D(key, spot, glow, frame) {
+        let g = _three[key];
+        if (!spot || spot.done) { if (g) g.visible = false; return; }
+        if (!g) g = _three[key] = makeGlowDoor3D(glow, frame);
+        g.visible = true;
+        g.position.set(spot.x, 0, spot.y);
+        if (player) g.rotation.y = Math.atan2(player.x - spot.x, player.y - spot.y);
+    }
     function updateExit3D() {
         if (!_three) return;
-        let g = _three.exitMesh;
-        const show = brExit && !brExit.done;
-        if (!show) { if (g) g.visible = false; return; }
-        if (!g) {
-            g = new THREE.Group();
-            const frameM = new THREE.MeshStandardMaterial({ color: 0x2d2a26, roughness: 0.8 });
-            const glowM = new THREE.MeshBasicMaterial({ color: 0xfff2a8 });
-            const beamM = new THREE.MeshBasicMaterial({ color: 0xfff2a8, transparent: true, opacity: 0.18, depthWrite: false });
-            for (const sx of [-30, 30]) { const post = new THREE.Mesh(new THREE.BoxGeometry(8, 90, 8), frameM); post.position.set(sx, 45, 0); g.add(post); }
-            const lintel = new THREE.Mesh(new THREE.BoxGeometry(68, 8, 8), frameM); lintel.position.set(0, 94, 0); g.add(lintel);
-            const door = new THREE.Mesh(new THREE.PlaneGeometry(52, 88), glowM); door.position.set(0, 45, 0); g.add(door);
-            const beam = new THREE.Mesh(new THREE.CylinderGeometry(40, 40, 400, 16, 1, true), beamM); beam.position.set(0, 200, 0); g.add(beam);
-            _three.scene.add(g); _three.exitMesh = g;
-        }
-        g.visible = true;
-        g.position.set(brExit.x, 0, brExit.y);
-        if (player) g.rotation.y = Math.atan2(player.x - brExit.x, player.y - brExit.y);
+        placeGlowDoor3D('exitMesh', brExit, 0xfff2a8, 0x2d2a26);
+        placeGlowDoor3D('hwDoorMesh', hwDoor, 0xff8c1a, 0x3a1a4a);   // 🎃 trick-or-treat door
     }
     // The hole a fallen ceiling tile leaves in the Lobby (only while the Floor 1 secret is live): a
     // dark opening just under the lid, fading to the grey concrete of the floor above in the middle.
@@ -20905,6 +21038,16 @@ const col = b.color || BLDG_COLORS[0];
             ctx.fillText(brExit.emoji, brExit.x, brExit.y);
             ctx.textBaseline = 'alphabetic';
         }
+        // 🎃 Trick-or-treat door — an orange glow with a door and a pumpkin
+        if (hwDoor && !hwDoor.done) {
+            const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
+            const g = ctx.createRadialGradient(hwDoor.x, hwDoor.y, 4, hwDoor.x, hwDoor.y, 60);
+            g.addColorStop(0, 'rgba(255,140,26,' + (0.5 + 0.3 * pulse) + ')'); g.addColorStop(1, 'rgba(255,140,26,0)');
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(hwDoor.x, hwDoor.y, 60, 0, Math.PI * 2); ctx.fill();
+            ctx.font = '34px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('🚪', hwDoor.x, hwDoor.y); ctx.font = '18px serif'; ctx.fillText('🎃', hwDoor.x + 18, hwDoor.y + 14);
+            ctx.textBaseline = 'alphabetic';
+        }
         // Traps — viewport culled
         const _cvx0 = _vx0 - 40, _cvy0 = _vy0 - 40;
         const _cvx1 = _vx1 + 40, _cvy1 = _vy1 + 40;
@@ -21649,6 +21792,12 @@ const col = b.color || BLDG_COLORS[0];
         // Traps — orange dots (active only)
         mctx.fillStyle = '#ff9f43';
         for (const t of traps) { if (t.cooldown <= 0) { mctx.beginPath(); mctx.arc(px2(t.x), py2(t.y), 1.6, 0, Math.PI*2); mctx.fill(); } }
+        // 🎃 Trick-or-treat door — an orange dot, pinned to the edge when it is off the map
+        if (hwDoor && !hwDoor.done) {
+            const dx = Math.max(6, Math.min(MW - 6, px2(hwDoor.x))), dy = Math.max(6, Math.min(MH - 6, py2(hwDoor.y)));
+            mctx.fillStyle = '#ff8c1a'; mctx.beginPath(); mctx.arc(dx, dy, 5, 0, Math.PI*2); mctx.fill();
+            mctx.strokeStyle = '#fff'; mctx.lineWidth = 1; mctx.stroke();
+        }
         // Backrooms exit — a yellow star, pinned to the edge when it is off the map
         if (brExit && !brExit.done) {
             const ex = Math.max(6, Math.min(MW - 6, px2(brExit.x))), ey = Math.max(6, Math.min(MH - 6, py2(brExit.y)));
@@ -22670,6 +22819,7 @@ const col = b.color || BLDG_COLORS[0];
 
     const CODES = {
         'DANIEL':     { reward: 'coins', amount: 500, msg: '+500 Rotten Flesh!' },
+        'TRICKORTREAT': { reward: 'candy', amount: 15, msg: '🎃 +15 candy! (once a day, during Halloween)' },
         'MONSTER':    { reward: 'coins', amount: 300, msg: '+300 Rotten Flesh!' },
         'RICH':       { reward: 'coins', amount: 1000, msg: '+1000 Rotten Flesh!' },
         'GLITCH':     { reward: 'class', className: 'Glitch', msg: 'Unlocked Glitch for next roll!' },
@@ -22808,6 +22958,11 @@ const col = b.color || BLDG_COLORS[0];
             msgEl.style.color = '#ff6b6b'; msgEl.textContent = 'Invalid code!';
             return;
         }
+        // The Halloween code: only during the event, and once a day (not the usual ten).
+        if (reward.reward === 'candy') {
+            if (!isHalloween()) { msgEl.style.color = '#ff6b6b'; msgEl.textContent = '🎃 Come back at Halloween!'; return; }
+            if (usesToday > 0) { msgEl.style.color = '#ff6b6b'; msgEl.textContent = '🎃 Already used today — try tomorrow!'; return; }
+        }
 
         markCodeUsed(code);
         SFX.rollResult('legendary');
@@ -22815,6 +22970,9 @@ const col = b.color || BLDG_COLORS[0];
         if (reward.reward === 'coins') {
             addCoins(reward.amount);
             msgEl.style.color = '#f9ca24'; msgEl.textContent = reward.msg;
+        } else if (reward.reward === 'candy') {
+            addCandy(reward.amount);
+            msgEl.style.color = '#ff9ff3'; msgEl.textContent = reward.msg;
         } else if (reward.reward === 'class') {
             guaranteedClass = CLASSES.find(c => c.name === reward.className) || null;
             msgEl.style.color = '#26de81'; msgEl.textContent = reward.msg;
@@ -24207,7 +24365,7 @@ const col = b.color || BLDG_COLORS[0];
 
     function startGame() {
         if (!chosenClass) return;
-        brExit = null;
+        brExit = null; hwDoor = null;
         ensureWorldAllowed();
         if (isPlayerBanned(playerName)) { alert('You are BANNED! Contact an Admin or Owner.'); return; }
         document.getElementById('roll-screen').style.display = 'none';

@@ -491,7 +491,11 @@ compares mechanics against a recorded baseline.
 `isHalloween()` is on 1 Oct – 7 Nov (override: localStorage `monster_attack_event_force` = 'halloween'/'off').
 While on: `halloweenOnKill` drops `candy` pickups (30%; bosses 15, Pumpkin King 25), boss waves are the
 Pumpkin King 35% of the time (rollMonsterClass), PROPS_FOR adds `jackolantern`, and the 🎃 menu button
-opens a candy shop (HALLOWEEN_SHOP; two items are secret arcade-shop items: title `pumpkin`, gun skin
-`gun-jack-o-lantern`). Candy is `monster_attack_candy` (synced). Tests that care about the normal boss
+opens the event menu. Candy is the event's points: `candy` (wallet, `monster_attack_candy`) is spent in
+the HALLOWEEN_SHOP; `candyEarned` (`monster_attack_hw_earned_<year>`) fills the 🎃 Halloween Pass
+(HW_PASS, 10 tiers, claimed list `monster_attack_hw_claimed_<year>`; the gun skin `gun-jack-o-lantern` and
+title `pumpkin` are secret arcade-shop items granted by tiers). Candy sources: kills, bosses, wave
+clears (halloweenOnWaveClear), the 🎁 daily treat, code TRICKORTREAT (once a day, event only) and the
+🚪 trick-or-treat door each wave (`hwDoor`, tickHwDoor; drawn like the Backrooms exit via placeGlowDoor3D). Tests that care about the normal boss
 pair must force the event off. `node tools/test-halloween.js` covers it.
 
