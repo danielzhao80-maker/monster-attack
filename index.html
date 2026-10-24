@@ -4942,7 +4942,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             localStorage.setItem(HW_CLAIMED_KEY(), JSON.stringify(hwClaimed));
         } catch (e) {}
     }
-    function addCandy(n) { candy += n; candyEarned += n; saveCandy(); refreshHalloweenButton(); }
+    // The arcade page adds candy to the same keys while this game is open (play-time candy, the
+    // pumpkin patch), so every change re-reads storage first instead of writing a stale number back.
+    function addCandy(n) { loadCandy(); candy += n; candyEarned += n; saveCandy(); refreshHalloweenButton(); }
     loadCandy();
 
     // 🎃 HALLOWEEN PASS — tiers unlock at candy EARNED; claim each once per year's event.
@@ -4961,6 +4963,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     ];
     function hwTierReached(t) { return candyEarned >= HW_PASS[t].at; }
     function claimHwTier(t) {
+        loadCandy();
         const tier = HW_PASS[t];
         if (!tier || !isHalloween() || !hwTierReached(t) || hwClaimed.indexOf(t) > -1) return false;
         hwClaimed.push(t);
@@ -5050,6 +5053,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         } catch (e) { return false; }
     }
     function buyHalloween(id) {
+        loadCandy();
         const it = HALLOWEEN_SHOP.find(x => x.id === id);
         if (!it || !isHalloween()) return false;
         if (candy < it.cost) { showStatus(`🍬 You need ${it.cost - candy} more candy`, '#ff9ff3'); return false; }
@@ -5060,6 +5064,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         return true;
     }
     function renderHalloweenScreen() {
+        loadCandy();
         const days = halloweenDaysLeft();
         const $ = (i) => document.getElementById(i);
         $('halloween-days').textContent = isHalloween() ? (days > 1 ? `Ends in ${days} days` : 'Last day!') : 'The event is over — see you next October';

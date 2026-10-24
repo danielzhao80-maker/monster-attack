@@ -206,7 +206,7 @@ check(q(`buyHalloween('points')`) === true && q(`buyHalloween('points')`) === fa
 check(q(`localStorage.getItem('monster_attack_candy')`) === '10', 'spending is saved');
 
 // ---- the Halloween Pass (fills from candy EARNED) ----
-q(`candy = 0; candyEarned = 0; hwClaimed = []; saveCandy(); coins = 0n; seasonXP = 0; points = 0;`);
+q(`candy = 0; saveCandy(); candyEarned = 0; hwClaimed = []; saveCandy(); coins = 0n; seasonXP = 0; points = 0;`);
 check(q(`HW_PASS.length`) === 10 && q(`HW_PASS[HW_PASS.length-1].id`) === 'pumpkin', '10 tiers, the 🎃 Pumpkin King title at the top');
 check(q(`claimHwTier(0)`) === false, 'a tier is locked until you have earned enough candy');
 q(`addCandy(30)`);
@@ -228,19 +228,25 @@ q(`document.getElementById('halloween-pass').children.length = 0; renderHallowee
 const passHead = q(`document.getElementById('halloween-pass-head').textContent`);
 check(q(`document.getElementById('halloween-pass').children.length`) === 10 && /500 candy collected/.test(passHead), 'the menu shows the pass', passHead + ' / ' + q(`document.getElementById('halloween-pass').children.length`));
 
+// ---- the arcade adds candy to the same keys while the game is open ----
+q(`candy = 5; candyEarned = 5; saveCandy();`);
+q(`localStorage.setItem('monster_attack_candy', '25'); localStorage.setItem('monster_attack_hw_earned_' + new Date().getFullYear(), '25');`);   // the arcade page: +20
+q(`addCandy(1)`);
+check(q('candy') === 26 && q('candyEarned') === 26, "candy the arcade added while playing is not overwritten", q('candy') + '/' + q('candyEarned'));
+
 // ---- other ways to get candy ----
-q(`candy = 0; candyEarned = 0; hwClaimed = []; saveCandy(); localStorage.removeItem('monster_attack_hw_daily');`);
+q(`candy = 0; saveCandy(); candyEarned = 0; hwClaimed = []; saveCandy(); localStorage.removeItem('monster_attack_hw_daily');`);
 check(q(`claimHwDaily()`) === true && q('candy') === 10, '🎁 daily treat: +10');
 check(q(`claimHwDaily()`) === false && q('candy') === 10, 'once a day');
 check(q(`halloweenOnWaveClear(3)`) === 2 && q(`halloweenOnWaveClear(12)`) === 4 && q('candy') === 16, 'clearing a wave: 2, +1 per 5 waves');
 // A real wave clear pays it.
-check(q(`(function(){ gameRunning=false; startGame(); candy = 0; waveIntroTimer = 0; monsters = []; monstersSpawned = monstersToSpawn; update(); return candy; })()`) === 2, 'a real wave clear pays out');
+check(q(`(function(){ gameRunning=false; startGame(); candy = 0; saveCandy(); waveIntroTimer = 0; monsters = []; monstersSpawned = monstersToSpawn; update(); return candy; })()`) === 2, 'a real wave clear pays out');
 // The trick-or-treat door.
 const door = JSON.parse(q(`(function(){
   gameRunning=false; startGame(); waveIntroTimer = 0; monsters = []; monstersSpawned = 0; monstersToSpawn = 99; __freezeMonsters = true;
   tickHwDoor(); var o = { made: !!hwDoor };
   if (hwDoor) { o.dist = Math.round(Math.hypot(hwDoor.x - player.x, hwDoor.y - player.y)); o.inWall = ptInBld(hwDoor.x, hwDoor.y, 30); }
-  candy = 0; player.x = hwDoor.x; player.y = hwDoor.y; tickHwDoor(); o.done = hwDoor.done; o.candy = candy;
+  candy = 0; saveCandy(); player.x = hwDoor.x; player.y = hwDoor.y; tickHwDoor(); o.done = hwDoor.done; o.candy = candy;
   tickHwDoor(); o.again = candy;
   wave++; tickHwDoor(); o.newDoor = !!hwDoor && !hwDoor.done;
   __freezeMonsters = false;
@@ -248,14 +254,14 @@ const door = JSON.parse(q(`(function(){
 check(door.made && door.dist >= 600 && door.dist <= 1100 && !door.inWall, 'a trick-or-treat door appears a walk away', door.dist + ' units');
 check(door.done && door.candy >= 1 && door.candy <= 8 && door.again === door.candy, 'knocking gives a treat (3-8) or a trick (1), once', door.candy + ' candy');
 check(door.newDoor, 'and a new door comes with the next wave');
-const treats = q(`(function(){ var t = 0; for (var i = 0; i < 400; i++) { hwDoor = null; tickHwDoor(); candy = 0; player.x = hwDoor.x; player.y = hwDoor.y; player.slow = 0; tickHwDoor(); if (candy >= 3) t++; } return t; })()`);
+const treats = q(`(function(){ var t = 0; for (var i = 0; i < 400; i++) { hwDoor = null; tickHwDoor(); candy = 0; saveCandy(); player.x = hwDoor.x; player.y = hwDoor.y; player.slow = 0; tickHwDoor(); if (candy >= 3) t++; } return t; })()`);
 check(treats > 240 && treats < 320, 'about 70% treats', treats + '/400');
 force('off');
 check(q(`(function(){ hwDoor = null; tickHwDoor(); return hwDoor; })()`) === null && q(`halloweenOnWaveClear(5)`) === 0, 'no doors or wave candy after the event');
 // The code.
 force('halloween');
 const redeem = c => q(`(function(){ document.getElementById('code-input').value = '${c}'; redeemCode(); return document.getElementById('code-msg').textContent; })()`);
-q(`candy = 0; localStorage.removeItem(USED_CODES_KEY);`);
+q(`candy = 0; saveCandy(); localStorage.removeItem(USED_CODES_KEY);`);
 const m1 = redeem('TRICKORTREAT');
 check(q('candy') === 15 && /15 candy/.test(m1), 'the code TRICKORTREAT gives 15 candy', m1);
 const m2 = redeem('TRICKORTREAT');
