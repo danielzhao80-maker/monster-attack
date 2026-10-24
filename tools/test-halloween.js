@@ -205,28 +205,38 @@ check(q(`buyHalloween('points')`) === true && q('points') === 3 && q('candy') ==
 check(q(`buyHalloween('points')`) === true && q(`buyHalloween('points')`) === false && q('candy') === 10, 'not enough candy -> no sale');
 check(q(`localStorage.getItem('monster_attack_candy')`) === '10', 'spending is saved');
 
-// ---- the Halloween Pass (fills from candy EARNED) ----
-q(`candy = 0; saveCandy(); candyEarned = 0; hwClaimed = []; saveCandy(); coins = 0n; seasonXP = 0; points = 0;`);
-check(q(`HW_PASS.length`) === 10 && q(`HW_PASS[HW_PASS.length-1].id`) === 'pumpkin', '10 tiers, the 🎃 Pumpkin King title at the top');
+// ---- the Halloween Pass: 50 tiers, filled by candy EARNED ----
+q(`candy = 0; candyEarned = 0; hwClaimed = []; saveCandy(); coins = 0n; seasonXP = 0; points = 0;`);
+check(q(`HW_PASS.length`) === 50 && q(`HW_PASS[0].at`) === 10 && q(`HW_PASS[24].at`) === 375 && q(`HW_PASS[49].at`) === 1000, '50 tiers: 10 candy for tier 1 ... 1000 for tier 50');
+check(q(`HW_PASS.every(function(t, i){ return i === 0 || t.at > HW_PASS[i-1].at; })`) === true, 'each tier needs more than the last');
+const cos = JSON.parse(q(`JSON.stringify(HW_PASS.filter(function(t){ return t.type === 'arcade'; }).map(function(t){ return [t.n, t.ids]; }))`));
+const allIds = cos.flatMap(c => c[1]);
+const titles = ['hw-sweettooth', 'hw-ghosthunter', 'hw-night', 'pumpkin'], bgs = ['bg-haunted-night', 'bg-graveyard-fog', 'bg-pumpkin-moon'], avatars = ['hw-ghost', 'hw-vampire', 'hw-pumpkinking'];
+check(titles.every(x => allIds.includes(x)), '4 event titles in the pass');
+check(bgs.every(x => allIds.includes(x)), '3 event backgrounds in the pass');
+check(avatars.every(x => allIds.includes(x)), '3 event avatars in the pass');
+const last = cos.find(c => c[0] === 50);
+check(last && ['hw-pumpkinking', 'bg-pumpkin-moon', 'pumpkin'].every(x => last[1].includes(x)) && q(`HW_PASS[49].best`) === true,
+      'the best ones are at tier 50: Pumpkin King avatar, Pumpkin Moon background and Pumpkin King title');
 check(q(`claimHwTier(0)`) === false, 'a tier is locked until you have earned enough candy');
 q(`addCandy(30)`);
 check(q('candyEarned') === 30 && q('candy') === 30, 'collecting candy fills both the wallet and the pass');
-check(q(`claimAllHw()`) === 2 && q(`coins.toString()`) === '200' && q('seasonXP') === 300, 'claim all: tiers 10 and 25 (200 flesh, 300 XP)');
+check(q(`claimAllHw()`) === 2 && q(`coins.toString()`) === '120' && q('seasonXP') === 130, 'claim all at 30: tiers 1 and 2 (120 flesh, 130 XP)');
 check(q(`claimHwTier(0)`) === false, 'each tier is claimed once');
 q(`buyHalloween('points')`);
 check(q('candy') === 0 && q('candyEarned') === 30, 'spending candy does NOT take pass progress away');
-q(`addCandy(70)`);
-check(q(`claimAllHw()`) === 3 && JSON.parse(store[ARC]).owned.indexOf('gun-jack-o-lantern') > -1, "at 100 earned: the Jack-o'-Lantern gun skin (arcade save)");
-q(`addCandy(400)`); q(`claimAllHw()`);
-check(JSON.parse(store[ARC]).owned.indexOf('pumpkin') > -1 && q('hwClaimed.length') === 10, 'at 500: every tier, including the Pumpkin King title');
-check(JSON.parse(q(`localStorage.getItem('monster_attack_hw_claimed_' + new Date().getFullYear())`)).length === 10
-      && q(`localStorage.getItem('monster_attack_hw_earned_' + new Date().getFullYear())`) === '500', "the pass is saved per year's event");
+q(`addCandy(${8 * 10 + Math.floor(64 / 5) - 30})`); q(`claimAllHw()`);
+check(JSON.parse(store[ARC]).owned.indexOf('hw-sweettooth') > -1, 'tier 8 gives the 🍬 Sweet Tooth title (arcade save)');
+q(`addCandy(1000)`); q(`claimAllHw()`);
+const ownedNow = JSON.parse(store[ARC]).owned;
+check(allIds.every(x => ownedNow.includes(x)) && q('hwClaimed.length') === 50, 'at 1000: all 50 tiers and every event item', allIds.filter(x => !ownedNow.includes(x)).join(','));
+check(JSON.parse(q(`localStorage.getItem('monster_attack_hw_claimed_' + new Date().getFullYear())`)).length === 50, "the pass is saved per year's event");
 q(`loadCandy()`);
-check(q('candyEarned') === 500 && q('hwClaimed.length') === 10, 'and loads back');
+check(q('hwClaimed.length') === 50, 'and loads back');
 // (the stub DOM does not empty `children` on innerHTML = '', so start from an empty list)
 q(`document.getElementById('halloween-pass').children.length = 0; renderHalloweenScreen()`);
 const passHead = q(`document.getElementById('halloween-pass-head').textContent`);
-check(q(`document.getElementById('halloween-pass').children.length`) === 10 && /500 candy collected/.test(passHead), 'the menu shows the pass', passHead + ' / ' + q(`document.getElementById('halloween-pass').children.length`));
+check(q(`document.getElementById('halloween-pass').children.length`) === 50 && /all unlocked/.test(passHead), 'the menu shows all 50 tiers', passHead);
 
 // ---- the arcade adds candy to the same keys while the game is open ----
 q(`candy = 5; candyEarned = 5; saveCandy();`);

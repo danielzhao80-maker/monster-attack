@@ -4947,20 +4947,32 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function addCandy(n) { loadCandy(); candy += n; candyEarned += n; saveCandy(); refreshHalloweenButton(); }
     loadCandy();
 
-    // 🎃 HALLOWEEN PASS — tiers unlock at candy EARNED; claim each once per year's event.
-    // arcade: an item in the shared arcade shop (arcade-shop.js) that the tier unlocks for good.
-    const HW_PASS = [
-        { at: 10,  name: '🍖 200 Flesh',                 type: 'coins',  amount: 200 },
-        { at: 25,  name: '🎟️ 300 Season Pass XP',        type: 'xp',     amount: 300 },
-        { at: 50,  name: '🏆 5 Points',                   type: 'points', amount: 5 },
-        { at: 75,  name: '🍖 500 Flesh',                 type: 'coins',  amount: 500 },
-        { at: 100, name: "🔫 Jack-o'-Lantern gun skin",  type: 'arcade', id: 'gun-jack-o-lantern' },
-        { at: 150, name: '🎟️ 600 Season Pass XP',        type: 'xp',     amount: 600 },
-        { at: 200, name: '🏆 15 Points',                  type: 'points', amount: 15 },
-        { at: 275, name: '🍖 1500 Flesh',                type: 'coins',  amount: 1500 },
-        { at: 350, name: '🏆 25 Points',                  type: 'points', amount: 25 },
-        { at: 500, name: '🎃 Pumpkin King title',         type: 'arcade', id: 'pumpkin' },
-    ];
+    // 🎃 HALLOWEEN PASS — 50 tiers that unlock at candy EARNED; claim each once per year's event.
+    // Tier n needs 10n + n²/5 candy (tier 1 = 10, tier 25 = 375, tier 50 = 1000). The event's
+    // cosmetics (secret items in the shared arcade shop, so they work in every game) are spread through
+    // it and the best ones are all at tier 50. Every other tier is flesh, Season Pass XP or points.
+    const HW_PASS_COSMETICS = {
+        8:  [{ id: 'hw-sweettooth',      name: '🍬 Sweet Tooth title' }],
+        12: [{ id: 'bg-haunted-night',   name: '🌌 Haunted Night background' }],
+        15: [{ id: 'hw-ghost',           name: '👻 Little Ghost avatar' }],
+        20: [{ id: 'hw-ghosthunter',     name: '👻 Ghost Hunter title' }],
+        22: [{ id: 'gun-jack-o-lantern', name: "🔫 Jack-o'-Lantern gun skin" }],
+        28: [{ id: 'bg-graveyard-fog',   name: '🪦 Graveyard Fog background' }],
+        32: [{ id: 'hw-vampire',         name: '🧛 Vampire avatar' }],
+        38: [{ id: 'hw-night',           name: '🦇 Creature of the Night title' }],
+        50: [{ id: 'hw-pumpkinking',     name: '🎃 Pumpkin King avatar' },
+             { id: 'bg-pumpkin-moon',    name: '🌕 Pumpkin Moon background' },
+             { id: 'pumpkin',            name: '🎃 Pumpkin King title' }],
+    };
+    const HW_PASS = Array.from({ length: 50 }, (_, i) => {
+        const n = i + 1, at = 10 * n + Math.floor(n * n / 5);
+        const cos = HW_PASS_COSMETICS[n];
+        if (cos) return { n, at, type: 'arcade', ids: cos.map(c => c.id), name: cos.map(c => c.name).join(' + '), best: n === 50 };
+        const k = n % 3;
+        if (k === 1) return { n, at, type: 'coins',  amount: 100 + n * 20,           name: `🍖 ${100 + n * 20} Flesh` };
+        if (k === 2) return { n, at, type: 'xp',     amount: 100 + n * 15,           name: `🎟️ ${100 + n * 15} Season Pass XP` };
+        return              { n, at, type: 'points', amount: 2 + Math.floor(n / 5),  name: `🏆 ${2 + Math.floor(n / 5)} Points` };
+    });
     function hwTierReached(t) { return candyEarned >= HW_PASS[t].at; }
     function claimHwTier(t) {
         loadCandy();
@@ -4970,7 +4982,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (tier.type === 'coins') addCoins(tier.amount);
         else if (tier.type === 'xp') addSeasonXP(tier.amount);
         else if (tier.type === 'points') { points += tier.amount; savePoints(); }
-        else if (tier.type === 'arcade') grantArcadeItem(tier.id);
+        else if (tier.type === 'arcade') tier.ids.forEach(grantArcadeItem);
         saveCandy();
         SFX.coin && SFX.coin();
         return true;
@@ -5082,8 +5094,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         $('halloween-pass-fill').style.width = Math.min(100, candyEarned / HW_PASS[HW_PASS.length - 1].at * 100) + '%';
         const pass = $('halloween-pass'); pass.innerHTML = '';
         HW_PASS.forEach((t, i) => {
-            const row = document.createElement('div'); row.style.cssText = rowCss + (hwTierReached(i) ? '' : 'opacity:0.55;');
-            row.innerHTML = `<span style="font-weight:800;"><span style="color:#ff9ff3;">🍬 ${t.at}</span> &nbsp;${t.name}${t.type === 'arcade' ? ' <span style="font-size:0.75em;color:#d6a2ff;">(arcade, every game)</span>' : ''}</span>`;
+            const row = document.createElement('div'); row.style.cssText = rowCss + (hwTierReached(i) || t.best ? '' : 'opacity:0.55;');   // the tier-50 prize always shows bright
+            if (t.best) row.style.cssText += 'border:3px solid #ffd23a;background:linear-gradient(90deg,rgba(255,140,26,0.35),rgba(165,94,234,0.35));box-shadow:0 0 18px rgba(255,210,58,0.5);';
+            row.innerHTML = `<span style="font-weight:800;"><span style="color:#d6a2ff;">${t.n}</span> · <span style="color:#ff9ff3;">🍬 ${t.at}</span> &nbsp;${t.best ? '⭐ ' : ''}${t.name}${t.type === 'arcade' ? ' <span style="font-size:0.75em;color:#d6a2ff;">(arcade, every game)</span>' : ''}</span>`;
             const claimed = hwClaimed.indexOf(i) > -1;
             row.appendChild(mkBtn(claimed ? '✅ Claimed' : hwTierReached(i) ? 'Claim' : '🔒', claimed || !hwTierReached(i) || !on,
                 () => { claimHwTier(i); renderHalloweenScreen(); }, 'tier' + i));

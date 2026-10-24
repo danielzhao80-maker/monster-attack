@@ -493,8 +493,9 @@ While on: `halloweenOnKill` drops `candy` pickups (30%; bosses 15, Pumpkin King 
 Pumpkin King 35% of the time (rollMonsterClass), PROPS_FOR adds `jackolantern`, and the 🎃 menu button
 opens the event menu. Candy is the event's points: `candy` (wallet, `monster_attack_candy`) is spent in
 the HALLOWEEN_SHOP; `candyEarned` (`monster_attack_hw_earned_<year>`) fills the 🎃 Halloween Pass
-(HW_PASS, 10 tiers, claimed list `monster_attack_hw_claimed_<year>`; the gun skin `gun-jack-o-lantern` and
-title `pumpkin` are secret arcade-shop items granted by tiers). Candy sources: kills, bosses, wave
+(HW_PASS: 50 tiers at 10n + n²/5 candy, claimed list `monster_attack_hw_claimed_<year>`; HW_PASS_COSMETICS
+puts the event's secret arcade-shop items — 4 titles, 3 backgrounds, 3 avatars, the gun skin — on tiers,
+with the best three on tier 50; the arcade page's HW.PASS uses the same formula). Candy sources: kills, bosses, wave
 clears (halloweenOnWaveClear), the 🎁 daily treat, code TRICKORTREAT (once a day, event only) and the
 🚪 trick-or-treat door each wave (`hwDoor`, tickHwDoor; drawn like the Backrooms exit via placeGlowDoor3D). Tests that care about the normal boss
 pair must force the event off. `node tools/test-halloween.js` covers it.
