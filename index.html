@@ -12938,6 +12938,7 @@ const col = b.color || BLDG_COLORS[0];
                 if (Math.random() < 0.25) particles.push({ x:m.x+(Math.random()-0.5)*16, y:m.y-10,
                     vx:0, vy:-0.8, life:20, maxLife:20, color:'#26de81', r:2 });
             }
+            if (m._trapSafe > 0) m._trapSafe--;   // trap immunity after a trap hit (see the trap loop)
             if (m.swallowed > 0) { m.swallowed--; continue; }
             if (m.stunned > 0 || m.frozen > 0) { if(m.hitFlash>0)m.hitFlash--; continue; }
             if (__freezeMonsters) { if (m.hitFlash>0) m.hitFlash--; continue; }
@@ -13201,10 +13202,15 @@ const col = b.color || BLDG_COLORS[0];
                     if (trap.cooldown > 0) break;
                 }
             }
-            // Monsters also trigger traps (no cooldown applied here so traps zap multiple monsters)
+            // Monsters also trigger traps (no cooldown applied here so traps zap multiple monsters).
+            // But each MONSTER gets ~2.5 s of trap immunity after a hit (_trapSafe, counted down in
+            // the monster loop): a trap never goes on cooldown for monsters, so one standing on a stun
+            // trap was re-stunned every frame and stood there forever — like disableImmune for players.
             if (trap.cooldown <= 0) {
                 for (const m of monsters) {
+                    if (m._trapSafe > 0) continue;
                     if (Math.hypot(trap.x - m.x, trap.y - m.y) < trap.r + m.r) {
+                        m._trapSafe = 150;
                         if (trap.effect === 'slow') m.slow = Math.max(m.slow||0, trap.duration);
                         if (trap.effect === 'stun') m.stunned = Math.max(m.stunned||0, trap.duration);
                         if (trap.effect === 'freeze') m.frozen = Math.max(m.frozen||0, trap.duration);

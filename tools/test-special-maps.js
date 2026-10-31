@@ -323,10 +323,20 @@ const chase = JSON.parse(q(`(function(){
   var start = Math.hypot(m.x-player.x, m.y-player.y), steps = 0;
   for (; steps < 6000 && Math.hypot(m.x-player.x, m.y-player.y) > 200; steps++) {
     monstersSpawned = 0; monsters = [m]; player.x = (gx+0.5)*MAZE_CELL; player.y = (gy+0.5)*MAZE_CELL; update(); }
-  return JSON.stringify({ rooms: best[2], start: Math.round(start), end: Math.round(Math.hypot(m.x-player.x, m.y-player.y)), steps: steps });
+  return JSON.stringify({ rooms: best[2], start: Math.round(start), end: Math.round(Math.hypot(m.x-player.x, m.y-player.y)), steps: steps, name: m.name, speed: m.speed, r: m.r, flags: Object.keys(m).filter(function(k){ return m[k] === true; }).join(" ") });
 })()`));
 // 200: a ranged monster stops at 180 to shoot, which still means it got through.
 check(chase.end <= 200, 'a monster ' + chase.rooms + ' rooms away finds its way through the maze', JSON.stringify(chase));
+
+// A monster standing on a stun trap is not stunned forever (traps never cool down for monsters).
+const trapStuck = JSON.parse(q(`(function(){
+  selectWorld('backrooms'); gameRunning=false; startGame(); waveIntroTimer = 0; monstersSpawned = 0; monstersToSpawn = 99;
+  spawnMonster(); var m = monsters[0]; monsters = [m]; m.hp = m.maxHp = 1e9; m.x = player.x + 400; m.y = player.y; m.riseT = 1;
+  traps = [{ x: m.x, y: m.y, r: 18, type: 'flicker', emoji: '💡', color: '#fff', dmg: 0, effect: 'stun', duration: 110, label: 'x', cooldown: 0 }];
+  var free = 0;
+  for (var f = 0; f < 600; f++) { monstersSpawned = 0; monsters = [m]; update(); if (!(m.stunned > 0)) free++; }
+  return JSON.stringify({ free: free, moved: Math.round(Math.hypot(m.x - player.x - 400, m.y - player.y)) }); })()`));
+check(trapStuck.free > 100 && trapStuck.moved > 30, 'a monster on a stun trap gets free between stuns and walks off', JSON.stringify(trapStuck));
 
 // ---- Floor 1 (Parking Zone): a builder hit by a falling ceiling tile looks up through the hole ----
 const tileRun = (cls, look, worldId) => JSON.parse(q(`(function(){
