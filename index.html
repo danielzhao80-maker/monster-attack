@@ -687,7 +687,7 @@
         <div style="max-width:520px;text-align:center;font-size:0.85em;line-height:1.5;margin-bottom:14px;color:#f3d9ff;">
             <b>🍬 Candy</b> is this event's points. Get it by: killing monsters (bosses drop a bag) ·
             beating the <b>🎃 Pumpkin King</b> on boss waves (25) · clearing waves · knocking on the glowing
-            <b>🚪 trick-or-treat door</b> each wave (watch the minimap!) · the <b>🎁 daily treat</b> · the code <b>TRICKORTREAT</b> (once a day).<br>
+            <b>🚪 trick-or-treat door</b> each wave (watch the minimap!) · the <b>🎁 daily treat</b> · <b>Halloween codes</b> on the main menu, each once a day — <b>TRICKORTREAT</b> is one, and there are 5 more to find!<br>
             Candy fills the <b>Halloween Pass</b> (spending never takes progress away) and buys things in the shop.
         </div>
         <div id="halloween-daily" style="margin-bottom:12px;"></div>
@@ -22908,7 +22908,13 @@ const col = b.color || BLDG_COLORS[0];
 
     const CODES = {
         'DANIEL':     { reward: 'coins', amount: 500, msg: '+500 Rotten Flesh!' },
+        // 🎃 Halloween codes: candy, once a day each, only while the event is on (see redeemCode).
         'TRICKORTREAT': { reward: 'candy', amount: 15, msg: '🎃 +15 candy! (once a day, during Halloween)' },
+        'PUMPKIN':      { reward: 'candy', amount: 20, msg: '🎃 +20 candy from the pumpkin patch!' },
+        'SPOOKY':       { reward: 'candy', amount: 10, msg: '👻 +10 spooky candy!' },
+        'BOO':          { reward: 'candy', amount: 5,  msg: '👻 BOO! +5 candy' },
+        'CANDYCORN':    { reward: 'candy', amount: 25, msg: '🌽 +25 candy corn!' },
+        'GHOSTPARTY':   { reward: 'candy', amount: 15, msg: '🎉 +15 candy — the ghosts are partying!' },
         'MONSTER':    { reward: 'coins', amount: 300, msg: '+300 Rotten Flesh!' },
         'RICH':       { reward: 'coins', amount: 1000, msg: '+1000 Rotten Flesh!' },
         'GLITCH':     { reward: 'class', className: 'Glitch', msg: 'Unlocked Glitch for next roll!' },

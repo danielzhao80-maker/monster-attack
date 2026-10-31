@@ -304,6 +304,21 @@ check(q(`unlockAction('flesh')`) === true && q(`coins.toString()`) === '10000' &
 setArcade({ owned: ['owner'] });
 check(q(`isArcadeAdmin()`) === true, 'the Owner counts as an admin too');
 
+// ---- the other Halloween codes ----
+force('halloween');
+q(`candy = 0; saveCandy(); localStorage.removeItem(USED_CODES_KEY);`);
+const hwCodes = { PUMPKIN: 20, SPOOKY: 10, BOO: 5, CANDYCORN: 25, GHOSTPARTY: 15 };
+let expect = 0;
+for (const [c, n] of Object.entries(hwCodes)) { redeem(c); expect += n; }
+check(q('candy') === expect, 'Halloween codes PUMPKIN, SPOOKY, BOO, CANDYCORN, GHOSTPARTY give candy', q('candy') + ' candy');
+for (const c of Object.keys(hwCodes)) redeem(c);
+check(q('candy') === expect, 'each one once a day');
+force('off'); q(`localStorage.removeItem(USED_CODES_KEY); candy = 0; saveCandy();`);
+redeem('PUMPKIN');
+check(q('candy') === 0, 'and only during Halloween');
+force('halloween');
+check(q(`Object.keys(CODES).filter(function(k){ return CODES[k].reward === 'candy'; }).length`) === 6, '6 Halloween codes in all');
+
 // ---- after the event ----
 force('off'); q(`candy = 50; candyEarned = 50; hwClaimed = []; saveCandy();`);
 check(q(`buyHalloween('flesh')`) === false && q(`claimHwTier(0)`) === false && q('candy') === 50, 'the shop and pass close after the event (candy is kept)');
