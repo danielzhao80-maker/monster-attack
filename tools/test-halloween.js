@@ -280,6 +280,30 @@ force('off'); q(`localStorage.removeItem(USED_CODES_KEY)`);
 const m3 = redeem('TRICKORTREAT');
 check(q('candy') === 15 && /Halloween/.test(m3), 'and only during the event', m3);
 
+// ---- 🔓 [U] Admin Unlocks (like [G] God Survival, but unlocks) ----
+force('halloween');
+setArcade({ owned: [] });
+q(`gameRunning=false; startGame(); document.getElementById('unlock-menu').style.display = 'none';`);
+q(`toggleUnlockMenu()`);
+check(q(`document.getElementById('unlock-menu').style.display`) !== 'flex' && q(`isArcadeAdmin()`) === false, '[U] stays shut for players without the arcade Admin Panel');
+check(q(`unlockAction('candy1000')`) === false, 'and its unlocks refuse to run');
+setArcade({ owned: [], adminUnlocked: true });
+q(`toggleUnlockMenu()`);
+check(q(`document.getElementById('unlock-menu').style.display`) === 'flex', '[U] opens for arcade admins');
+q(`toggleUnlockMenu()`);
+check(q(`document.getElementById('unlock-menu').style.display`) === 'none', 'and [U] closes it again');
+check(/k==='u' && gameRunning\) \{ toggleUnlockMenu\(\)/.test(code), 'the U key is wired up like G');
+q(`candy = 0; candyEarned = 0; hwClaimed = []; saveCandy(); coins = 0n; points = 0;`);
+check(q(`unlockAction('candy100')`) === true && q(`unlockAction('candy1000')`) === true && q('candy') === 1100, 'admin: +100 / +1000 candy');
+check(q(`unlockAction('hwpass')`) === true && q('hwClaimed.length') === 50 && JSON.parse(store[ARC]).owned.indexOf('pumpkin') > -1, 'admin: fill the whole Halloween Pass (all 50 tiers claimed)');
+setArcade({ owned: [], adminUnlocked: true });
+check(q(`unlockAction('hwitems')`) === true && ['hw-ghost', 'hw-vampire', 'hw-pumpkinking', 'bg-pumpkin-moon', 'gun-jack-o-lantern', 'hw-night'].every(x => JSON.parse(store[ARC]).owned.indexOf(x) > -1), 'admin: every Halloween item');
+check(q(`unlockAction('floors')`) === true && JSON.parse(store[ARC]).specialMaps.length === 21, 'admin: all 21 Backrooms floors');
+q(`coins = 0n; points = 0;`);
+check(q(`unlockAction('flesh')`) === true && q(`coins.toString()`) === '10000' && q(`unlockAction('points')`) === true && q('points') === 100, 'admin: flesh and points');
+setArcade({ owned: ['owner'] });
+check(q(`isArcadeAdmin()`) === true, 'the Owner counts as an admin too');
+
 // ---- after the event ----
 force('off'); q(`candy = 50; candyEarned = 50; hwClaimed = []; saveCandy();`);
 check(q(`buyHalloween('flesh')`) === false && q(`claimHwTier(0)`) === false && q('candy') === 50, 'the shop and pass close after the event (candy is kept)');

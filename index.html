@@ -356,6 +356,20 @@
         <button class="god-btn" id="god-damage" onclick="godAction('damage')">💥 Max Damage 400</button>
         <button class="god-btn" id="god-nuke" onclick="godAction('nuke')">☢️ Nuke All Monsters</button>
     </div>
+    <!-- 🔓 ADMIN UNLOCK MENU — [U] in a game, like the God Survival menu but for unlocks, not buffs.
+         Only for players who have opened the arcade's 🛠️ Admin Panel (see isArcadeAdmin). -->
+    <div id="unlock-menu" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:20px;padding:25px 30px;display:none;flex-direction:column;align-items:center;gap:8px;z-index:30;box-shadow:0 10px 40px rgba(0,0,0,0.3);border:4px solid #a55eea;min-width:320px;">
+        <h2 style="font-family:'Fredoka One',cursive;font-size:1.6em;color:#8854d0;letter-spacing:2px;">🔓 Admin Unlocks</h2>
+        <div style="color:#636e72;font-size:0.8em;font-weight:700;margin-bottom:8px;">Press [U] to close</div>
+        <button class="god-btn" onclick="unlockAction('candy100')">🍬 +100 Candy</button>
+        <button class="god-btn" onclick="unlockAction('candy1000')">🍬 +1000 Candy</button>
+        <button class="god-btn" onclick="unlockAction('hwpass')">🎃 Fill the Halloween Pass</button>
+        <button class="god-btn" onclick="unlockAction('hwitems')">👻 All Halloween titles, avatars &amp; skins</button>
+        <button class="god-btn" onclick="unlockAction('floors')">🌀 All Backrooms floors (0–20)</button>
+        <button class="god-btn" onclick="unlockAction('flesh')">🍖 +10,000 Flesh</button>
+        <button class="god-btn" onclick="unlockAction('points')">🏆 +100 Points</button>
+        <div id="unlock-msg" style="min-height:1.2em;font-weight:800;color:#8854d0;font-size:0.85em;"></div>
+    </div>
     <button id="lb-btn" onclick="openLeaderboard()">Leaderboard</button>
     <button id="tut-btn" onclick="openTutorial()">Tutorial</button>
     <button id="season-quick-btn" onclick="openSeasonScreen()">🎟️ Season Pass</button>
@@ -22077,6 +22091,53 @@ const col = b.color || BLDG_COLORS[0];
         refreshGodMenu();
     }
 
+    // ======================== 🔓 ADMIN UNLOCK MENU ([U]) ========================
+    // Same idea as the God Survival menu, but it hands out candy and unlocks instead of buffs. Only
+    // for arcade admins: whoever has opened the arcade's Admin Panel (or owns the Owner title).
+    function arcadeSave() {
+        try { return (window.ArcadeShop && window.ArcadeShop.load) ? window.ArcadeShop.load() : JSON.parse(localStorage.getItem('daniels-arcade-v1') || '{}'); }
+        catch (e) { return {}; }
+    }
+    function isArcadeAdmin() { const s = arcadeSave(); return !!(s.adminUnlocked || (s.owned || []).indexOf('owner') > -1); }
+    function toggleUnlockMenu() {
+        const el = document.getElementById('unlock-menu'); if (!el) return;
+        if (el.style.display === 'flex') { el.style.display = 'none'; return; }
+        if (!isArcadeAdmin()) { showStatus("🔒 [U] Admin Unlocks: open the arcade's 🛠️ Admin Panel first", '#a55eea'); return; }
+        document.getElementById('unlock-msg').textContent = '';
+        el.style.display = 'flex';
+    }
+    function unlockAction(kind) {
+        if (!isArcadeAdmin()) return false;
+        const say = (t) => { const m = document.getElementById('unlock-msg'); if (m) m.textContent = t; showStatus(t, '#a55eea'); };
+        if (kind === 'candy100') { addCandy(100); say(`🍬 +100 candy (${candy})`); }
+        else if (kind === 'candy1000') { addCandy(1000); say(`🍬 +1000 candy (${candy})`); }
+        else if (kind === 'hwpass') {
+            // Enough candy EARNED for every tier, then claim them all (works even outside the event).
+            loadCandy();
+            candyEarned = Math.max(candyEarned, HW_PASS[HW_PASS.length - 1].at); saveCandy();
+            let n = 0;
+            for (let t = 0; t < HW_PASS.length; t++) {
+                const tier = HW_PASS[t];
+                if (hwClaimed.indexOf(t) > -1) continue;
+                hwClaimed.push(t); n++;
+                if (tier.type === 'coins') addCoins(tier.amount);
+                else if (tier.type === 'xp') addSeasonXP(tier.amount);
+                else if (tier.type === 'points') { points += tier.amount; savePoints(); }
+                else if (tier.type === 'arcade') tier.ids.forEach(grantArcadeItem);
+            }
+            saveCandy();
+            say(`🎃 Halloween Pass filled — ${n} tier${n === 1 ? '' : 's'} claimed`);
+        }
+        else if (kind === 'hwitems') { Object.values(HW_PASS_COSMETICS).flat().forEach(c => grantArcadeItem(c.id)); say('👻 Every Halloween title, avatar, background and gun skin unlocked'); }
+        else if (kind === 'floors') { FLOOR_IDS.forEach(unlockSpecialMap); say('🌀 All 21 Backrooms floors unlocked — Worlds → ⭐ Special Maps'); }
+        else if (kind === 'flesh') { addCoins(10000); say('🍖 +10,000 flesh'); }
+        else if (kind === 'points') { points += 100; savePoints(); say('🏆 +100 points'); }
+        else return false;
+        SFX.pickup && SFX.pickup();
+        refreshHalloweenButton();
+        return true;
+    }
+
     function togglePause() {
         if (!gameRunning) return;
         if (NET.mode === 'client') return; // only the host controls pause in multiplayer
@@ -24469,6 +24530,7 @@ const col = b.color || BLDG_COLORS[0];
         const k=e.key.toLowerCase();
         if (k==='escape' || (k==='p' && gameRunning)) { togglePause(); return; }
         if (k==='g' && gameRunning) { toggleGodMenu(); return; }
+        if (k==='u' && gameRunning) { toggleUnlockMenu(); return; }   // 🔓 admin unlocks (arcade admins only)
         if (k==='v' && gameRunning) { cycleCameraMode(); return; }
         if (k==='f' && gameRunning) { toggleFullscreen(); return; }
         if (k==='m' && gameRunning) { _mpDiagOn = !_mpDiagOn; renderMpDiag(); return; }   // multiplayer diagnostics
