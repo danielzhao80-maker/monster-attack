@@ -361,10 +361,10 @@
     <div id="unlock-menu" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:20px;padding:25px 30px;display:none;flex-direction:column;align-items:center;gap:8px;z-index:30;box-shadow:0 10px 40px rgba(0,0,0,0.3);border:4px solid #a55eea;min-width:320px;">
         <h2 style="font-family:'Fredoka One',cursive;font-size:1.6em;color:#8854d0;letter-spacing:2px;">🔓 Admin Unlocks</h2>
         <div style="color:#636e72;font-size:0.8em;font-weight:700;margin-bottom:8px;">Press [U] to close</div>
-        <button class="god-btn" onclick="unlockAction('candy100')">🍬 +100 Candy</button>
-        <button class="god-btn" onclick="unlockAction('candy1000')">🍬 +1000 Candy</button>
-        <button class="god-btn" onclick="unlockAction('hwpass')">🎃 Fill the Halloween Pass</button>
-        <button class="god-btn" onclick="unlockAction('hwitems')">👻 All Halloween titles, avatars &amp; skins</button>
+        <button class="god-btn" id="unlock-cur100" onclick="unlockAction('cur100')">🍬 +100 Candy</button>
+        <button class="god-btn" id="unlock-cur1000" onclick="unlockAction('cur1000')">🍬 +1000 Candy</button>
+        <button class="god-btn" id="unlock-pass" onclick="unlockAction('pass')">🎃 Fill the Halloween Pass</button>
+        <button class="god-btn" onclick="unlockAction('eventitems')">🎉 All event titles, avatars &amp; skins</button>
         <button class="god-btn" onclick="unlockAction('floors')">🌀 All Backrooms floors (0–20)</button>
         <button class="god-btn" onclick="unlockAction('flesh')">🍖 +10,000 Flesh</button>
         <button class="god-btn" onclick="unlockAction('points')">🏆 +100 Points</button>
@@ -489,7 +489,7 @@
             <button id="artifacts-btn" onclick="openArtifactsScreen()" style="margin-top:5px;background:linear-gradient(180deg,#a55eea,#8854d0);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #5f27cd;transition:all 0.2s;">🏺 Artifacts</button>
             <button id="abilities-btn" onclick="openAbilitiesScreen()" style="margin-top:5px;background:linear-gradient(180deg,#a29bfe,#6c5ce7);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #4834b5;transition:all 0.2s;">⚡ Abilities</button>
             <button id="season-btn" onclick="openSeasonScreen()" style="margin-top:5px;background:linear-gradient(180deg,#feca57,#ff9f43);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #b33939;transition:all 0.2s;">Season Pass</button>
-            <button id="halloween-btn" onclick="openHalloweenScreen()" style="display:none;margin-top:5px;background:linear-gradient(180deg,#ff8c1a,#d35400);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #5a1a8a;transition:all 0.2s;">🎃 Halloween<span id="halloween-badge"></span></button>
+            <button id="event-btn" onclick="openEventScreen()" style="display:none;margin-top:5px;background:linear-gradient(180deg,#ff8c1a,#d35400);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #5a1a8a;transition:all 0.2s;"><span id="event-btn-label">🎃 Halloween</span><span id="event-badge"></span></button>
             <button id="pets-btn" onclick="openPetsScreen()" style="margin-top:5px;background:linear-gradient(180deg,#fd79a8,#c44569);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #7d1f3d;transition:all 0.2s;">🐾 Pets</button>
             <button id="music-btn" onclick="toggleMusic()" style="margin-top:5px;background:linear-gradient(180deg,#74b9ff,#0984e3);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #05528f;transition:all 0.2s;">🎵 Music: On</button>
             <button id="mapmaker-btn" onclick="openMapMaker()" style="margin-top:5px;background:linear-gradient(180deg,#00b894,#00806a);border:none;color:#fff;padding:8px 25px;font-family:'Fredoka One',cursive;font-size:0.85em;cursor:pointer;border-radius:50px;letter-spacing:2px;box-shadow:0 3px 0 #005c4c;transition:all 0.2s;">🗺️ Map Maker</button>
@@ -679,25 +679,20 @@
         <div id="season-tiers" style="display:flex;flex-direction:column;gap:6px;align-items:center;width:100%;max-width:520px;"></div>
     </div>
 
-    <!-- 🎃 HALLOWEEN EVENT (only shown while the event is on — see isHalloween) -->
-    <div id="halloween-screen" style="position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(circle at 50% 0%,#5a1a8a,#1a0b2e 60%,#0b0614);display:none;flex-direction:column;align-items:center;z-index:16;overflow-y:auto;padding:20px 14px;color:#ffe6c7;">
-        <h2 style="font-family:'Fredoka One',cursive;font-size:2.2em;color:#ff8c1a;text-shadow:2px 2px 0 #000,0 0 18px #ff6a00;margin-bottom:2px;">🎃 Halloween Event 🦇</h2>
-        <div id="halloween-days" style="font-weight:800;font-size:0.9em;color:#d6a2ff;margin-bottom:10px;"></div>
-        <div id="halloween-candy" style="font-family:'Fredoka One',cursive;font-size:1.6em;color:#ff9ff3;margin-bottom:8px;">🍬 0</div>
-        <div style="max-width:520px;text-align:center;font-size:0.85em;line-height:1.5;margin-bottom:14px;color:#f3d9ff;">
-            <b>🍬 Candy</b> is this event's points. Get it by: killing monsters (bosses drop a bag) ·
-            beating the <b>🎃 Pumpkin King</b> on boss waves (25) · clearing waves · knocking on the glowing
-            <b>🚪 trick-or-treat door</b> each wave (watch the minimap!) · the <b>🎁 daily treat</b> · <b>Halloween codes</b> on the main menu, each once a day — <b>TRICKORTREAT</b> is one, and there are 5 more to find!<br>
-            Candy fills the <b>Halloween Pass</b> (spending never takes progress away) and buys things in the shop.
-        </div>
-        <div id="halloween-daily" style="margin-bottom:12px;"></div>
-        <div id="halloween-pass-head" style="font-family:'Fredoka One',cursive;color:#ff8c1a;margin:4px 0;"></div>
-        <div style="width:100%;max-width:520px;height:14px;background:rgba(255,255,255,0.12);border-radius:10px;overflow:hidden;margin-bottom:8px;"><div id="halloween-pass-fill" style="width:0%;height:100%;background:linear-gradient(90deg,#ff8c1a,#ff9ff3);"></div></div>
-        <button class="btn" style="padding:6px 20px;font-size:0.8em;margin-bottom:8px;background:linear-gradient(180deg,#a55eea,#5a1a8a);box-shadow:0 3px 0 #2a0a4a;" onclick="claimAllHw()">Claim all</button>
-        <div id="halloween-pass" style="display:flex;flex-direction:column;gap:6px;width:100%;max-width:520px;margin-bottom:16px;"></div>
-        <div style="font-family:'Fredoka One',cursive;color:#ff8c1a;margin:4px 0 8px;">🍬 Candy Shop</div>
-        <div id="halloween-shop" style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:520px;"></div>
-        <button class="btn" style="margin-top:16px;padding:10px 30px;font-size:0.9em;background:linear-gradient(180deg,#636e72,#2d3436);box-shadow:0 4px 0 #000;" onclick="closeHalloweenScreen()">Back</button>
+    <!-- 🎉 SEASONAL EVENT MENU (🎃 Halloween / 🎄 Christmas) — filled and themed by renderEventScreen -->
+    <div id="event-screen" style="position:fixed;top:0;left:0;width:100%;height:100%;display:none;flex-direction:column;align-items:center;z-index:16;overflow-y:auto;padding:20px 14px;">
+        <h2 id="event-title" style="font-family:'Fredoka One',cursive;font-size:2.2em;margin-bottom:2px;"></h2>
+        <div id="event-days" style="font-weight:800;font-size:0.9em;margin-bottom:10px;opacity:.8;"></div>
+        <div id="event-cur" style="font-family:'Fredoka One',cursive;font-size:1.6em;margin-bottom:8px;"></div>
+        <div id="event-how" style="max-width:520px;text-align:center;font-size:0.85em;line-height:1.5;margin-bottom:14px;"></div>
+        <div id="event-daily" style="margin-bottom:12px;"></div>
+        <div id="event-pass-head" style="font-family:'Fredoka One',cursive;margin:4px 0;"></div>
+        <div style="width:100%;max-width:520px;height:14px;background:rgba(255,255,255,0.12);border-radius:10px;overflow:hidden;margin-bottom:8px;"><div id="event-pass-fill" style="width:0%;height:100%;"></div></div>
+        <button class="btn" style="padding:6px 20px;font-size:0.8em;margin-bottom:8px;background:linear-gradient(180deg,#a55eea,#5a1a8a);box-shadow:0 3px 0 #2a0a4a;" onclick="claimAllEv()">Claim all</button>
+        <div id="event-pass" style="display:flex;flex-direction:column;gap:6px;width:100%;max-width:520px;margin-bottom:16px;"></div>
+        <div id="event-shop-head" style="font-family:'Fredoka One',cursive;margin:4px 0 8px;"></div>
+        <div id="event-shop" style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:520px;"></div>
+        <button class="btn" style="margin-top:16px;padding:10px 30px;font-size:0.9em;background:linear-gradient(180deg,#636e72,#2d3436);box-shadow:0 4px 0 #000;" onclick="closeEventScreen()">Back</button>
     </div>
 
     <div id="mp-menu" style="position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#a8e6cf,#88d8f7,#fcbad3);display:none;flex-direction:column;justify-content:center;align-items:center;z-index:20;">
@@ -2502,6 +2497,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         { name:'Null Titan', emoji:'⬛', accessory:'👑', armorColor:'#2d3436', rarity:'legendary', rarityColor:'#f1c40f', color:'#2d3436', hp:95, speed:0.75, damage:21, score:170, isBossOnly:true, body:'titan', habitat:'void', hasShield:true, phasing:true, isRanged:true, desc:'Boss only!' },
         // ---- SPECIAL MAP BOSSES (The Backrooms) — mid-level numbers, existing bodies ----
         // 🎃 Halloween-only boss (rollMonsterClass): may take any boss wave while the event is on.
+        // 🎄 Christmas-only boss: throws freezing snowballs, gets angry when hurt.
+        { name:'Evil Snowman', emoji:'⛄', accessory:'👑', armorColor:'#dfe9f3', rarity:'legendary', rarityColor:'#f1c40f', color:'#eaf6ff', hp:62, speed:1.1, damage:15, score:120, isBossOnly:true, body:'titan', habitat:'ice', isRanged:true, freezeDuration:120, enrage:true, desc:'Boss only! Christmas — hurls freezing snowballs' },
         { name:'Pumpkin King', emoji:'🎃', accessory:'👑', armorColor:'#ff7f00', rarity:'legendary', rarityColor:'#f1c40f', color:'#ff7f00', hp:60, speed:1.15, damage:16, score:120, isBossOnly:true, body:'titan', habitat:'lava', isRanged:true, enrage:true, canScream:true, desc:'Boss only! Halloween — hurls flaming pumpkins and shrieks' },
         { name:'The Entity', emoji:'👤', accessory:'👑', armorColor:'#3d3526', rarity:'legendary', rarityColor:'#f1c40f', color:'#3d3526', hp:46, speed:1.3, damage:15, score:108, isBossOnly:true, body:'wraith', habitat:'void', phasing:true, teleports:true, desc:'Boss only! Drifts straight through the walls' },
         { name:'Bacteria', emoji:'🦠', accessory:'👑', armorColor:'#8a8f3a', rarity:'legendary', rarityColor:'#f1c40f', color:'#8a8f3a', hp:64, speed:0.95, damage:15, score:108, isBossOnly:true, body:'blob', habitat:'toxic', splits:true, poisonTrail:true, desc:'Boss only! Splits into more of itself' },
@@ -2779,7 +2776,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Boss waves summon one of the CURRENT WORLD's two bosses — a straight 50/50 coin flip,
         // so you never know which of the pair is waiting for you.
         if (typeof wave !== 'undefined' && wave > 0 && wave % 10 === 0) {
-            if (isHalloween() && Math.random() < 0.35) return MONSTER_CLASSES.find(c => c.name === 'Pumpkin King');
+            const _ev = activeEvent();   // 🎉 the event's own boss may take any boss wave
+            if (_ev && Math.random() < 0.35) return MONSTER_CLASSES.find(c => c.name === _ev.boss);
             const pool = (currentWorld && currentWorld.bosses) || ['Dragon', 'Crane Titan'];
             const pick = pool[Math.random() < 0.5 ? 0 : 1] || pool[0];
             return MONSTER_CLASSES.find(c => c.name === pick) || MONSTER_CLASSES.find(c => c.isBossOnly);
@@ -4911,55 +4909,18 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         document.getElementById('start-screen').style.display = 'flex';
     }
 
-    // ======================== 🎃 HALLOWEEN EVENT ========================
-    // On by itself from 1 October to 7 November, every year. While it is on: monsters drop candy
-    // (bosses drop a bag), boss waves can be the Pumpkin King, jack-o'-lanterns stand in every world,
-    // and the 🎃 menu button opens a candy shop. Candy is kept (monster_attack_ key, so it syncs to
-    // the arcade account) but can only be spent during the event. 'monster_attack_event_force' =
-    // 'halloween' / 'off' overrides the date (tests, and an owner showing it off early).
-    const CANDY_KEY = 'monster_attack_candy';
+    // ======================== 🎉 SEASONAL EVENTS: 🎃 HALLOWEEN, 🎄 CHRISTMAS ========================
+    // Each event turns itself on by date, every year (EVENTS[..].on). While one is on: monsters drop
+    // its currency (bosses drop a bag), boss waves can be its boss, its decoration stands in every world,
+    // a gift spot appears each wave, and its menu button opens a 50-tier pass + a shop. The currency is
+    // kept in monster_attack_ keys (so it syncs to the arcade account) but is only spent during the
+    // event. 'monster_attack_event_force' = 'halloween' / 'christmas' / 'off' overrides the date (tests,
+    // and an owner showing an event off early). Halloween's keys are the original ones, so nothing
+    // collected before this existed is lost.
     const EVENT_FORCE_KEY = 'monster_attack_event_force';
-    function isHalloween(d) {
-        try {
-            const f = localStorage.getItem(EVENT_FORCE_KEY);
-            if (f === 'halloween') return true;
-            if (f === 'off') return false;
-        } catch (e) {}
-        d = d || new Date();
-        return d.getMonth() === 9 || (d.getMonth() === 10 && d.getDate() <= 7);
-    }
-    // Candy is the event's points. Two numbers: `candy` is your wallet (spent in the candy shop),
-    // `candyEarned` is everything you have collected THIS year's event — it is what fills the
-    // 🎃 Halloween Pass, so spending candy never loses you pass progress.
-    let candy = 0, candyEarned = 0, hwClaimed = [];
-    const hwYear = (d) => (d || new Date()).getFullYear();
-    const HW_EARNED_KEY = () => 'monster_attack_hw_earned_' + hwYear();
-    const HW_CLAIMED_KEY = () => 'monster_attack_hw_claimed_' + hwYear();
-    const HW_DAILY_KEY = 'monster_attack_hw_daily';
-    function loadCandy() {
-        try {
-            candy = Math.max(0, parseInt(localStorage.getItem(CANDY_KEY)) || 0);
-            candyEarned = Math.max(0, parseInt(localStorage.getItem(HW_EARNED_KEY())) || 0);
-            hwClaimed = JSON.parse(localStorage.getItem(HW_CLAIMED_KEY()) || '[]');
-            if (!Array.isArray(hwClaimed)) hwClaimed = [];
-        } catch (e) { candy = 0; candyEarned = 0; hwClaimed = []; }
-    }
-    function saveCandy() {
-        try {
-            localStorage.setItem(CANDY_KEY, String(candy));
-            localStorage.setItem(HW_EARNED_KEY(), String(candyEarned));
-            localStorage.setItem(HW_CLAIMED_KEY(), JSON.stringify(hwClaimed));
-        } catch (e) {}
-    }
-    // The arcade page adds candy to the same keys while this game is open (play-time candy, the
-    // pumpkin patch), so every change re-reads storage first instead of writing a stale number back.
-    function addCandy(n) { loadCandy(); candy += n; candyEarned += n; saveCandy(); refreshHalloweenButton(); }
-    loadCandy();
-
-    // 🎃 HALLOWEEN PASS — 50 tiers that unlock at candy EARNED; claim each once per year's event.
-    // Tier n needs 10n + n²/5 candy (tier 1 = 10, tier 25 = 375, tier 50 = 1000). The event's
-    // cosmetics (secret items in the shared arcade shop, so they work in every game) are spread through
-    // it and the best ones are all at tier 50. Every other tier is flesh, Season Pass XP or points.
+    // The pass: tier n needs 10n + n²/5 (tier 1 = 10, tier 25 = 375, tier 50 = 1000). Each event's
+    // cosmetics (secret items in the shared arcade shop, so they work in every game) sit on these tiers,
+    // the best ones on tier 50; every other tier is flesh, Season Pass XP or points.
     const HW_PASS_COSMETICS = {
         8:  [{ id: 'hw-sweettooth',      name: '🍬 Sweet Tooth title' }],
         12: [{ id: 'bg-haunted-night',   name: '🌌 Haunted Night background' }],
@@ -4973,88 +4934,187 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
              { id: 'bg-pumpkin-moon',    name: '🌕 Pumpkin Moon background' },
              { id: 'pumpkin',            name: '🎃 Pumpkin King title' }],
     };
-    const HW_PASS = Array.from({ length: 50 }, (_, i) => {
-        const n = i + 1, at = 10 * n + Math.floor(n * n / 5);
-        const cos = HW_PASS_COSMETICS[n];
-        if (cos) return { n, at, type: 'arcade', ids: cos.map(c => c.id), name: cos.map(c => c.name).join(' + '), best: n === 50 };
-        const k = n % 3;
-        if (k === 1) return { n, at, type: 'coins',  amount: 100 + n * 20,           name: `🍖 ${100 + n * 20} Flesh` };
-        if (k === 2) return { n, at, type: 'xp',     amount: 100 + n * 15,           name: `🎟️ ${100 + n * 15} Season Pass XP` };
-        return              { n, at, type: 'points', amount: 2 + Math.floor(n / 5),  name: `🏆 ${2 + Math.floor(n / 5)} Points` };
-    });
-    function hwTierReached(t) { return candyEarned >= HW_PASS[t].at; }
-    function claimHwTier(t) {
-        loadCandy();
-        const tier = HW_PASS[t];
-        if (!tier || !isHalloween() || !hwTierReached(t) || hwClaimed.indexOf(t) > -1) return false;
-        hwClaimed.push(t);
+    const XM_PASS_COSMETICS = {
+        8:  [{ id: 'xm-helper',          name: "🧝 Santa's Helper title" }],
+        12: [{ id: 'bg-snowy-night',     name: '🌨️ Snowy Night background' }],
+        15: [{ id: 'xm-penguin',         name: '🐧 Penguin avatar' }],
+        20: [{ id: 'xm-snowballer',      name: '⛄ Snowball Champ title' }],
+        22: [{ id: 'gun-candy-cane',     name: '🔫 Candy Cane gun skin' }],
+        28: [{ id: 'bg-northern-lights', name: '🌌 Northern Lights background' }],
+        32: [{ id: 'xm-snowman',         name: '⛄ Snowman avatar' }],
+        38: [{ id: 'xm-reindeer',        name: '🦌 Reindeer Rider title' }],
+        50: [{ id: 'xm-santa',           name: '🎅 Santa avatar' },
+             { id: 'bg-christmas-eve',   name: '🎄 Christmas Eve background' },
+             { id: 'santa',              name: '🎅 Santa Claus title' }],
+    };
+    function makePass(cosmetics) {
+        return Array.from({ length: 50 }, (_, i) => {
+            const n = i + 1, at = 10 * n + Math.floor(n * n / 5);
+            const cos = cosmetics[n];
+            if (cos) return { n, at, type: 'arcade', ids: cos.map(c => c.id), name: cos.map(c => c.name).join(' + '), best: n === 50 };
+            const k = n % 3;
+            if (k === 1) return { n, at, type: 'coins',  amount: 100 + n * 20,           name: `🍖 ${100 + n * 20} Flesh` };
+            if (k === 2) return { n, at, type: 'xp',     amount: 100 + n * 15,           name: `🎟️ ${100 + n * 15} Season Pass XP` };
+            return              { n, at, type: 'points', amount: 2 + Math.floor(n / 5),  name: `🏆 ${2 + Math.floor(n / 5)} Points` };
+        });
+    }
+    const EVENTS = {
+        halloween: {
+            id: 'halloween', name: 'Halloween', emoji: '🎃', side: '🦇',
+            on: (d) => d.getMonth() === 9 || (d.getMonth() === 10 && d.getDate() <= 7),     // 1 Oct – 7 Nov
+            year: (d) => d.getFullYear(),
+            nextTime: 'see you next October',
+            cur: 'candy', curEmoji: '🍬', curColor: '#ff9ff3',
+            keys: { wallet: 'monster_attack_candy', earned: 'monster_attack_hw_earned_', claimed: 'monster_attack_hw_claimed_', daily: 'monster_attack_hw_daily' },
+            boss: 'Pumpkin King', prop: 'jackolantern',
+            gift: { emoji: '🚪', label: 'trick-or-treat door', glow: 0xff8c1a, frame: 0x3a1a4a, color: '#ff8c1a', side: '🎃',
+                    treat: (n) => `🚪 Trick or treat? TREAT! 🍬 +${n} candy`, trick: '👻 TRICK! BOO! (🍬 +1 anyway)' },
+            daily: '🎁 Daily treat',
+            pass: makePass(HW_PASS_COSMETICS), cosmetics: HW_PASS_COSMETICS,
+            theme: { bg: 'radial-gradient(circle at 50% 0%,#5a1a8a,#1a0b2e 60%,#0b0614)', title: '#ff8c1a', glow: '#ff6a00', text: '#ffe6c7',
+                     soft: '#f3d9ff', accent: '#d6a2ff', main: '#ff8c1a', dark: '#d35400', edge: '#5a1a8a' },
+            title: '🎃 Halloween Event 🦇',
+            how: `Monsters drop <b>🍬 candy</b> (bosses drop a bag) · beat the <b>🎃 Pumpkin King</b> on boss waves (25) · clear waves ·
+                  knock on the glowing <b>🚪 trick-or-treat door</b> each wave (watch the minimap!) · the <b>🎁 daily treat</b> ·
+                  <b>Halloween codes</b> on the main menu, each once a day — <b>TRICKORTREAT</b> is one, and there are 5 more to find!`,
+        },
+        christmas: {
+            id: 'christmas', name: 'Christmas', emoji: '🎄', side: '⛄',
+            on: (d) => d.getMonth() === 11 || (d.getMonth() === 0 && d.getDate() <= 7),     // 1 Dec – 7 Jan
+            year: (d) => d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear(),       // January belongs to last December's event
+            nextTime: 'see you next December',
+            cur: 'snowflakes', curEmoji: '❄️', curColor: '#9fe3ff',
+            keys: { wallet: 'monster_attack_snowflakes', earned: 'monster_attack_xm_earned_', claimed: 'monster_attack_xm_claimed_', daily: 'monster_attack_xm_daily' },
+            boss: 'Evil Snowman', prop: 'xmastree',
+            gift: { emoji: '🎁', label: 'present', glow: 0x2ecc71, frame: 0xc0392b, color: '#2ecc71', side: '🎄',
+                    treat: (n) => `🎁 A present! ❄️ +${n} snowflakes`, trick: '🪨 A lump of coal! (❄️ +1 anyway)' },
+            daily: '🎁 Daily present',
+            pass: makePass(XM_PASS_COSMETICS), cosmetics: XM_PASS_COSMETICS,
+            theme: { bg: 'radial-gradient(circle at 50% 0%,#1e5a3a,#0b2a1e 60%,#06140e)', title: '#ff4d4d', glow: '#ffffff', text: '#eafff3',
+                     soft: '#d9fff0', accent: '#9fe3ff', main: '#e74c3c', dark: '#a93226', edge: '#145a32' },
+            title: '🎄 Christmas Event ⛄',
+            how: `Monsters drop <b>❄️ snowflakes</b> (bosses drop a bag) · beat the <b>⛄ Evil Snowman</b> on boss waves (25) · clear waves ·
+                  open the glowing <b>🎁 present</b> each wave (watch the minimap!) · the <b>🎁 daily present</b> ·
+                  <b>Christmas codes</b> on the main menu, each once a day — <b>JINGLEBELLS</b> is one, and there are 5 more to find!`,
+        },
+    };
+    // The event that is on now (or null). The force switch wins over the date.
+    function activeEvent(d) {
+        try {
+            const f = localStorage.getItem(EVENT_FORCE_KEY);
+            if (f === 'off') return null;
+            if (f && EVENTS[f]) return EVENTS[f];
+        } catch (e) {}
+        d = d || new Date();
+        return Object.values(EVENTS).find(e => e.on(d)) || null;
+    }
+    const isEventOn = (id, d) => { const e = activeEvent(d); return !!e && (!id || e.id === id); };
+
+    // The active event's numbers. `evWallet` is spent in the shop; `evEarned` is everything collected
+    // in THIS year's event and fills the pass, so spending never loses pass progress. With no event on
+    // they stay on the last one (only the menu needs them, and it is hidden then).
+    let evShown = EVENTS.halloween, evWallet = 0, evEarned = 0, evClaimed = [];
+    const evYear = (ev) => ev.year(new Date());
+    function loadEvent(ev) {
+        ev = ev || activeEvent() || evShown; evShown = ev;
+        try {
+            evWallet = Math.max(0, parseInt(localStorage.getItem(ev.keys.wallet)) || 0);
+            evEarned = Math.max(0, parseInt(localStorage.getItem(ev.keys.earned + evYear(ev))) || 0);
+            evClaimed = JSON.parse(localStorage.getItem(ev.keys.claimed + evYear(ev)) || '[]');
+            if (!Array.isArray(evClaimed)) evClaimed = [];
+        } catch (e) { evWallet = 0; evEarned = 0; evClaimed = []; }
+    }
+    function saveEvent() {
+        const ev = evShown;
+        try {
+            localStorage.setItem(ev.keys.wallet, String(evWallet));
+            localStorage.setItem(ev.keys.earned + evYear(ev), String(evEarned));
+            localStorage.setItem(ev.keys.claimed + evYear(ev), JSON.stringify(evClaimed));
+        } catch (e) {}
+    }
+    // The arcade page adds currency to the same keys while this game is open (play-time, the daily
+    // pick), so every change re-reads storage first instead of writing a stale number back.
+    function addEventCur(n, ev) {
+        ev = ev || activeEvent(); if (!ev) return;
+        loadEvent(ev); evWallet += n; evEarned += n; saveEvent(); refreshEventButton();
+    }
+    loadEvent();
+
+    function evTierReached(t) { return evEarned >= evShown.pass[t].at; }
+    function claimEvTier(t) {
+        const ev = activeEvent(); if (!ev) return false;
+        loadEvent(ev);
+        const tier = ev.pass[t];
+        if (!tier || !evTierReached(t) || evClaimed.indexOf(t) > -1) return false;
+        evClaimed.push(t);
         if (tier.type === 'coins') addCoins(tier.amount);
         else if (tier.type === 'xp') addSeasonXP(tier.amount);
         else if (tier.type === 'points') { points += tier.amount; savePoints(); }
         else if (tier.type === 'arcade') tier.ids.forEach(grantArcadeItem);
-        saveCandy();
+        saveEvent();
         SFX.coin && SFX.coin();
         return true;
     }
-    function claimAllHw() {
+    function claimAllEv() {
         let n = 0;
-        for (let t = 0; t < HW_PASS.length; t++) if (claimHwTier(t)) n++;
-        renderHalloweenScreen();
+        if (activeEvent()) for (let t = 0; t < activeEvent().pass.length; t++) if (claimEvTier(t)) n++;
+        renderEventScreen();
         return n;
     }
-    function hwUnclaimed() { let n = 0; for (let t = 0; t < HW_PASS.length; t++) if (hwTierReached(t) && hwClaimed.indexOf(t) < 0) n++; return n; }
+    function evUnclaimed() { let n = 0; for (let t = 0; t < evShown.pass.length; t++) if (evTierReached(t) && evClaimed.indexOf(t) < 0) n++; return n; }
 
-    // The candy shop: spend the wallet. (The arcade rewards live in the pass now.)
-    const HALLOWEEN_SHOP = [
+    // The shop: spend the wallet. (The arcade rewards live in the pass.)
+    const EVENT_SHOP = [
         { id: 'flesh',  name: '🍖 100 Flesh',          cost: 10, give: () => addCoins(100) },
         { id: 'xp',     name: '🎟️ 250 Season Pass XP', cost: 20, give: () => addSeasonXP(250) },
         { id: 'points', name: '🏆 3 Points',            cost: 30, give: () => { points += 3; savePoints(); } },
     ];
-    // 🎁 Daily treat: 10 candy once a day, from the Halloween menu.
-    const hwToday = () => new Date().toISOString().slice(0, 10);
-    function hwDailyReady() { try { return isHalloween() && localStorage.getItem(HW_DAILY_KEY) !== hwToday(); } catch (e) { return false; } }
-    function claimHwDaily() {
-        if (!hwDailyReady()) return false;
-        try { localStorage.setItem(HW_DAILY_KEY, hwToday()); } catch (e) {}
-        addCandy(10); SFX.pickup && SFX.pickup();
-        renderHalloweenScreen();
+    // 🎁 Daily gift: 10 once a day, from the event menu.
+    const evToday = () => new Date().toISOString().slice(0, 10);
+    function evDailyReady() { const ev = activeEvent(); try { return !!ev && localStorage.getItem(ev.keys.daily) !== evToday(); } catch (e) { return false; } }
+    function claimEvDaily() {
+        if (!evDailyReady()) return false;
+        try { localStorage.setItem(activeEvent().keys.daily, evToday()); } catch (e) {}
+        addEventCur(10); SFX.pickup && SFX.pickup();
+        renderEventScreen();
         return true;
     }
-    // Clearing a wave: 2 candy, +1 more for every 5 waves you are in.
-    function halloweenOnWaveClear(w) {
-        if (!isHalloween()) return 0;
+    // Clearing a wave: 2, +1 more for every 5 waves you are in.
+    function eventOnWaveClear(w) {
+        if (!activeEvent()) return 0;
         const n = 2 + Math.floor(w / 5);
-        addCandy(n);
+        addEventCur(n);
         return n;
     }
-    // 🚪 TRICK-OR-TREAT DOORS: each wave a glowing door appears a walk away (on the minimap, in
-    // top-down and in 3D). Knock on it: usually a treat (3–8 candy), sometimes a trick (a scare and a
-    // slow — and still 1 candy).
-    let hwDoor = null;
-    function tickHwDoor() {
-        if (!player || NET.mode === 'client' || !isHalloween() || usingCustomMap) { hwDoor = null; return; }
-        if (!hwDoor || hwDoor.wave !== wave) {
-            hwDoor = null;
+    // The GIFT SPOT each wave (🚪 trick-or-treat door / 🎁 present): it appears a walk away, on the
+    // minimap, in top-down and in 3D. Usually a treat (3–8), sometimes a trick (a scare/coal, a slow —
+    // and still 1).
+    let evGift = null;
+    function tickEvGift() {
+        const ev = activeEvent();
+        if (!player || NET.mode === 'client' || !ev || usingCustomMap) { evGift = null; return; }
+        if (!evGift || evGift.wave !== wave || evGift.ev !== ev.id) {
+            evGift = null;
             for (let k = 0; k < 60; k++) {
                 const a = Math.random() * Math.PI * 2, d = 600 + Math.random() * 500;
                 const x = player.x + Math.cos(a) * d, y = player.y + Math.sin(a) * d;
                 if (ptInBld(x, y, 40)) continue;
-                hwDoor = { x, y, wave, done: false };
+                evGift = { x, y, wave, ev: ev.id, done: false };
                 break;
             }
             return;
         }
-        if (hwDoor.done || Math.hypot(player.x - hwDoor.x, player.y - hwDoor.y) >= 45) return;
-        hwDoor.done = true;
+        if (evGift.done || Math.hypot(player.x - evGift.x, player.y - evGift.y) >= 45) return;
+        evGift.done = true;
         if (Math.random() < 0.7) {
             const n = 3 + Math.floor(Math.random() * 6);
-            addCandy(n);
-            showStatus(`🚪 Trick or treat? TREAT! 🍬 +${n} candy`, '#ff9ff3');
+            addEventCur(n);
+            showStatus(ev.gift.treat(n), ev.curColor);
             SFX.pickup && SFX.pickup();
         } else {
-            addCandy(1);
+            addEventCur(1);
             player.slow = Math.max(player.slow || 0, 120);
-            showStatus('👻 TRICK! BOO! (🍬 +1 anyway)', '#a29bfe');
+            showStatus(ev.gift.trick, '#a29bfe');
             addShake(8);
             SFX.scream && SFX.scream();
         }
@@ -5073,84 +5133,98 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             return true;
         } catch (e) { return false; }
     }
-    function buyHalloween(id) {
-        loadCandy();
-        const it = HALLOWEEN_SHOP.find(x => x.id === id);
-        if (!it || !isHalloween()) return false;
-        if (candy < it.cost) { showStatus(`🍬 You need ${it.cost - candy} more candy`, '#ff9ff3'); return false; }
-        candy -= it.cost; saveCandy();
+    function buyEvent(id) {
+        const ev = activeEvent(); if (!ev) return false;
+        loadEvent(ev);
+        const it = EVENT_SHOP.find(x => x.id === id);
+        if (!it) return false;
+        if (evWallet < it.cost) { showStatus(`${ev.curEmoji} You need ${it.cost - evWallet} more ${ev.cur}`, ev.curColor); return false; }
+        evWallet -= it.cost; saveEvent();
         it.give();
         SFX.pickup && SFX.pickup();
-        renderHalloweenScreen();
+        renderEventScreen();
         return true;
     }
-    function renderHalloweenScreen() {
-        loadCandy();
-        const $ = (i) => document.getElementById(i);
+    function renderEventScreen() {
+        const ev = activeEvent();
+        loadEvent(ev);
+        const E = evShown, T = E.theme, $ = (i) => document.getElementById(i);
+        const scr = $('event-screen'); scr.style.background = T.bg; scr.style.color = T.text;
+        $('event-title').textContent = E.title; $('event-title').style.color = T.title; $('event-title').style.textShadow = `2px 2px 0 #000,0 0 18px ${T.glow}`;
         // No countdown to the end (asked for) — only say so once it IS over.
-        $('halloween-days').textContent = isHalloween() ? '' : 'The event is over — see you next October';
-        $('halloween-candy').textContent = `🍬 ${candy} candy`;
-        const on = isHalloween();
-        const rowCss = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;border-radius:14px;background:rgba(255,140,26,0.12);border:2px solid #ff8c1a;';
-        const btnCss = 'padding:6px 16px;font-size:0.8em;background:linear-gradient(180deg,#ff8c1a,#d35400);box-shadow:0 3px 0 #5a1a8a;';
-        const mkBtn = (label, disabled, onclick, tag) => { const b = document.createElement('button'); b.className = 'btn'; b.style.cssText = btnCss; b.textContent = label; b.disabled = disabled; b.onclick = onclick; if (tag) b.dataset.hw = tag; return b; };
-        // Daily treat
-        const daily = $('halloween-daily'); daily.innerHTML = '';
-        daily.appendChild(mkBtn(hwDailyReady() ? '🎁 Daily treat: +10 🍬' : '🎁 Daily treat collected — come back tomorrow', !hwDailyReady(), claimHwDaily, 'daily'));
+        $('event-days').textContent = ev ? '' : `The event is over — ${E.nextTime}`;
+        $('event-cur').textContent = `${E.curEmoji} ${evWallet} ${E.cur}`; $('event-cur').style.color = E.curColor;
+        $('event-how').innerHTML = E.how + `<br>${E.cur[0].toUpperCase() + E.cur.slice(1)} fill the <b>${E.name} Pass</b> (spending never takes progress away) and buy things in the shop.`;
+        $('event-how').style.color = T.soft;
+        const rowCss = `display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;border-radius:14px;background:rgba(255,255,255,0.07);border:2px solid ${T.main};`;
+        const btnCss = `padding:6px 16px;font-size:0.8em;background:linear-gradient(180deg,${T.main},${T.dark});box-shadow:0 3px 0 ${T.edge};`;
+        const mkBtn = (label, disabled, onclick, tag) => { const b = document.createElement('button'); b.className = 'btn'; b.style.cssText = btnCss; b.textContent = label; b.disabled = disabled; b.onclick = onclick; if (tag) b.dataset.ev = tag; return b; };
+        // Daily gift
+        const daily = $('event-daily'); daily.innerHTML = '';
+        daily.appendChild(mkBtn(evDailyReady() ? `${E.daily}: +10 ${E.curEmoji}` : `${E.daily} collected — come back tomorrow`, !evDailyReady(), claimEvDaily, 'daily'));
         // The pass
-        const next = HW_PASS.find(t => candyEarned < t.at);
-        $('halloween-pass-head').textContent = `🎃 Halloween Pass — ${candyEarned} candy collected` + (next ? ` · next reward at ${next.at}` : ' · all unlocked!');
-        $('halloween-pass-fill').style.width = Math.min(100, candyEarned / HW_PASS[HW_PASS.length - 1].at * 100) + '%';
-        const pass = $('halloween-pass'); pass.innerHTML = '';
-        HW_PASS.forEach((t, i) => {
-            const row = document.createElement('div'); row.style.cssText = rowCss + (hwTierReached(i) || t.best ? '' : 'opacity:0.55;');   // the tier-50 prize always shows bright
-            if (t.best) row.style.cssText += 'border:3px solid #ffd23a;background:linear-gradient(90deg,rgba(255,140,26,0.35),rgba(165,94,234,0.35));box-shadow:0 0 18px rgba(255,210,58,0.5);';
-            row.innerHTML = `<span style="font-weight:800;"><span style="color:#d6a2ff;">${t.n}</span> · <span style="color:#ff9ff3;">🍬 ${t.at}</span> &nbsp;${t.best ? '⭐ ' : ''}${t.name}${t.type === 'arcade' ? ' <span style="font-size:0.75em;color:#d6a2ff;">(arcade, every game)</span>' : ''}</span>`;
-            const claimed = hwClaimed.indexOf(i) > -1;
-            row.appendChild(mkBtn(claimed ? '✅ Claimed' : hwTierReached(i) ? 'Claim' : '🔒', claimed || !hwTierReached(i) || !on,
-                () => { claimHwTier(i); renderHalloweenScreen(); }, 'tier' + i));
+        const next = E.pass.find(t => evEarned < t.at);
+        $('event-pass-head').textContent = `${E.emoji} ${E.name} Pass — ${evEarned} ${E.cur} collected` + (next ? ` · next reward at ${next.at}` : ' · all unlocked!');
+        $('event-pass-head').style.color = T.main;
+        $('event-pass-fill').style.width = Math.min(100, evEarned / E.pass[E.pass.length - 1].at * 100) + '%';
+        $('event-pass-fill').style.background = `linear-gradient(90deg,${T.main},${E.curColor})`;
+        const pass = $('event-pass'); pass.innerHTML = '';
+        E.pass.forEach((t, i) => {
+            const row = document.createElement('div'); row.style.cssText = rowCss + (evTierReached(i) || t.best ? '' : 'opacity:0.55;');   // the tier-50 prize always shows bright
+            if (t.best) row.style.cssText += `border:3px solid #ffd23a;background:linear-gradient(90deg,${T.main}55,${T.accent}55);box-shadow:0 0 18px rgba(255,210,58,0.5);`;
+            row.innerHTML = `<span style="font-weight:800;"><span style="color:${T.accent};">${t.n}</span> · <span style="color:${E.curColor};">${E.curEmoji} ${t.at}</span> &nbsp;${t.best ? '⭐ ' : ''}${t.name}${t.type === 'arcade' ? ` <span style="font-size:0.75em;color:${T.accent};">(arcade, every game)</span>` : ''}</span>`;
+            const claimed = evClaimed.indexOf(i) > -1;
+            row.appendChild(mkBtn(claimed ? '✅ Claimed' : evTierReached(i) ? 'Claim' : '🔒', claimed || !evTierReached(i) || !ev,
+                () => { claimEvTier(i); renderEventScreen(); }, 'tier' + i));
             pass.appendChild(row);
         });
         // The shop
-        const box = $('halloween-shop'); box.innerHTML = '';
-        for (const it of HALLOWEEN_SHOP) {
+        $('event-shop-head').textContent = `${E.curEmoji} ${E.name} Shop`; $('event-shop-head').style.color = T.main;
+        const box = $('event-shop'); box.innerHTML = '';
+        for (const it of EVENT_SHOP) {
             const row = document.createElement('div'); row.style.cssText = rowCss;
             row.innerHTML = `<span style="font-weight:800;">${it.name}</span>`;
-            row.appendChild(mkBtn(`🍬 ${it.cost}`, !on || candy < it.cost, () => buyHalloween(it.id), it.id));
+            row.appendChild(mkBtn(`${E.curEmoji} ${it.cost}`, !ev || evWallet < it.cost, () => buyEvent(it.id), it.id));
             box.appendChild(row);
         }
     }
-    function openHalloweenScreen() {
+    function openEventScreen() {
         document.getElementById('start-screen').style.display = 'none';
-        document.getElementById('halloween-screen').style.display = 'flex';
-        renderHalloweenScreen();
+        document.getElementById('event-screen').style.display = 'flex';
+        renderEventScreen();
     }
-    function closeHalloweenScreen() {
-        document.getElementById('halloween-screen').style.display = 'none';
+    function closeEventScreen() {
+        document.getElementById('event-screen').style.display = 'none';
         document.getElementById('start-screen').style.display = 'flex';
-        refreshHalloweenButton();
+        refreshEventButton();
     }
-    // The menu button only exists while the event is on; the badge shows your candy.
-    function refreshHalloweenButton() {
-        const b = document.getElementById('halloween-btn'); if (!b) return;
-        b.style.display = isHalloween() ? '' : 'none';
-        const badge = document.getElementById('halloween-badge');
-        const ready = hwUnclaimed() + (hwDailyReady() ? 1 : 0);
-        if (badge) badge.textContent = (candy > 0 ? ` 🍬${candy}` : '') + (ready ? ` (${ready})` : '');
+    // The menu button only exists while an event is on; it wears that event's look and badge.
+    function refreshEventButton() {
+        const b = document.getElementById('event-btn'); if (!b) return;
+        const ev = activeEvent();
+        b.style.display = ev ? '' : 'none';
+        if (!ev) return;
+        b.style.background = `linear-gradient(180deg,${ev.theme.main},${ev.theme.dark})`;
+        b.style.boxShadow = `0 3px 0 ${ev.theme.edge}`;
+        document.getElementById('event-btn-label').textContent = `${ev.emoji} ${ev.name}`;
+        loadEvent(ev);
+        const ready = evUnclaimed() + (evDailyReady() ? 1 : 0);
+        document.getElementById('event-badge').textContent = (evWallet > 0 ? ` ${ev.curEmoji}${evWallet}` : '') + (ready ? ` (${ready})` : '');
     }
-    // Candy from a kill. Normal monsters: 30% for one piece. Bosses: a bag of 5 (×3 each), and the
-    // Pumpkin King spills 5 pieces worth 5 each — 25 candy.
-    function halloweenOnKill(m) {
-        if (!isHalloween() || !m) return;
-        const drop = (n) => pickups.push({ x: m.x + (Math.random() - 0.5) * 50, y: m.y + (Math.random() - 0.5) * 50, type: 'candy', n, life: 900 });
-        if (m.name === 'Pumpkin King') { for (let i = 0; i < 5; i++) drop(5); }
+    // Currency from a kill. Normal monsters: 30% for one. Bosses: a bag of 5 (×3 each); the event's
+    // own boss spills 5 worth 5 each — 25.
+    function eventOnKill(m) {
+        const ev = activeEvent();
+        if (!ev || !m) return;
+        const drop = (n) => pickups.push({ x: m.x + (Math.random() - 0.5) * 50, y: m.y + (Math.random() - 0.5) * 50, type: 'eventcur', ev: ev.id, n, life: 900 });
+        if (m.name === ev.boss) { for (let i = 0; i < 5; i++) drop(5); }
         else if (m.isBoss) { for (let i = 0; i < 5; i++) drop(3); }
         else if (Math.random() < 0.3) drop(1);
     }
     window.addEventListener('load', () => {
-        refreshHalloweenButton();
-        // The arcade's 🎃 Halloween button opens the game with ?open=halloween — go straight to the event menu.
-        try { if (new URLSearchParams(location.search).get('open') === 'halloween' && isHalloween()) openHalloweenScreen(); } catch (e) {}
+        refreshEventButton();
+        // The arcade's event button opens the game with ?open=event (older links: ?open=halloween).
+        try { const o = new URLSearchParams(location.search).get('open'); if ((o === 'event' || o === 'halloween') && activeEvent()) openEventScreen(); } catch (e) {}
     });
     function applySeasonPrize(prize) {
         if (!prize) return;
@@ -8764,7 +8838,7 @@ const col = b.color || BLDG_COLORS[0];
             awardXP(xpForKill(m));
             explodeMonster(m);
             spawnPickup(m.x, m.y);
-            halloweenOnKill(m);   // 🎃 candy while the Halloween event is on
+            eventOnKill(m);   // 🎉 event currency (candy / snowflakes) while an event is on
             revengeOnKill(m);   // ⚔️ the Reaper that killed you last match — after the XP, so its banner wins
             if (player.cls.canCopy && bySelf) { player.copiedPower = true; player.copyTimer = 600; player.copySpeedBonus = 1.5; player.copiedMonsterName = m.name || ''; showStatus(`COPIED: ${m.name}`, '#ffeaa7'); }
             // Sikuna: every 10 kills spawns a Sikuna finger (up to 30 lifetime)
@@ -12497,7 +12571,7 @@ const col = b.color || BLDG_COLORS[0];
         astralSecretTick();   // Astral Temple secret spot (invisible) — places it and drops a faint sparkle
         tickTileHole();       // The Lobby: looking up through a fallen tile's hole unlocks Floor 1
         tickFloorExit();      // Floors 1–19: survive, then reach the exit to unlock the next floor
-        tickHwDoor();         // 🎃 the trick-or-treat door
+        tickEvGift();         // 🎉 the event's gift spot (trick-or-treat door / present)
 
         // Timers
         if (p.frozen > 0) { p.frozen--; if (p.frozen===0) p.disableImmune = 120; }
@@ -13280,8 +13354,9 @@ const col = b.color || BLDG_COLORS[0];
                     if (picker===player && stowItem('finger')) { SFX.pickup(); showStatus('🎒 Sikuna Finger stowed', '#26de81'); }
                     else { picker.hp = picker.maxHp; picker.sikunaBuff = 600; picker.invincible = Math.max(picker.invincible,60); if(picker===player){SFX.pickup(); showStatus(`🖐️ SIKUNA FINGER EATEN! +50% SPD/DMG 10s (${picker.sikunaFingersUsed}/30)`, '#ff2d55');} }
                 }
-                else if (pk.type==='candy') {
-                    if (picker===player) { addCandy(pk.n||1); SFX.coin(); showStatus(`🍬 +${pk.n||1} candy (${candy})`, '#ff9ff3'); }
+                else if (pk.type==='eventcur' || pk.type==='candy') {   // ('candy' = a pickup from before the event system)
+                    const _pev = EVENTS[pk.ev] || EVENTS.halloween;
+                    if (picker===player) { addEventCur(pk.n||1, _pev); SFX.coin(); showStatus(`${_pev.curEmoji} +${pk.n||1} ${_pev.cur} (${evWallet})`, _pev.curColor); }
                 }
                 // Everything else that lives in the backpack: chili, bomb, freeze, shield, power.
                 // These are all "save it for the right moment" items, so they stow by default — but a
@@ -13308,7 +13383,7 @@ const col = b.color || BLDG_COLORS[0];
 
         // Wave complete — roll new monster class + auto save
         if (monstersSpawned >= monstersToSpawn && monsters.length === 0) {
-            halloweenOnWaveClear(wave);   // 🎃 candy for clearing it
+            eventOnWaveClear(wave);   // 🎉 event currency for clearing it
             wave++; monstersSpawned = 0; spawnTimer = 90;
             bossHabitat = null; // the last boss's arena drains away with it
             setTimeOfDayForWave(wave);
@@ -16271,12 +16346,12 @@ const col = b.color || BLDG_COLORS[0];
         for (const m of monsters)     sprites.push({ x:m.x, y:m.y, size: m.r*2.4, emoji: m.emoji, color: m.color, hpBar: m.hp/m.maxHp });
         for (const pk of pickups) {
             // Emoji comes from the backpack item table so a new item only has to be defined once.
-            const e = pk.type==='sikunaFinger' ? '🖐️' : pk.type==='candy' ? '🍬' : (BP_ITEM[pk.type] ? BP_ITEM[pk.type].emoji : '🪙');
+            const e = pk.type==='sikunaFinger' ? '🖐️' : (pk.type==='eventcur' || pk.type==='candy') ? (EVENTS[pk.ev] || EVENTS.halloween).curEmoji : (BP_ITEM[pk.type] ? BP_ITEM[pk.type].emoji : '🪙');
             sprites.push({ x:pk.x, y:pk.y, size: 22, emoji: e, hover: 6 });
         }
         for (const t of traps) sprites.push({ x:t.x, y:t.y, size: t.r*1.8, emoji: t.emoji, color: t.color });
         if (brExit && !brExit.done) sprites.push({ x:brExit.x, y:brExit.y, size: 60, emoji: brExit.emoji, color: '#feca57' });
-        if (hwDoor && !hwDoor.done) sprites.push({ x:hwDoor.x, y:hwDoor.y, size: 50, emoji: '🚪', color: '#ff8c1a' });
+        if (evGift && !evGift.done) sprites.push({ x:evGift.x, y:evGift.y, size: 50, emoji: EVENTS[evGift.ev].gift.emoji, color: EVENTS[evGift.ev].gift.color });
         for (const a of allies)   sprites.push({ x:a.x, y:a.y, size: 34, emoji: SUMMON_EMOJI[summonKind(a)], color: FRIEND_COL });
         for (const tu of turrets) sprites.push({ x:tu.x, y:tu.y, size: 34, emoji: '🤖' });
         for (const b of bullets)  sprites.push({ x:b.x, y:b.y, size: 14, emoji: b.bemoji || '•', color: b.color || '#ffcc00', hover: 22 });
@@ -16690,7 +16765,10 @@ const col = b.color || BLDG_COLORS[0];
     function updateExit3D() {
         if (!_three) return;
         placeGlowDoor3D('exitMesh', brExit, 0xfff2a8, 0x2d2a26);
-        placeGlowDoor3D('hwDoorMesh', hwDoor, 0xff8c1a, 0x3a1a4a);   // 🎃 trick-or-treat door
+        // 🎉 the event's gift spot; rebuilt in the right colours if the event changes
+        if (evGift && _three._giftEv !== evGift.ev && _three.giftMesh) { _three.scene.remove(_three.giftMesh); _three.giftMesh = null; }
+        if (evGift) _three._giftEv = evGift.ev;
+        placeGlowDoor3D('giftMesh', evGift, evGift ? EVENTS[evGift.ev].gift.glow : 0, evGift ? EVENTS[evGift.ev].gift.frame : 0);
     }
     // The hole a fallen ceiling tile leaves in the Lobby (only while the Floor 1 secret is live): a
     // dark opening just under the lid, fading to the grey concrete of the floor above in the middle.
@@ -17702,7 +17780,8 @@ const col = b.color || BLDG_COLORS[0];
     };
     function PROPS_FOR(w) {
         const set = (w && PROP_SETS[w.id]) || PROP_SETS.city;
-        return isHalloween() ? set.concat(['jackolantern', 'jackolantern']) : set;   // 🎃 every world, while the event is on
+        const ev = activeEvent();   // 🎉 the event's decoration stands in every world while it is on
+        return ev ? set.concat([ev.prop, ev.prop]) : set;
     }
 
     function buildProp(kind, takeLight) {
@@ -17952,6 +18031,18 @@ const col = b.color || BLDG_COLORS[0];
                 const stainM = M('bkr-stain', { color: 0x9c8350, roughness: 0.95 });
                 const t = put(TG.Box(22, 1, 22), tileM, 0.6); t.rotation.z = 0.04;
                 put(TG.Cylinder(6, 6, 0.4, 10), stainM, 1.3, 3, -2).scale.set(1, 1, 0.7);
+                break;
+            }
+            case 'xmastree': {
+                // 🎄 A little Christmas tree: three stacked cones, a trunk, baubles and a star. Self-lit bits; no real light.
+                const leafM = M('xmas-leaf', { color: 0x1e8449, roughness: 0.8 });
+                const trunkM = M('xmas-trunk', { color: 0x6d4925, roughness: 0.9 });
+                const starM = _pf('prop-xmas-star', () => new THREE.MeshBasicMaterial({ color: 0xffd23a }));
+                const balls = [0xe74c3c, 0xf1c40f, 0x3498db, 0xffffff].map((c, i) => _pf('prop-xmas-ball' + i, () => new THREE.MeshBasicMaterial({ color: c })));
+                put(TG.Cylinder(2.5, 3, 8, 8), trunkM, 4);
+                put(TG.Cone(16, 18, 10), leafM, 16); put(TG.Cone(13, 16, 10), leafM, 26); put(TG.Cone(9, 13, 10), leafM, 35);
+                const st = put(TG.Sphere(2.6, 8, 6), starM, 43); st.scale.set(1, 1.3, 1);
+                for (let k = 0; k < 8; k++) { const a = k * 0.8, h = 14 + (k % 3) * 9, rr = 13 - (k % 3) * 3.4; put(TG.Sphere(1.6, 8, 6), balls[k % 4], h, Math.cos(a) * rr, Math.sin(a) * rr); }
                 break;
             }
             case 'jackolantern': {
@@ -18975,7 +19066,8 @@ const col = b.color || BLDG_COLORS[0];
 
     function makePickupMesh(pk) {
         const g = new THREE.Group();
-        const colHex = pk.type==='sikunaFinger' ? '#ff2d55' : pk.type==='candy' ? '#ff9ff3' : (BP_ITEM[pk.type] ? BP_ITEM[pk.type].color : '#feca57');
+        const _pev = (pk.type==='eventcur' || pk.type==='candy') ? (EVENTS[pk.ev] || EVENTS.halloween) : null;
+        const colHex = pk.type==='sikunaFinger' ? '#ff2d55' : _pev ? _pev.curColor : (BP_ITEM[pk.type] ? BP_ITEM[pk.type].color : '#feca57');
         const col = _hex(colHex);
         // Glowing halo disc on the ground
         const halo = new THREE.Mesh(TG.Ring(8, 14, 28), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
@@ -18995,7 +19087,12 @@ const col = b.color || BLDG_COLORS[0];
             // White shine highlight
             const shine = new THREE.Mesh(TG.Sphere(1.2, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
             shine.position.set(-3, 4, 2.2); g.add(shine);
-        } else if (pk.type === 'candy') {
+        } else if (_pev && _pev.id === 'christmas') {
+            // A snowflake — three crossed icy bars and a bright middle.
+            const ice = new THREE.MeshStandardMaterial({ color: 0xcff4ff, roughness: 0.15, metalness: 0.3, emissive: 0x9fe3ff, emissiveIntensity: 0.5 });
+            for (let k = 0; k < 3; k++) { const bar = new THREE.Mesh(TG.Box(14, 1.6, 1.6), ice); bar.rotation.z = k * Math.PI / 3; g.add(bar); }
+            g.add(new THREE.Mesh(TG.Sphere(2.4, 10, 8), ice));
+        } else if (_pev) {
             // A wrapped sweet — round middle, twisted wrapper ends.
             const sweet = new THREE.MeshStandardMaterial({ color: 0xff6bcb, roughness: 0.25, metalness: 0.2, emissive: 0xff6bcb, emissiveIntensity: 0.3 });
             const wrap = new THREE.MeshStandardMaterial({ color: 0xffe066, roughness: 0.4, metalness: 0.3 });
@@ -21075,14 +21172,15 @@ const col = b.color || BLDG_COLORS[0];
             ctx.fillText(brExit.emoji, brExit.x, brExit.y);
             ctx.textBaseline = 'alphabetic';
         }
-        // 🎃 Trick-or-treat door — an orange glow with a door and a pumpkin
-        if (hwDoor && !hwDoor.done) {
-            const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
-            const g = ctx.createRadialGradient(hwDoor.x, hwDoor.y, 4, hwDoor.x, hwDoor.y, 60);
-            g.addColorStop(0, 'rgba(255,140,26,' + (0.5 + 0.3 * pulse) + ')'); g.addColorStop(1, 'rgba(255,140,26,0)');
-            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(hwDoor.x, hwDoor.y, 60, 0, Math.PI * 2); ctx.fill();
+        // 🎉 The event's gift spot — a glow with its emoji (🚪 trick-or-treat door / 🎁 present)
+        if (evGift && !evGift.done) {
+            const G = EVENTS[evGift.ev].gift, pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
+            const rgb = [(G.glow >> 16) & 255, (G.glow >> 8) & 255, G.glow & 255].join(',');
+            const g = ctx.createRadialGradient(evGift.x, evGift.y, 4, evGift.x, evGift.y, 60);
+            g.addColorStop(0, 'rgba(' + rgb + ',' + (0.5 + 0.3 * pulse) + ')'); g.addColorStop(1, 'rgba(' + rgb + ',0)');
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(evGift.x, evGift.y, 60, 0, Math.PI * 2); ctx.fill();
             ctx.font = '34px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText('🚪', hwDoor.x, hwDoor.y); ctx.font = '18px serif'; ctx.fillText('🎃', hwDoor.x + 18, hwDoor.y + 14);
+            ctx.fillText(G.emoji, evGift.x, evGift.y); ctx.font = '18px serif'; ctx.fillText(G.side, evGift.x + 18, evGift.y + 14);
             ctx.textBaseline = 'alphabetic';
         }
         // Traps — viewport culled
@@ -21160,8 +21258,9 @@ const col = b.color || BLDG_COLORS[0];
         ctx.font='16px serif';ctx.textAlign='center';
         for (const pk of pickups) {
             if (pk.x < _cvx0 || pk.x > _cvx1 || pk.y < _cvy0 || pk.y > _cvy1) continue;
-            const tColor = pk.type==='health'?'#ff3838':pk.type==='ammo'?'#48dbfb':pk.type==='chili'?'#e17055':pk.type==='sikunaFinger'?'#ff2d55':pk.type==='candy'?'#ff9ff3':'#feca57';
-            const tEmoji = pk.type==='health'?'❤️':pk.type==='ammo'?'🔫':pk.type==='chili'?'🌶️':pk.type==='sikunaFinger'?'🖐️':pk.type==='candy'?'🍬':'🪙';
+            const _pev = (pk.type==='eventcur' || pk.type==='candy') ? (EVENTS[pk.ev] || EVENTS.halloween) : null;
+            const tColor = pk.type==='health'?'#ff3838':pk.type==='ammo'?'#48dbfb':pk.type==='chili'?'#e17055':pk.type==='sikunaFinger'?'#ff2d55':_pev?_pev.curColor:'#feca57';
+            const tEmoji = pk.type==='health'?'❤️':pk.type==='ammo'?'🔫':pk.type==='chili'?'🌶️':pk.type==='sikunaFinger'?'🖐️':_pev?_pev.curEmoji:'🪙';
             const fade = pk.life < 60 ? pk.life/60 : 1;
             const t = Date.now()/200;
             const bob = Math.sin(t + pk.x*0.01) * 4;
@@ -21830,9 +21929,9 @@ const col = b.color || BLDG_COLORS[0];
         mctx.fillStyle = '#ff9f43';
         for (const t of traps) { if (t.cooldown <= 0) { mctx.beginPath(); mctx.arc(px2(t.x), py2(t.y), 1.6, 0, Math.PI*2); mctx.fill(); } }
         // 🎃 Trick-or-treat door — an orange dot, pinned to the edge when it is off the map
-        if (hwDoor && !hwDoor.done) {
-            const dx = Math.max(6, Math.min(MW - 6, px2(hwDoor.x))), dy = Math.max(6, Math.min(MH - 6, py2(hwDoor.y)));
-            mctx.fillStyle = '#ff8c1a'; mctx.beginPath(); mctx.arc(dx, dy, 5, 0, Math.PI*2); mctx.fill();
+        if (evGift && !evGift.done) {
+            const dx = Math.max(6, Math.min(MW - 6, px2(evGift.x))), dy = Math.max(6, Math.min(MH - 6, py2(evGift.y)));
+            mctx.fillStyle = EVENTS[evGift.ev].gift.color; mctx.beginPath(); mctx.arc(dx, dy, 5, 0, Math.PI*2); mctx.fill();
             mctx.strokeStyle = '#fff'; mctx.lineWidth = 1; mctx.stroke();
         }
         // Backrooms exit — a yellow star, pinned to the edge when it is off the map
@@ -22099,37 +22198,42 @@ const col = b.color || BLDG_COLORS[0];
         if (el.style.display === 'flex') { el.style.display = 'none'; return; }
         if (!isArcadeAdmin()) { showStatus("🔒 [U] Admin Unlocks: open the arcade's 🛠️ Admin Panel first", '#a55eea'); return; }
         document.getElementById('unlock-msg').textContent = '';
+        const ev = activeEvent() || EVENTS.halloween;   // label the currency buttons for the event that is on
+        document.getElementById('unlock-cur100').textContent = `${ev.curEmoji} +100 ${ev.cur}`;
+        document.getElementById('unlock-cur1000').textContent = `${ev.curEmoji} +1000 ${ev.cur}`;
+        document.getElementById('unlock-pass').textContent = `${ev.emoji} Fill the ${ev.name} Pass`;
         el.style.display = 'flex';
     }
     function unlockAction(kind) {
         if (!isArcadeAdmin()) return false;
         const say = (t) => { const m = document.getElementById('unlock-msg'); if (m) m.textContent = t; showStatus(t, '#a55eea'); };
-        if (kind === 'candy100') { addCandy(100); say(`🍬 +100 candy (${candy})`); }
-        else if (kind === 'candy1000') { addCandy(1000); say(`🍬 +1000 candy (${candy})`); }
-        else if (kind === 'hwpass') {
-            // Enough candy EARNED for every tier, then claim them all (works even outside the event).
-            loadCandy();
-            candyEarned = Math.max(candyEarned, HW_PASS[HW_PASS.length - 1].at); saveCandy();
+        // Currency and pass act on the event that is on now (Halloween outside any event).
+        const ev = activeEvent() || EVENTS.halloween;
+        if (kind === 'cur100' || kind === 'cur1000') { const n = kind === 'cur100' ? 100 : 1000; addEventCur(n, ev); say(`${ev.curEmoji} +${n} ${ev.cur} (${evWallet})`); }
+        else if (kind === 'pass') {
+            // Enough EARNED for every tier, then claim them all (works even outside the event).
+            loadEvent(ev);
+            evEarned = Math.max(evEarned, ev.pass[ev.pass.length - 1].at);
             let n = 0;
-            for (let t = 0; t < HW_PASS.length; t++) {
-                const tier = HW_PASS[t];
-                if (hwClaimed.indexOf(t) > -1) continue;
-                hwClaimed.push(t); n++;
+            for (let t = 0; t < ev.pass.length; t++) {
+                const tier = ev.pass[t];
+                if (evClaimed.indexOf(t) > -1) continue;
+                evClaimed.push(t); n++;
                 if (tier.type === 'coins') addCoins(tier.amount);
                 else if (tier.type === 'xp') addSeasonXP(tier.amount);
                 else if (tier.type === 'points') { points += tier.amount; savePoints(); }
                 else if (tier.type === 'arcade') tier.ids.forEach(grantArcadeItem);
             }
-            saveCandy();
-            say(`🎃 Halloween Pass filled — ${n} tier${n === 1 ? '' : 's'} claimed`);
+            saveEvent();
+            say(`${ev.emoji} ${ev.name} Pass filled — ${n} tier${n === 1 ? '' : 's'} claimed`);
         }
-        else if (kind === 'hwitems') { Object.values(HW_PASS_COSMETICS).flat().forEach(c => grantArcadeItem(c.id)); say('👻 Every Halloween title, avatar, background and gun skin unlocked'); }
+        else if (kind === 'eventitems') { Object.values(EVENTS).forEach(e => Object.values(e.cosmetics).flat().forEach(c => grantArcadeItem(c.id))); say('🎉 Every Halloween and Christmas title, avatar, background and gun skin unlocked'); }
         else if (kind === 'floors') { FLOOR_IDS.forEach(unlockSpecialMap); say('🌀 All 21 Backrooms floors unlocked — Worlds → ⭐ Special Maps'); }
         else if (kind === 'flesh') { addCoins(10000); say('🍖 +10,000 flesh'); }
         else if (kind === 'points') { points += 100; savePoints(); say('🏆 +100 points'); }
         else return false;
         SFX.pickup && SFX.pickup();
-        refreshHalloweenButton();
+        refreshEventButton();
         return true;
     }
 
@@ -22903,13 +23007,19 @@ const col = b.color || BLDG_COLORS[0];
 
     const CODES = {
         'DANIEL':     { reward: 'coins', amount: 500, msg: '+500 Rotten Flesh!' },
-        // 🎃 Halloween codes: candy, once a day each, only while the event is on (see redeemCode).
-        'TRICKORTREAT': { reward: 'candy', amount: 15, msg: '🎃 +15 candy! (once a day, during Halloween)' },
-        'PUMPKIN':      { reward: 'candy', amount: 20, msg: '🎃 +20 candy from the pumpkin patch!' },
-        'SPOOKY':       { reward: 'candy', amount: 10, msg: '👻 +10 spooky candy!' },
-        'BOO':          { reward: 'candy', amount: 5,  msg: '👻 BOO! +5 candy' },
-        'CANDYCORN':    { reward: 'candy', amount: 25, msg: '🌽 +25 candy corn!' },
-        'GHOSTPARTY':   { reward: 'candy', amount: 15, msg: '🎉 +15 candy — the ghosts are partying!' },
+        // 🎉 Event codes: the event's currency, once a day each, only while THAT event is on (see redeemCode).
+        'TRICKORTREAT': { reward: 'event', event: 'halloween', amount: 15, msg: '🎃 +15 candy! (once a day, during Halloween)' },
+        'PUMPKIN':      { reward: 'event', event: 'halloween', amount: 20, msg: '🎃 +20 candy from the pumpkin patch!' },
+        'SPOOKY':       { reward: 'event', event: 'halloween', amount: 10, msg: '👻 +10 spooky candy!' },
+        'BOO':          { reward: 'event', event: 'halloween', amount: 5,  msg: '👻 BOO! +5 candy' },
+        'CANDYCORN':    { reward: 'event', event: 'halloween', amount: 25, msg: '🌽 +25 candy corn!' },
+        'GHOSTPARTY':   { reward: 'event', event: 'halloween', amount: 15, msg: '🎉 +15 candy — the ghosts are partying!' },
+        'JINGLEBELLS':  { reward: 'event', event: 'christmas', amount: 15, msg: '🔔 +15 snowflakes! (once a day, during Christmas)' },
+        'HOHOHO':       { reward: 'event', event: 'christmas', amount: 10, msg: '🎅 Ho ho ho! +10 snowflakes' },
+        'SNOWMAN':      { reward: 'event', event: 'christmas', amount: 20, msg: '⛄ +20 snowflakes!' },
+        'CANDYCANE':    { reward: 'event', event: 'christmas', amount: 25, msg: '🍭 +25 snowflakes!' },
+        'MISTLETOE':    { reward: 'event', event: 'christmas', amount: 5,  msg: '🌿 +5 snowflakes' },
+        'NORTHPOLE':    { reward: 'event', event: 'christmas', amount: 15, msg: '🧭 +15 snowflakes from the North Pole!' },
         'MONSTER':    { reward: 'coins', amount: 300, msg: '+300 Rotten Flesh!' },
         'RICH':       { reward: 'coins', amount: 1000, msg: '+1000 Rotten Flesh!' },
         'GLITCH':     { reward: 'class', className: 'Glitch', msg: 'Unlocked Glitch for next roll!' },
@@ -23048,9 +23158,10 @@ const col = b.color || BLDG_COLORS[0];
             msgEl.style.color = '#ff6b6b'; msgEl.textContent = 'Invalid code!';
             return;
         }
-        // The Halloween code: only during the event, and once a day (not the usual ten).
-        if (reward.reward === 'candy') {
-            if (!isHalloween()) { msgEl.style.color = '#ff6b6b'; msgEl.textContent = '🎃 Come back at Halloween!'; return; }
+        // Event codes: only during THEIR event, and once a day (not the usual ten).
+        if (reward.reward === 'event') {
+            const ce = EVENTS[reward.event];
+            if (!isEventOn(reward.event)) { msgEl.style.color = '#ff6b6b'; msgEl.textContent = `${ce.emoji} Come back at ${ce.name}!`; return; }
             if (usesToday > 0) { msgEl.style.color = '#ff6b6b'; msgEl.textContent = '🎃 Already used today — try tomorrow!'; return; }
         }
 
@@ -23060,8 +23171,8 @@ const col = b.color || BLDG_COLORS[0];
         if (reward.reward === 'coins') {
             addCoins(reward.amount);
             msgEl.style.color = '#f9ca24'; msgEl.textContent = reward.msg;
-        } else if (reward.reward === 'candy') {
-            addCandy(reward.amount);
+        } else if (reward.reward === 'event') {
+            addEventCur(reward.amount, EVENTS[reward.event]);
             msgEl.style.color = '#ff9ff3'; msgEl.textContent = reward.msg;
         } else if (reward.reward === 'class') {
             guaranteedClass = CLASSES.find(c => c.name === reward.className) || null;
@@ -24455,7 +24566,7 @@ const col = b.color || BLDG_COLORS[0];
 
     function startGame() {
         if (!chosenClass) return;
-        brExit = null; hwDoor = null;
+        brExit = null; evGift = null;
         ensureWorldAllowed();
         if (isPlayerBanned(playerName)) { alert('You are BANNED! Contact an Admin or Owner.'); return; }
         document.getElementById('roll-screen').style.display = 'none';

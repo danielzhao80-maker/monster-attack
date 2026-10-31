@@ -117,7 +117,7 @@ node tools/test-ultimates.js index.html     # ultimate forms: enter, transform, 
 node tools/test-world-styles.js index.html  # per-world architecture across all 30 worlds
 node tools/test-summons-look.js index.html  # summons: one 2D+3D look per kind, mechanics unchanged
 node tools/test-special-maps.js index.html  # ⭐ Special Maps: lock/unlock, Backrooms run, save, City fallback
-node tools/test-halloween.js index.html     # 🎃 Halloween: dates, candy, Pumpkin King, jack-o'-lanterns, candy shop
+node tools/test-events.js index.html        # 🎉 Halloween + Christmas events: dates, currency, bosses, decorations, pass, shop, codes
 ```
 
 ### Saves
@@ -487,16 +487,15 @@ them; all stand on a green friendly ring. A summon with no kind falls back to th
 summon? Give it a kind, a 2D case and a 3D builder — `test-summons-look.js` checks all three and
 compares mechanics against a recorded baseline.
 
-### 🎃 Halloween event
-`isHalloween()` is on 1 Oct – 7 Nov (override: localStorage `monster_attack_event_force` = 'halloween'/'off').
-While on: `halloweenOnKill` drops `candy` pickups (30%; bosses 15, Pumpkin King 25), boss waves are the
-Pumpkin King 35% of the time (rollMonsterClass), PROPS_FOR adds `jackolantern`, and the 🎃 menu button
-opens the event menu. Candy is the event's points: `candy` (wallet, `monster_attack_candy`) is spent in
-the HALLOWEEN_SHOP; `candyEarned` (`monster_attack_hw_earned_<year>`) fills the 🎃 Halloween Pass
-(HW_PASS: 50 tiers at 10n + n²/5 candy, claimed list `monster_attack_hw_claimed_<year>`; HW_PASS_COSMETICS
-puts the event's secret arcade-shop items — 4 titles, 3 backgrounds, 3 avatars, the gun skin — on tiers,
-with the best three on tier 50; the arcade page's HW.PASS uses the same formula). Candy sources: kills, bosses, wave
-clears (halloweenOnWaveClear), the 🎁 daily treat, code TRICKORTREAT (once a day, event only) and the
-🚪 trick-or-treat door each wave (`hwDoor`, tickHwDoor; drawn like the Backrooms exit via placeGlowDoor3D). Tests that care about the normal boss
-pair must force the event off. `node tools/test-halloween.js` covers it.
-
+### 🎉 Seasonal events (🎃 Halloween, 🎄 Christmas)
+One engine, `EVENTS` (halloween: 1 Oct – 7 Nov, christmas: 1 Dec – 7 Jan; January counts as last
+December's year). `activeEvent()` picks the one that is on; localStorage `monster_attack_event_force` =
+'halloween' / 'christmas' / 'off' overrides the date. Each event has its currency (candy / snowflakes —
+Halloween keeps the original `monster_attack_candy` / `_hw_` keys), a 50-tier pass (`makePass`, 10n + n²/5,
+cosmetics = secret arcade-shop items with lockText "<Event> Pass N", best on tier 50), a boss that takes
+35% of boss waves (Pumpkin King / Evil Snowman), a prop added to every world (jackolantern / xmastree),
+a gift spot each wave (`evGift`: trick-or-treat door / present), a daily gift, wave-clear currency,
+codes (`reward: 'event'`, once a day, only during that event), and `[U]` admin unlocks. State:
+`evWallet` (shop) / `evEarned` (pass) / `evClaimed`; always `loadEvent()` before changing — the arcade
+page adds to the same keys (play time, daily pick). The arcade page mirrors EVENTS (dates, keys, looks).
+`node tools/test-events.js` covers both.
