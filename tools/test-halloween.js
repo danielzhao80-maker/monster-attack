@@ -140,9 +140,11 @@ const force = v => q(v ? `localStorage.setItem('monster_attack_event_force', '${
 force(null);
 check(q(`isHalloween(new Date(2026, 9, 1))`) && q(`isHalloween(new Date(2026, 9, 31))`) && q(`isHalloween(new Date(2026, 10, 7))`), 'on from 1 October to 7 November');
 check(!q(`isHalloween(new Date(2026, 8, 30))`) && !q(`isHalloween(new Date(2026, 10, 8))`) && !q(`isHalloween(new Date(2027, 2, 1))`), 'off the rest of the year');
-check(q(`halloweenDaysLeft(new Date(2026, 9, 24, 12))`) === 15 && q(`halloweenDaysLeft(new Date(2026, 10, 7, 12))`) === 1, 'counts the days left', q(`halloweenDaysLeft(new Date(2026, 9, 24, 12))`));
 force('off'); check(q(`isHalloween(new Date(2026, 9, 24))`) === false, 'can be forced off');
 force('halloween'); check(q(`isHalloween(new Date(2026, 2, 1))`) === true, 'and forced on');
+
+force('halloween'); q(`renderHalloweenScreen()`);
+check(!/Ends in|Last day/.test(q(`document.getElementById('halloween-days').textContent`)), 'no countdown to when it ends');
 
 // ---- menu button ----
 force('halloween'); q(`refreshHalloweenButton()`);
@@ -197,7 +199,7 @@ check(q(`PROPS_FOR(findWorld('desert')).indexOf('jackolantern')`) === -1, 'not a
 // ---- the candy shop (spends the wallet) ----
 force('halloween');
 setArcade({ coins: 0, owned: [] });
-q(`candy = 100; candyEarned = 0; hwClaimed = []; saveCandy(); coins = 0n; seasonXP = 0; points = 0; openHalloweenScreen();`);
+q(`candy = 100; candyEarned = 0; hwClaimed = []; saveCandy(); coins = 0n; seasonXP = 0; points = 0; document.getElementById('halloween-shop').children.length = 0; openHalloweenScreen();`);
 check(q(`document.getElementById('halloween-shop').children.length`) === 3, 'the shop lists 3 things');
 check(q(`buyHalloween('flesh')`) === true && q(`coins.toString()`) === '100' && q('candy') === 90, '10 candy -> 100 flesh');
 check(q(`buyHalloween('xp')`) === true && q('seasonXP') === 250 && q('candy') === 70, '20 candy -> 250 Season Pass XP');

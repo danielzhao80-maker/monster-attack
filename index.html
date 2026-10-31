@@ -4928,11 +4928,6 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         d = d || new Date();
         return d.getMonth() === 9 || (d.getMonth() === 10 && d.getDate() <= 7);
     }
-    function halloweenDaysLeft(d) {
-        d = d || new Date();
-        const end = new Date(d.getFullYear(), 10, 8);            // the morning after 7 November
-        return Math.max(0, Math.ceil((end - d) / 86400000));
-    }
     // Candy is the event's points. Two numbers: `candy` is your wallet (spent in the candy shop),
     // `candyEarned` is everything you have collected THIS year's event — it is what fills the
     // 🎃 Halloween Pass, so spending candy never loses you pass progress.
@@ -5091,9 +5086,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     function renderHalloweenScreen() {
         loadCandy();
-        const days = halloweenDaysLeft();
         const $ = (i) => document.getElementById(i);
-        $('halloween-days').textContent = isHalloween() ? (days > 1 ? `Ends in ${days} days` : 'Last day!') : 'The event is over — see you next October';
+        // No countdown to the end (asked for) — only say so once it IS over.
+        $('halloween-days').textContent = isHalloween() ? '' : 'The event is over — see you next October';
         $('halloween-candy').textContent = `🍬 ${candy} candy`;
         const on = isHalloween();
         const rowCss = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;border-radius:14px;background:rgba(255,140,26,0.12);border:2px solid #ff8c1a;';
