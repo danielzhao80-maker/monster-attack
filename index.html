@@ -5307,8 +5307,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const cls = MONSTER_CLASSES.find(c => c.name === name); if (!cls) return null;
         const keep = currentMonsterClass; currentMonsterClass = cls; spawnMonster(); currentMonsterClass = keep;
         const m = monsters[monsters.length - 1]; if (!m) return null;
-        const a = Math.random() * Math.PI * 2, d = asBoss ? 0 : 70;
-        m.x = hwCastle.x + Math.cos(a) * d; m.y = hwCastle.y + Math.sin(a) * d;
+        // Guards line up along the road in front of the gate (the street is too tight for a ring).
+        const side = Math.random() < 0.5 ? -1 : 1;
+        m.x = hwCastle.x + (asBoss ? 0 : side * (50 + Math.random() * 70)); m.y = hwCastle.y + (asBoss ? 0 : (Math.random() - 0.5) * 30);
+        if (ptInBld(m.x, m.y, m.r)) { m.x = hwCastle.x; m.y = hwCastle.y; }
         const hpBase = cls.hp * 7 * (1 + (wave - 1) * 0.2);
         m._castle = true; m.riseT = 1;
         if (asBoss) {
@@ -7771,7 +7773,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // 🏚️ Trick-or-Treat Street: one endless straight road along x, houses packed shoulder to shoulder
     // on both sides (no gaps, so the street is the only way), and in the start chunk a gate just behind
     // where you begin — you can only go forward. Doors face the road (pickHouses).
-    const STREET_HALF = 110;   // half the road's width (a tight street: ~6 m across)
+    const STREET_HALF = 80;    // half the road's width (a very tight street: ~4.5 m — still fits the big bosses)
     // Monsters never spawn behind the gate at the start of Trick-or-Treat Street (they could never get round it).
     const behindStreetGate = (x) => !!currentWorld && currentWorld.id === 'trickstreet' && !usingCustomMap && x < WORLD_W / 2 - 440;
     function buildStreetChunk(bs, rnd, ox, oy, S, styleId, cx, cy) {
@@ -12465,6 +12467,16 @@ const col = b.color || BLDG_COLORS[0];
             y = ref.y + Math.sin(a) * spawnDist;
             tries++;
         } while ((ptInBld(x, y, 20) || behindStreetGate(x)) && tries < 40); // not inside a building (or behind the street's gate)
+        // On Trick-or-Treat Street the road is too narrow for a ring: come down the road, mostly from ahead.
+        if (currentWorld && currentWorld.id === 'trickstreet' && !usingCustomMap) {
+            const roadY = Math.floor(ref.y / WORLD_H) * WORLD_H + WORLD_H / 2;
+            for (let k = 0; k < 20; k++) {
+                const ahead = Math.random() < 0.75 || behindStreetGate(ref.x - spawnDist);
+                x = ref.x + (ahead ? 1 : -1) * spawnDist * (0.8 + Math.random() * 0.4);
+                y = roadY + (Math.random() - 0.5) * STREET_HALF;
+                if (!ptInBld(x, y, 20) && !behindStreetGate(x)) break;
+            }
+        }
 
         const boss = isBossWave();
         const hpMult = (1 + (wave-1)*0.2) * (boss ? 12 + wave*0.5 : 1);

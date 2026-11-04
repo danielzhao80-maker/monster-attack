@@ -358,7 +358,8 @@ const street = JSON.parse(q(`(function(){
   __freezeMonsters = false; return JSON.stringify(o); })()`));
 check(street.goal === 60, 'the street starts with a goal: double your candy (30 -> 60)', street.goal);
 check(street.gaps === 0 && street.road, 'one road with houses packed along both sides (no way round)', JSON.stringify(street));
-check(street.width <= 240, 'a tight street (about 6 m across)', street.width + ' units');
+check(street.width <= 160, 'a very tight street (about 4.5 m across)', street.width + ' units');
+
 check(street.gate && street.spawnBehind === 0, 'a gate behind the start (forward only) — and no monsters spawn behind it');
 check(street.houses === 6 && street.doorsOnRoad, 'the 6 nearest houses have doors on the road side');
 check(street.castle && street.candy >= 60 && street.castleOnRoad, 'knock until your candy has doubled — then the castle appears up the road', street.candy + ' candy, ' + street.knocks + ' knocks');
@@ -368,6 +369,7 @@ const fight = JSON.parse(q(`(function(){
   __freezeMonsters = true; waveIntroTimer = 0; monsters = []; monstersSpawned = 0; monstersToSpawn = 99; points = 0; savePoints();
   player.x = hwCastle.x; player.y = hwCastle.y; hwCastleTick();
   var o = { phase1: hwCastle.phase, guards: monsters.filter(function(m){ return m._castle && m.name === 'Castle Guard'; }).length };
+  o.guardsInWalls = monsters.filter(function(m){ return m._castle && ptInBld(m.x, m.y, m.r); }).length;
   var before = monsters.length; spawnTimer = 0; update(); o.noWaveSpawns = monsters.length === before;
   monsters.forEach(function(m){ m.hp = 1; m.hasShield = false; m.shieldUp = false; m.dodge = 0; });
   for (var i = monsters.length - 1; i >= 0; i--) hitMonster(monsters[i], i, 99999);
@@ -381,10 +383,16 @@ const fight = JSON.parse(q(`(function(){
   o.phase3 = hwCastle.phase; o.bossCandy = evWallet - c0;
   __freezeMonsters = false; return JSON.stringify(o); })()`));
 check(fight.phase1 === 'guards' && fight.guards === 4, 'entering the castle: 4 guards', JSON.stringify(fight));
+check(fight.guardsInWalls === 0, 'the guards stand on the road, not inside houses');
 check(fight.noWaveSpawns, 'no wave monsters join while you are inside');
 check(fight.points === 10 && fight.phase2 === 'boss', 'beating the guards: 🏆 +10 points and the door opens');
 check(fight.bossIsBoss && /^BOSS (Slimy the Jelly|Biscuit the Cerberus|Mr Roll|Mr Blob|Mrs Gum)$/.test(fight.bossName), 'a candy boss is waiting', fight.bossName);
 check(fight.phase3 === 'done' && fight.bossCandy >= 40, 'beating it: 🍬 +40 candy (plus its candy bag)', fight.bossCandy + ' candy');
+const crowd = JSON.parse(q(`(function(){ selectWorld('trickstreet'); gameRunning = false; startGame(); var inside = 0, behind = 0, ahead = 0, n = 1500;
+  for (var i = 0; i < n; i++) { spawnMonster(); var m = monsters.pop(); if (ptInBld(m.x, m.y, m.r)) inside++; if (m.x < WORLD_W / 2 - 440) behind++; if (m.x > player.x) ahead++; }
+  return JSON.stringify({ inside: inside, behind: behind, ahead: ahead, n: n }); })()`));
+check(crowd.inside === 0 && crowd.behind === 0, 'monsters always come down the road — never inside a house or behind the gate', JSON.stringify(crowd));
+check(crowd.ahead > crowd.n * 0.6, 'mostly from ahead', crowd.ahead + '/' + crowd.n);
 // The castle in other maps: about 5% of Halloween runs.
 const finds = q(`(function(){ selectWorld('city'); gameRunning = false; startGame(); var n = 0; for (var i = 0; i < 2000; i++) { hwCastleNewRun(); if (hwCastle) n++; } return n; })()`);
 check(finds > 60 && finds < 145, 'in any other map the castle is a 5% find', finds + '/2000');
