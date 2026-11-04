@@ -5254,7 +5254,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     let hwHouses = [], hwKnocks = 0, hwCastle = null, hwStreetGoal = 0;
     const streetRoadY = () => Math.floor(player.y / WORLD_H) * WORLD_H + WORLD_H / 2;   // the road you are on
-    const castleBusy = () => !!hwCastle && (hwCastle.phase === 'guards' || hwCastle.phase === 'boss');
+    const castleBusy = () => !!hwCastle && (hwCastle.phase === 'guards' || hwCastle.phase === 'boss' || hwCastle.phase === 'won');
     // Trick-or-Treat Street has no wave monsters: just houses to knock on, then the castle.
     const noWaveMonsters = () => !!currentWorld && currentWorld.id === 'trickstreet' && !usingCustomMap;
     function openSpot(x, y, r) { return !ptInBld(x, y, r || 40) && !ptInWall(x, y, r || 40); }
@@ -5308,14 +5308,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             addShake(8);
         }
     }
-    function spawnCastleMonster(name, asBoss) {
+    function spawnCastleMonster(name, asBoss, x, y) {
         const cls = MONSTER_CLASSES.find(c => c.name === name); if (!cls) return null;
         const keep = currentMonsterClass; currentMonsterClass = cls; spawnMonster(); currentMonsterClass = keep;
         const m = monsters[monsters.length - 1]; if (!m) return null;
-        // Guards line up along the road in front of the gate (the street is too tight for a ring).
-        const side = Math.random() < 0.5 ? -1 : 1;
-        m.x = hwCastle.x + (asBoss ? 0 : side * (50 + Math.random() * 70)); m.y = hwCastle.y + (asBoss ? 0 : (Math.random() - 0.5) * 30);
-        if (ptInBld(m.x, m.y, m.r)) { m.x = hwCastle.x; m.y = hwCastle.y; }
+        m.x = x; m.y = y;
         const hpBase = cls.hp * 7 * (1 + (wave - 1) * 0.2);
         m._castle = true; m.riseT = 1;
         if (asBoss) {
@@ -5332,15 +5329,16 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function hwCastleTick() {
         if (!player || NET.mode === 'client' || !isEventOn('halloween') || usingCustomMap) { hwHouses = []; return; }
         const onStreet = currentWorld && currentWorld.id === 'trickstreet';
-        if (onStreet) {
+        if (castleRoom) hwHouses = [];   // inside the castle: no street doors
+        else if (onStreet) {
             // 🏃 Auto-run: the street carries you forward (steer up/down for the doors) until you are
             // inside the castle. Doors you have run past are gone; new ones appear ahead.
-            if (!hwCastle || hwCastle.phase === 'closed') {
+            if (!castleRoom && (!hwCastle || hwCastle.phase === 'closed')) {
                 const step = Math.max(1.5, (player.speed || 3) * 0.85);
                 if (!ptInBld(player.x + step, player.y, player.r) && !ptInWall(player.x + step, player.y, player.r)) player.x += step;
             }
-            hwHouses = hwHouses.filter(h => !h.done && h.x > player.x - 60);
-            if (hwHouses.length < 3) pickHouses();
+            hwHouses = hwHouses.filter(h => !h.done && h.x > player.x - 60);   // (the one beside you can still be knocked)
+            if (hwHouses.filter(h => h.x > player.x).length < 3) pickHouses();   // always at least 3 still ahead
             for (const h of hwHouses) {
                 if (h.done || Math.hypot(player.x - h.x, player.y - h.y) >= 40) continue;
                 trickOrTreat(h); hwKnocks++;
@@ -5352,27 +5350,69 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (!hwCastle) return;
         const c = hwCastle;
         if (c.phase === 'closed' && Math.hypot(player.x - c.x, player.y - c.y) < 60) {
-            c.phase = 'guards';
-            for (let i = 0; i < 4; i++) spawnCastleMonster('Castle Guard', false);
-            showStatus('🏰 You enter the castle… 4 guards block the door!', '#a55eea');
-            addShake(10); SFX.scream && SFX.scream();
+            enterCastle(c);
         } else if (c.phase === 'guards' && !monsters.some(m => m._castle)) {
             points += 10; savePoints();
             c.boss = rollCastleBoss();
             c.phase = 'boss';
-            spawnCastleMonster(c.boss, true);
+            openCastleDoor();
+            spawnCastleMonster(c.boss, true, c.x + 480, c.y);
             showStatus(`🏆 +10 points! The door creaks open… it's ${c.boss.toUpperCase()}!`, '#feca57');
             addShake(14);
         } else if (c.phase === 'boss' && !monsters.some(m => m._castle)) {
-            c.phase = 'done';
+            c.phase = 'won'; c.exitIn = 150;   // a moment to enjoy it, then back outside
             addEventCur(40, EVENTS.halloween);
             showStatus(`🏰 ${c.boss} is beaten! 🍬 +40 candy`, '#26de81');
             SFX.pickup && SFX.pickup();
+        } else if (c.phase === 'won' && --c.exitIn <= 0) {
+            leaveCastle(c);
         }
+    }
+    // 🏰 INSIDE THE CASTLE. Walking into the gate takes you into the castle hall, which replaces the
+    // world while you are inside (refreshChunks sees castleRoom): a stone hall with a guard room and,
+    // behind a locked door, the boss chamber. Monsters that were chasing you outside wait out there.
+    let castleRoom = null;
+    function buildCastleRoom(c) {
+        const O = { x: c.x, y: c.y }, T = 40, H = 220, W = 800, D = 360;
+        const walls = [];
+        const add = (x, y, w, h, extra) => walls.push(Object.assign({ x, y, w, h, hgt: H, st: 'hwcastle', color: ['#6b6b72', '#5f5f66', '#74747b'][walls.length % 3] }, extra));
+        add(O.x - W - T, O.y - D - T, 2 * W + 2 * T, T);          // north wall
+        add(O.x - W - T, O.y + D, 2 * W + 2 * T, T);              // south wall
+        add(O.x - W - T, O.y - D, T, 2 * D);                      // west wall (behind you)
+        add(O.x + W, O.y - D, T, 2 * D);                          // east wall
+        add(O.x + 100, O.y - D, T, D - 110);                      // the dividing wall…
+        add(O.x + 100, O.y + 110, T, D - 110);
+        add(O.x + 100, O.y - 110, T, 220, { castleDoor: true });  // …and its locked door
+        add(O.x - 420, O.y - 210, 50, 50); add(O.x - 420, O.y + 160, 50, 50);   // pillars in the guard room
+        return walls;
+    }
+    function enterCastle(c) {
+        castleRoom = { buildings: buildCastleRoom(c), outside: monsters.filter(m => !m._castle), from: { x: player.x, y: player.y } };
+        monsters = [];
+        player.x = c.x - 700; player.y = c.y; player.angle = 0;
+        _loadedChunkKey = null; refreshChunks(true);
+        c.phase = 'guards';
+        [[-300, -150], [-300, 150], [-150, -60], [-150, 60]].forEach(([dx, dy]) => spawnCastleMonster('Castle Guard', false, c.x + dx, c.y + dy));
+        showStatus('🏰 You step inside the castle… 4 guards block the door!', '#a55eea');
+        addShake(10); SFX.scream && SFX.scream();
+    }
+    function openCastleDoor() {
+        if (!castleRoom) return;
+        castleRoom.buildings = castleRoom.buildings.filter(b => !b.castleDoor);
+        _loadedChunkKey = null; refreshChunks(true);
+    }
+    function leaveCastle(c) {
+        const back = castleRoom ? castleRoom.outside : [];
+        castleRoom = null;
+        monsters = monsters.filter(m => !m._castle).concat(back);
+        player.x = c.x + 140; player.y = c.y;      // out through the far side of the gate
+        _loadedChunkKey = null; refreshChunks(true);
+        c.phase = 'done';
+        showStatus('🏰 You leave the castle with your candy!', '#26de81');
     }
     // A run starts: the street gets its houses; anywhere else the castle is a 5% find.
     function hwCastleNewRun() {
-        hwHouses = []; hwKnocks = 0; hwCastle = null; hwStreetGoal = 0;
+        hwHouses = []; hwKnocks = 0; hwCastle = null; hwStreetGoal = 0; castleRoom = null;
         if (!isEventOn('halloween') || usingCustomMap || NET.mode === 'client') return;
         if (currentWorld && currentWorld.id === 'trickstreet') {
             // The goal: double the candy you have now (at least +20, so an empty bag still has a goal).
@@ -7885,6 +7925,14 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // into a new chunk, so this is safe to call every frame.
     function refreshChunks(force) {
         if (!player) return;
+        // 🏰 Inside the candy castle the hall IS the world (see enterCastle).
+        if (castleRoom) {
+            if (!force && _loadedChunkKey === 'castle') return;
+            _loadedChunkKey = 'castle';
+            buildings = castleRoom.buildings; traps = [];
+            shadeZones = buildings.map(b => ({ x: b.x, y: b.y, w: b.w + 30, h: b.h + 20 }));
+            return;
+        }
         // A hand-drawn map is a single fixed place, not an endless streamed world — so it replaces
         // the chunk system wholesale rather than pretending to be a chunk.
         if (usingCustomMap && customMap.length) {
@@ -7986,6 +8034,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // parked cars in painted bays, the odd dividing wall (buildGarageChunk). Not a maze.
         concretemaze: { body:'concretewall', w:[22,360], h:[22,360], hgt:[110,110], tall:0, tallHgt:[110,110], facade:'concrete', gap:0, garage:true },
         // 🎃 Trick-or-Treat Street (Halloween only): a street of small spooky houses to knock on.
+        // 🏰 The candy castle's inside: tall grey stone walls (only built by enterCastle).
+        hwcastle: { body:'brwall', w:[40,40], h:[40,40], hgt:[220,220], tall:0, tallHgt:[220,220], facade:'stone', gap:0, cap:'#3d3d44' },
         hwhouse: { body:'brwall', w:[150,220], h:[160,210], hgt:[80,120], tall:0.1, tallHgt:[150,190], facade:'windows', gap:0, cap:'#3a1f12', street:true },
         // Floors 2–20 ('br2'…'br20'), built from BACKROOMS_FLOORS. Indoor layouts reach the 110 ceiling.
         ...Object.fromEntries(BACKROOMS_FLOORS.map(f => ['br' + f.n,
@@ -8307,6 +8357,7 @@ const col = b.color || BLDG_COLORS[0];
         { st:'backroom',   emoji:'\ud83d\udfe8', name:'Office Wall' },
         { st:'concretemaze', emoji:'\u2b1c', name:'Concrete Wall' },
         { st:'hwhouse', emoji:'\ud83c\udfda\ufe0f', name:'Spooky House' },
+        { st:'hwcastle', emoji:'\ud83c\udff0', name:'Castle Wall' },
         ...BACKROOMS_FLOORS.map(f => ({ st: 'br' + f.n, emoji: f.emoji, name: f.name })),   // Backrooms floors 2–20
     ];
     function mmActiveStyle() { return mmStyle || worldStyleId(currentWorld); }

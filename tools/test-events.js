@@ -364,30 +364,42 @@ check(street.gate && street.spawnBehind === 0, 'a gate behind the start (forward
 check(street.houses === 6 && street.doorsOnRoad, 'the 6 nearest houses have doors on the road side');
 check(street.castle && street.candy >= 60 && street.castleOnRoad, 'knock until your candy has doubled — then the castle appears up the road', street.candy + ' candy, ' + street.knocks + ' knocks');
 check(q(`(function(){ var keep = hwCastle, c = localStorage.getItem('monster_attack_candy'); localStorage.setItem('monster_attack_candy', '0'); hwCastleNewRun(); var g = hwStreetGoal; hwCastle = keep; localStorage.setItem('monster_attack_candy', c); return g; })()`) === 20, 'an empty bag still has a goal (+20)');
-// Inside the castle.
+// Inside the castle: a hall with a guard room, a locked door, and the boss chamber behind it.
 const fight = JSON.parse(q(`(function(){
-  __freezeMonsters = true; waveIntroTimer = 0; monsters = []; monstersSpawned = 0; monstersToSpawn = 99; points = 0; savePoints();
+  __freezeMonsters = true; waveIntroTimer = 0; points = 0; savePoints();
+  monsters = []; spawnMonster(); var outsider = monsters[0]; outsider._mark = 'outside';
+  var gate = { x: hwCastle.x, y: hwCastle.y };
   player.x = hwCastle.x; player.y = hwCastle.y; hwCastleTick();
-  var o = { phase1: hwCastle.phase, guards: monsters.filter(function(m){ return m._castle && m.name === 'Castle Guard'; }).length };
+  var o = { phase1: hwCastle.phase, guards: monsters.filter(function(m){ return m._castle && m.name === 'Castle Guard'; }).length,
+            outsiderGone: monsters.indexOf(outsider) < 0, hall: buildings.length > 0 && buildings.every(function(b){ return b.st === 'hwcastle'; }),
+            inGuardRoom: player.x < gate.x - 600, doorShut: buildings.some(function(b){ return b.castleDoor; }) };
   o.guardsInWalls = monsters.filter(function(m){ return m._castle && ptInBld(m.x, m.y, m.r); }).length;
+  // The hall is closed: you cannot walk out through its walls.
+  o.walled = ptInBld(gate.x - 830, gate.y, 5) && ptInBld(gate.x, gate.y - 380, 5) && ptInBld(gate.x + 120, gate.y, 5);
   var before = monsters.length; spawnTimer = 0; update(); o.noWaveSpawns = monsters.length === before;
   monsters.forEach(function(m){ m.hp = 1; m.hasShield = false; m.shieldUp = false; m.dodge = 0; });
   for (var i = monsters.length - 1; i >= 0; i--) hitMonster(monsters[i], i, 99999);
   hwCastleTick();
-  o.points = points; o.phase2 = hwCastle.phase; o.boss = hwCastle.boss;
-  var b = monsters.find(function(m){ return m._castle; }); o.bossIsBoss = !!(b && b.isBoss); o.bossName = b && b.name;
+  o.points = points; o.phase2 = hwCastle.phase; o.boss = hwCastle.boss; o.doorOpen = !buildings.some(function(b){ return b.castleDoor; });
+  var b = monsters.find(function(m){ return m._castle; }); o.bossIsBoss = !!(b && b.isBoss); o.bossName = b && b.name; o.bossInChamber = !!b && b.x > gate.x + 100;
   loadEvent(); var c0 = evWallet;
   monsters.forEach(function(m){ m.hp = 1; m.hasShield = false; m.shieldUp = false; m.dodge = 0; });
   for (var i = monsters.length - 1; i >= 0; i--) hitMonster(monsters[i], i, 99999);
   pickups = []; hwCastleTick(); loadEvent();
   o.phase3 = hwCastle.phase; o.bossCandy = evWallet - c0;
+  for (var f = 0; f < 160; f++) hwCastleTick();
+  o.phase4 = hwCastle.phase; o.outside = !castleRoom && !buildings.some(function(b){ return b.st === 'hwcastle'; }) && Math.abs(player.x - gate.x) < 200;
+  o.outsiderBack = monsters.some(function(m){ return m._mark === 'outside'; });
   __freezeMonsters = false; return JSON.stringify(o); })()`));
-check(fight.phase1 === 'guards' && fight.guards === 4, 'entering the castle: 4 guards', JSON.stringify(fight));
-check(fight.guardsInWalls === 0, 'the guards stand on the road, not inside houses');
+check(fight.phase1 === 'guards' && fight.hall && fight.inGuardRoom, 'walking into the gate takes you INSIDE the castle hall', JSON.stringify(fight));
+check(fight.walled, 'the hall is walled in all round (and the door to the boss is shut)');
+check(fight.doorShut && fight.guards === 4 && fight.guardsInWalls === 0, '4 guards in the guard room');
+check(fight.outsiderGone, 'monsters chasing you outside stay outside');
 check(fight.noWaveSpawns, 'no wave monsters join while you are inside');
-check(fight.points === 10 && fight.phase2 === 'boss', 'beating the guards: 🏆 +10 points and the door opens');
-check(fight.bossIsBoss && /^BOSS (Slimy the Jelly|Biscuit the Cerberus|Mr Roll|Mr Blob|Mrs Gum)$/.test(fight.bossName), 'a candy boss is waiting', fight.bossName);
-check(fight.phase3 === 'done' && fight.bossCandy >= 40, 'beating it: 🍬 +40 candy (plus its candy bag)', fight.bossCandy + ' candy');
+check(fight.points === 10 && fight.phase2 === 'boss' && fight.doorOpen, 'beating the guards: 🏆 +10 points and the door opens');
+check(fight.bossIsBoss && fight.bossInChamber && /^BOSS (Slimy the Jelly|Biscuit the Cerberus|Mr Roll|Mr Blob|Mrs Gum)$/.test(fight.bossName), 'a candy boss waits in the chamber behind it', fight.bossName);
+check(fight.phase3 === 'won' && fight.bossCandy >= 40, 'beating it: 🍬 +40 candy', fight.bossCandy + ' candy');
+check(fight.phase4 === 'done' && fight.outside && fight.outsiderBack, 'then you come back out (the world and its monsters back as they were)');
 const crowd = JSON.parse(q(`(function(){ selectWorld('trickstreet'); gameRunning = false; startGame(); var inside = 0, behind = 0, ahead = 0, n = 1500;
   for (var i = 0; i < n; i++) { spawnMonster(); var m = monsters.pop(); if (ptInBld(m.x, m.y, m.r)) inside++; if (m.x < WORLD_W / 2 - 440) behind++; if (m.x > player.x) ahead++; }
   return JSON.stringify({ inside: inside, behind: behind, ahead: ahead, n: n }); })()`));
