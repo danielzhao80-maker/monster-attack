@@ -5253,6 +5253,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         return CASTLE_BOSSES[0][0];
     }
     let hwHouses = [], hwKnocks = 0, hwCastle = null, hwStreetGoal = 0;
+    const streetRoadY = () => Math.floor(player.y / WORLD_H) * WORLD_H + WORLD_H / 2;   // the road you are on
     const castleBusy = () => !!hwCastle && (hwCastle.phase === 'guards' || hwCastle.phase === 'boss');
     // Trick-or-Treat Street has no wave monsters: just houses to knock on, then the castle.
     const noWaveMonsters = () => !!currentWorld && currentWorld.id === 'trickstreet' && !usingCustomMap;
@@ -5279,8 +5280,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     // The 6 nearest houses each get a door at their front step.
     function pickHouses() {
-        const near = buildings.map(b => ({ b, d: Math.hypot(b.x + b.w/2 - player.x, b.y + b.h/2 - player.y) }))
-            .filter(o => o.d > 120).sort((a, b) => a.d - b.d);
+        const street = currentWorld && currentWorld.id === 'trickstreet';
+        // On the street you only run forward, so the doors are the next houses ahead of you.
+        const near = buildings.map(b => ({ b, d: street ? b.x + b.w/2 - player.x : Math.hypot(b.x + b.w/2 - player.x, b.y + b.h/2 - player.y) }))
+            .filter(o => o.d > 120 && (!street || (o.b.house && Math.abs(o.b.y + o.b.h / 2 - streetRoadY()) < STREET_HALF + 260))).sort((a, b) => a.d - b.d);
         hwHouses = [];
         for (const { b } of near) {
             if (b.gate) continue;
@@ -5330,7 +5333,14 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (!player || NET.mode === 'client' || !isEventOn('halloween') || usingCustomMap) { hwHouses = []; return; }
         const onStreet = currentWorld && currentWorld.id === 'trickstreet';
         if (onStreet) {
-            if (!hwHouses.some(h => !h.done)) pickHouses();
+            // 🏃 Auto-run: the street carries you forward (steer up/down for the doors) until you are
+            // inside the castle. Doors you have run past are gone; new ones appear ahead.
+            if (!hwCastle || hwCastle.phase === 'closed') {
+                const step = Math.max(1.5, (player.speed || 3) * 0.85);
+                if (!ptInBld(player.x + step, player.y, player.r) && !ptInWall(player.x + step, player.y, player.r)) player.x += step;
+            }
+            hwHouses = hwHouses.filter(h => !h.done && h.x > player.x - 60);
+            if (hwHouses.length < 3) pickHouses();
             for (const h of hwHouses) {
                 if (h.done || Math.hypot(player.x - h.x, player.y - h.y) >= 40) continue;
                 trickOrTreat(h); hwKnocks++;
@@ -5368,6 +5378,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             // The goal: double the candy you have now (at least +20, so an empty bag still has a goal).
             loadEvent(EVENTS.halloween);
             hwStreetGoal = Math.max(evWallet * 2, evWallet + 20);
+            if (player) player.y = streetRoadY();   // start in the middle of the road: steer to the doors
             showStatus(`🏚️ Trick or treat! Walk the street and double your candy: 🍬 ${evWallet} → ${hwStreetGoal}`, '#ff8c1a');
         } else if (Math.random() < 0.05) placeCastle();
     }

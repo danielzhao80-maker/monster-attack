@@ -405,6 +405,21 @@ check(quiet.alive === 0 && quiet.spawned === 0, 'Trick-or-Treat Street spawns no
 check(quiet.guards === 4 && quiet.others === 0, '…only the castle guards (and then its boss)');
 check(quiet.citySpawned > 0, 'other maps still spawn monsters as normal');
 
+// 🏃 Auto-run on the street: forward by itself, doors keep coming ahead, stops inside the castle.
+const run = JSON.parse(q(`(function(){ selectWorld('trickstreet'); gameRunning = false; startGame(); player.invincible = 1e9; player.hp = player.maxHp = 1e9;
+  keys = {}; var x0 = player.x, y0 = player.y;
+  for (var f = 0; f < 600; f++) { __clock += 16.7; gameLoop(__clock); }
+  var o = { moved: Math.round(player.x - x0), drift: Math.round(Math.abs(player.y - y0)), doorsAhead: hwHouses.filter(function(h){ return !h.done && h.x > player.x; }).length };
+  hwCastle = { x: player.x + 20, y: player.y, phase: 'closed' }; hwCastleTick();
+  var xc = player.x; for (var f = 0; f < 120; f++) { __clock += 16.7; gameLoop(__clock); }
+  o.phase = hwCastle.phase; o.afterCastle = Math.round(player.x - xc);
+  selectWorld('city'); gameRunning = false; startGame(); keys = {}; var cx0 = player.x; for (var f = 0; f < 300; f++) { __clock += 16.7; gameLoop(__clock); } o.cityMoved = Math.round(Math.abs(player.x - cx0));
+  return JSON.stringify(o); })()`));
+check(run.moved > 600 && run.drift < 5, 'on the street you run forward by yourself (no keys pressed)', JSON.stringify(run));
+check(run.doorsAhead >= 3, 'and new doors keep appearing ahead of you');
+check(run.phase === 'guards' && run.afterCastle === 0, 'the run stops once you are inside the castle');
+check(run.cityMoved === 0, 'other maps do not move you');
+
 // The castle in other maps: about 5% of Halloween runs.
 const finds = q(`(function(){ selectWorld('city'); gameRunning = false; startGame(); var n = 0; for (var i = 0; i < 2000; i++) { hwCastleNewRun(); if (hwCastle) n++; } return n; })()`);
 check(finds > 60 && finds < 145, 'in any other map the castle is a 5% find', finds + '/2000');
