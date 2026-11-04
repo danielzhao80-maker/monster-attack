@@ -7771,7 +7771,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // 🏚️ Trick-or-Treat Street: one endless straight road along x, houses packed shoulder to shoulder
     // on both sides (no gaps, so the street is the only way), and in the start chunk a gate just behind
     // where you begin — you can only go forward. Doors face the road (pickHouses).
-    const STREET_HALF = 180;   // half the road's width
+    const STREET_HALF = 110;   // half the road's width (a tight street: ~6 m across)
     // Monsters never spawn behind the gate at the start of Trick-or-Treat Street (they could never get round it).
     const behindStreetGate = (x) => !!currentWorld && currentWorld.id === 'trickstreet' && !usingCustomMap && x < WORLD_W / 2 - 440;
     function buildStreetChunk(bs, rnd, ox, oy, S, styleId, cx, cy) {

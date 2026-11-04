@@ -346,17 +346,19 @@ const street = JSON.parse(q(`(function(){
   var o = { goal: hwStreetGoal, startY: player.y };
   // Houses shoulder to shoulder on both sides of the road, all along it.
   var roadY = WORLD_H / 2, gaps = 0;
-  for (var x = player.x - 200; x < player.x + 3000; x += 15) { if (!ptInBld(x, roadY - 180 - 40, 2)) gaps++; if (!ptInBld(x, roadY + 180 + 40, 2)) gaps++; }
+  for (var x = player.x - 200; x < player.x + 3000; x += 15) { if (!ptInBld(x, roadY - STREET_HALF - 40, 2)) gaps++; if (!ptInBld(x, roadY + STREET_HALF + 40, 2)) gaps++; }
+  o.width = STREET_HALF * 2;
   o.gaps = gaps; o.road = !ptInBld(player.x + 1000, roadY, 20);
   o.gate = ptInBld(WORLD_W / 2 - 500, roadY, 5) && player.x > WORLD_W / 2 - 480;
   var behind = 0; for (var i = 0; i < 300; i++) { spawnMonster(); var m = monsters.pop(); if (m.x < WORLD_W / 2 - 440) behind++; } o.spawnBehind = behind;
-  hwCastleTick(); o.houses = hwHouses.length; o.doorsOnRoad = hwHouses.every(function(h){ return Math.abs(h.y - roadY) < 180; });
+  hwCastleTick(); o.houses = hwHouses.length; o.doorsOnRoad = hwHouses.every(function(h){ return Math.abs(h.y - roadY) < STREET_HALF; });
   var k = 0;
   while (!hwCastle && k < 60) { var h = hwHouses.find(function(x){ return !x.done; }); if (!h) { hwCastleTick(); k++; continue; } player.x = h.x; player.y = h.y; hwCastleTick(); k++; }
   loadEvent(); o.candy = evWallet; o.castle = !!hwCastle; o.castleOnRoad = hwCastle && Math.abs(hwCastle.y - roadY) < 20; o.knocks = hwKnocks;
   __freezeMonsters = false; return JSON.stringify(o); })()`));
 check(street.goal === 60, 'the street starts with a goal: double your candy (30 -> 60)', street.goal);
 check(street.gaps === 0 && street.road, 'one road with houses packed along both sides (no way round)', JSON.stringify(street));
+check(street.width <= 240, 'a tight street (about 6 m across)', street.width + ' units');
 check(street.gate && street.spawnBehind === 0, 'a gate behind the start (forward only) — and no monsters spawn behind it');
 check(street.houses === 6 && street.doorsOnRoad, 'the 6 nearest houses have doors on the road side');
 check(street.castle && street.candy >= 60 && street.castleOnRoad, 'knock until your candy has doubled — then the castle appears up the road', street.candy + ' candy, ' + street.knocks + ' knocks');
