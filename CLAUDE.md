@@ -502,7 +502,7 @@ page adds to the same keys (play time, daily pick). The arcade page mirrors EVEN
 Halloween extras: 🏚️ **Trick-or-Treat Street** (`trickstreet`, `event:'halloween'` → open only during it, `night:true`
 → NIGHT_LIGHT): buildStreetChunk lays one road between packed houses plus a gate behind the start
 (`behindStreetGate` keeps spawns in front). hwCastleTick: 6 house doors (`hwHouses`), double your candy
-(`hwStreetGoal`, ≥ +20) → 🏰 castle up the road; elsewhere the castle is a 5% find (hwCastleNewRun). Castle:
+(`hwStreetGoal`, ≥ +20) → 🏰 castle up the road. No wave monsters there (`noWaveMonsters`) — only the castle's; elsewhere the castle is a 5% find (hwCastleNewRun). Castle:
 4 Castle Guards (`m._castle`; no wave spawns meanwhile — `castleBusy()`) → 🏆 +10 points → a CASTLE_BOSSES roll
 (Slimy 50 / Biscuit 25 / Mr Roll 14 / Mr Blob 10 / Mrs Gum 1) → 🍬 +40. The other games use ArcadeShop.halloween
 (REBUILD first win, Track Run first win — one time each; Buckshot's ☠️ Grim Reaper: +50 once / −60 per loss);

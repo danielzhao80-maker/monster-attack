@@ -393,6 +393,18 @@ const crowd = JSON.parse(q(`(function(){ selectWorld('trickstreet'); gameRunning
   return JSON.stringify({ inside: inside, behind: behind, ahead: ahead, n: n }); })()`));
 check(crowd.inside === 0 && crowd.behind === 0, 'monsters always come down the road — never inside a house or behind the gate', JSON.stringify(crowd));
 check(crowd.ahead > crowd.n * 0.6, 'mostly from ahead', crowd.ahead + '/' + crowd.n);
+// No wave monsters on the street — only the castle's guards and boss.
+const quiet = JSON.parse(q(`(function(){ selectWorld('trickstreet'); gameRunning = false; startGame(); player.invincible = 1e9; player.hp = player.maxHp = 1e9;
+  for (var f = 0; f < 1500; f++) { __clock += 16.7; gameLoop(__clock); }
+  var o = { alive: monsters.length, spawned: monstersSpawned };
+  hwCastle = { x: player.x + 60, y: Math.floor(player.y / WORLD_H) * WORLD_H + WORLD_H / 2, phase: 'closed' }; player.x = hwCastle.x; player.y = hwCastle.y; hwCastleTick();
+  o.guards = monsters.filter(function(m){ return m.name === 'Castle Guard'; }).length; o.others = monsters.filter(function(m){ return !m._castle; }).length;
+  selectWorld('city'); gameRunning = false; startGame(); for (var f = 0; f < 600; f++) { __clock += 16.7; gameLoop(__clock); } o.citySpawned = monstersSpawned;
+  return JSON.stringify(o); })()`));
+check(quiet.alive === 0 && quiet.spawned === 0, 'Trick-or-Treat Street spawns no wave monsters', JSON.stringify(quiet));
+check(quiet.guards === 4 && quiet.others === 0, '…only the castle guards (and then its boss)');
+check(quiet.citySpawned > 0, 'other maps still spawn monsters as normal');
+
 // The castle in other maps: about 5% of Halloween runs.
 const finds = q(`(function(){ selectWorld('city'); gameRunning = false; startGame(); var n = 0; for (var i = 0; i < 2000; i++) { hwCastleNewRun(); if (hwCastle) n++; } return n; })()`);
 check(finds > 60 && finds < 145, 'in any other map the castle is a 5% find', finds + '/2000');

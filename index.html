@@ -5254,6 +5254,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     let hwHouses = [], hwKnocks = 0, hwCastle = null, hwStreetGoal = 0;
     const castleBusy = () => !!hwCastle && (hwCastle.phase === 'guards' || hwCastle.phase === 'boss');
+    // Trick-or-Treat Street has no wave monsters: just houses to knock on, then the castle.
+    const noWaveMonsters = () => !!currentWorld && currentWorld.id === 'trickstreet' && !usingCustomMap;
     function openSpot(x, y, r) { return !ptInBld(x, y, r || 40) && !ptInWall(x, y, r || 40); }
     function placeCastle() {
         if (currentWorld && currentWorld.id === 'trickstreet') {
@@ -12981,8 +12983,9 @@ const col = b.color || BLDG_COLORS[0];
 
         // Spawn
         spawnTimer--;
-        // (no new wave monsters while you fight inside the candy castle)
-        if (spawnTimer <= 0 && monstersSpawned < monstersToSpawn && !castleBusy()) { spawnMonster(); monstersSpawned++; spawnTimer = Math.max(15, 50 - wave*3); }
+        // (no new wave monsters while you fight inside the candy castle — and none at all on
+        // Trick-or-Treat Street, where the only monsters are the castle's guards and its boss)
+        if (spawnTimer <= 0 && monstersSpawned < monstersToSpawn && !castleBusy() && !noWaveMonsters()) { spawnMonster(); monstersSpawned++; spawnTimer = Math.max(15, 50 - wave*3); }
 
         // Bullets
         for (let i = bullets.length-1; i >= 0; i--) {
