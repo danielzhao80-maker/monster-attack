@@ -2261,6 +2261,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             clockwork:'hum', grove:'jungle',    storybook:'room',
             backrooms:'fluoro',   backrooms2:'hum',
             ..._brRows(f => f.bed),
+            trickstreet:'room',
         };
         let src = null, filt = null, gain = null, lfo = null, lfoGain = null, drone = null;
         let evTimer = null, current = null, running = false;
@@ -2498,6 +2499,13 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // ---- SPECIAL MAP BOSSES (The Backrooms) — mid-level numbers, existing bodies ----
         // 🎃 Halloween-only boss (rollMonsterClass): may take any boss wave while the event is on.
         // 🎄 Christmas-only boss: throws freezing snowballs, gets angry when hurt.
+        // 🏰 The Halloween castle (hwCastleTick): 4 Castle Guards, then one of five candy bosses.
+        { name:'Castle Guard', emoji:'💂', accessory:'⚔️', armorColor:'#5d6d7e', rarity:'legendary', rarityColor:'#f1c40f', color:'#5d6d7e', hp:14, speed:1.2, damage:8, score:30, isBossOnly:true, body:'golem', hasShield:true, desc:'Guards the candy castle' },
+        { name:'Slimy the Jelly', emoji:'🍮', accessory:'👑', armorColor:'#2ecc71', rarity:'legendary', rarityColor:'#f1c40f', color:'#55efc4', hp:50, speed:1.0, damage:13, score:110, isBossOnly:true, body:'blob', habitat:'toxic', splits:true, poisonTrail:true, desc:'Candy castle boss — wobbles and splits' },
+        { name:'Biscuit the Cerberus', emoji:'🍪', accessory:'👑', armorColor:'#c58b4b', rarity:'legendary', rarityColor:'#f1c40f', color:'#d4a373', hp:58, speed:1.35, damage:15, score:120, isBossOnly:true, body:'titan', habitat:'lava', breathesFire:true, enrage:true, desc:'Candy castle boss — a three-headed cookie dog' },
+        { name:'Mr Roll', emoji:'🍬', accessory:'👑', armorColor:'#ff6bcb', rarity:'legendary', rarityColor:'#f1c40f', color:'#ff9ff3', hp:60, speed:1.4, damage:14, score:125, isBossOnly:true, body:'serpent', habitat:'jungle', canSwallow:true, desc:'Candy castle boss — a big long strip of candy' },
+        { name:'Mr Blob', emoji:'🍫', accessory:'👑', armorColor:'#5d3a1a', rarity:'legendary', rarityColor:'#f1c40f', color:'#7b4a24', hp:68, speed:0.9, damage:16, score:130, isBossOnly:true, body:'blob', habitat:'toxic', poisonTrail:true, splits:true, desc:'Candy castle boss — a melted chocolate bar' },
+        { name:'Mrs Gum', emoji:'🧸', accessory:'👑', armorColor:'#ff4757', rarity:'legendary', rarityColor:'#f1c40f', color:'#ff6b81', hp:90, speed:1.1, damage:18, score:200, isBossOnly:true, body:'golem', habitat:'lava', hasShield:true, enrage:true, canScream:true, desc:'Candy castle boss — the 1-in-100 gummy bear' },
         { name:'Evil Snowman', emoji:'⛄', accessory:'👑', armorColor:'#dfe9f3', rarity:'legendary', rarityColor:'#f1c40f', color:'#eaf6ff', hp:62, speed:1.1, damage:15, score:120, isBossOnly:true, body:'titan', habitat:'ice', isRanged:true, freezeDuration:120, enrage:true, desc:'Boss only! Christmas — hurls freezing snowballs' },
         { name:'Pumpkin King', emoji:'🎃', accessory:'👑', armorColor:'#ff7f00', rarity:'legendary', rarityColor:'#f1c40f', color:'#ff7f00', hp:60, speed:1.15, damage:16, score:120, isBossOnly:true, body:'titan', habitat:'lava', isRanged:true, enrage:true, canScream:true, desc:'Boss only! Halloween — hurls flaming pumpkins and shrieks' },
         { name:'The Entity', emoji:'👤', accessory:'👑', armorColor:'#3d3526', rarity:'legendary', rarityColor:'#f1c40f', color:'#3d3526', hp:46, speed:1.3, damage:15, score:108, isBossOnly:true, body:'wraith', habitat:'void', phasing:true, teleports:true, desc:'Boss only! Drifts straight through the walls' },
@@ -2586,6 +2594,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         clockwork:'sparks', grove:'spores',  storybook:'petals',
         backrooms:'motes',  backrooms2:'drips',
         ..._brRows(f => f.fx),
+        trickstreet:'mist',
         city:null,                            // clear air over an ordinary city
     };
     function worldFxKind(w) { const k = w && WORLD_FX[w.id]; return k ? FX_KINDS[k] : null; }
@@ -2750,6 +2759,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // ---- special maps ----
         backrooms: [['Smiler','😁','#f5f0d0'],['Partygoer','🎈','#ff9f43'],['Skin-Stealer','🧍','#b8a07a'],['Hound','🐕','#6b5b4a']],
         ..._brRows(f => f.monsters),
+        trickstreet:[['Zombie Kid','🧟','#7bae5a'],['Sheet Ghost','👻','#f1f2f6'],['Little Witch','🧙','#8e44ad'],['Tiny Vampire','🧛','#c0392b']],
         backrooms2:[['Faceling','🫥','#c8c2b4'],['Death Moth','🦋','#7a6f5a'],['Clump','🫠','#8a5a4a'],['Wretch','🧟','#6e6a5e']],
     };
     // Which base each slot re-skins, in order.
@@ -4976,7 +4986,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             title: '🎃 Halloween Event 🦇',
             how: `Monsters drop <b>🍬 candy</b> (bosses drop a bag) · beat the <b>🎃 Pumpkin King</b> on boss waves (25) · clear waves ·
                   knock on the glowing <b>🚪 trick-or-treat door</b> each wave (watch the minimap!) · the <b>🎁 daily treat</b> ·
-                  <b>Halloween codes</b> on the main menu, each once a day — <b>TRICKORTREAT</b> is one, and there are 5 more to find!`,
+                  <b>Halloween codes</b> on the main menu, each once a day — <b>TRICKORTREAT</b> is one, and there are 5 more to find!<br>
+                  🏚️ <b>Trick-or-Treat Street</b> (Worlds → ⭐ Special Maps): knock on houses, then storm the 🏰 candy castle (4 guards, then a candy boss!). The castle can turn up in any map too.<br>
+                  🎮 Your first win in <b>REBUILD</b> and in <b>Track Run</b> gives candy (once each) — tell <b>Nullp</b> about <b>treats</b> first for +10%. ☠️ Beat the <b>Grim Reaper</b> in Buckshot for 50 (once)!`,
         },
         christmas: {
             id: 'christmas', name: 'Christmas', emoji: '🎄', side: '⛄',
@@ -5162,6 +5174,13 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Daily gift
         const daily = $('event-daily'); daily.innerHTML = '';
         daily.appendChild(mkBtn(evDailyReady() ? `${E.daily}: +10 ${E.curEmoji}` : `${E.daily} collected — come back tomorrow`, !evDailyReady(), claimEvDaily, 'daily'));
+        if (E.id === 'halloween' && ev) {   // ☠️ Buckshot's Grim Reaper (+50 if you win, −60 if you lose)
+            let set = false, beaten = false;
+            try { set = localStorage.getItem('monster_attack_hw_reaper_next') === '1'; beaten = localStorage.getItem('monster_attack_hw_once_reaper_' + new Date().getFullYear()) === '1'; } catch (e) {}
+            const rb = mkBtn(beaten ? '☠️ Grim Reaper beaten ✓ (one time only)' : set ? '☠️ The Grim Reaper is waiting in Buckshot (offline)…' : '☠️ Challenge the Grim Reaper in Buckshot (win +50 🍬 once · lose −60 🍬)', set || beaten,
+                () => { try { localStorage.setItem('monster_attack_hw_reaper_next', '1'); } catch (e) {} showStatus('☠️ Your next offline Buckshot game is against the Grim Reaper!', '#a29bfe'); renderEventScreen(); }, 'reaper');
+            rb.style.marginLeft = '8px'; daily.appendChild(rb);
+        }
         // The pass
         const next = E.pass.find(t => evEarned < t.at);
         $('event-pass-head').textContent = `${E.emoji} ${E.name} Pass — ${evEarned} ${E.cur} collected` + (next ? ` · next reward at ${next.at}` : ' · all unlocked!');
@@ -5221,6 +5240,134 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         else if (m.isBoss) { for (let i = 0; i < 5; i++) drop(3); }
         else if (Math.random() < 0.3) drop(1);
     }
+    // ---- 🏚️ TRICK-OR-TREAT STREET + 🏰 THE CANDY CASTLE (Halloween) ----
+    // Trick-or-Treat Street is one long road between houses; the 6 nearest houses each have a door to
+    // knock on (a treat 3–8, or a trick 1). Once your candy has DOUBLED since the street began
+    // (hwStreetGoal), the candy castle appears up the road. On any other map the castle turns up in 5% of
+    // Halloween runs. Inside: 4 Castle Guards; beat them for 🏆 10 points and the door opens on one of
+    // five candy bosses (CASTLE_BOSSES). Beat the boss: 🍬 40 more. Host-only, like the gift spot.
+    const CASTLE_BOSSES = [['Slimy the Jelly', 50], ['Biscuit the Cerberus', 25], ['Mr Roll', 14], ['Mr Blob', 10], ['Mrs Gum', 1]];
+    function rollCastleBoss(r) {
+        r = (r === undefined ? Math.random() : r) * 100;
+        for (const [name, pct] of CASTLE_BOSSES) { if (r < pct) return name; r -= pct; }
+        return CASTLE_BOSSES[0][0];
+    }
+    let hwHouses = [], hwKnocks = 0, hwCastle = null, hwStreetGoal = 0;
+    const castleBusy = () => !!hwCastle && (hwCastle.phase === 'guards' || hwCastle.phase === 'boss');
+    function openSpot(x, y, r) { return !ptInBld(x, y, r || 40) && !ptInWall(x, y, r || 40); }
+    function placeCastle() {
+        if (currentWorld && currentWorld.id === 'trickstreet') {
+            // On the street the castle stands on the road, further along.
+            const roadY = Math.floor(player.y / WORLD_H) * WORLD_H + WORLD_H / 2;
+            for (let d = 1400; d < 3000; d += 100) if (openSpot(player.x + d, roadY, 70)) {
+                hwCastle = { x: player.x + d, y: roadY, phase: 'closed' };
+                showStatus('🏰 You doubled your candy! The candy castle is just up the street…', '#a55eea');
+                return true;
+            }
+        }
+        for (let k = 0; k < 80; k++) {
+            const a = Math.random() * Math.PI * 2, d = 1200 + Math.random() * 500;
+            const x = player.x + Math.cos(a) * d, y = player.y + Math.sin(a) * d;
+            if (!openSpot(x, y, 70)) continue;
+            hwCastle = { x, y, phase: 'closed' };
+            showStatus('🏰 A candy castle appeared! Find it on the minimap…', '#a55eea');
+            return true;
+        }
+        return false;
+    }
+    // The 6 nearest houses each get a door at their front step.
+    function pickHouses() {
+        const near = buildings.map(b => ({ b, d: Math.hypot(b.x + b.w/2 - player.x, b.y + b.h/2 - player.y) }))
+            .filter(o => o.d > 120).sort((a, b) => a.d - b.d);
+        hwHouses = [];
+        for (const { b } of near) {
+            if (b.gate) continue;
+            // The door is on the side facing the player (on the street: the road).
+            const x = b.x + b.w / 2, y = (b.y + b.h / 2 < player.y) ? b.y + b.h + 34 : b.y - 34;
+            if (!openSpot(x, y, 22)) continue;
+            hwHouses.push({ x, y, done: false });
+            if (hwHouses.length >= 6) break;
+        }
+    }
+    function trickOrTreat(spot) {
+        spot.done = true;
+        if (Math.random() < 0.7) {
+            const n = 3 + Math.floor(Math.random() * 6);
+            addEventCur(n, EVENTS.halloween);
+            showStatus(`🏚️ Knock knock… TREAT! 🍬 +${n} candy`, '#ff9ff3');
+            SFX.pickup && SFX.pickup();
+        } else {
+            addEventCur(1, EVENTS.halloween);
+            player.slow = Math.max(player.slow || 0, 120);
+            showStatus('👻 TRICK! (🍬 +1 anyway)', '#a29bfe');
+            addShake(8);
+        }
+    }
+    function spawnCastleMonster(name, asBoss) {
+        const cls = MONSTER_CLASSES.find(c => c.name === name); if (!cls) return null;
+        const keep = currentMonsterClass; currentMonsterClass = cls; spawnMonster(); currentMonsterClass = keep;
+        const m = monsters[monsters.length - 1]; if (!m) return null;
+        const a = Math.random() * Math.PI * 2, d = asBoss ? 0 : 70;
+        m.x = hwCastle.x + Math.cos(a) * d; m.y = hwCastle.y + Math.sin(a) * d;
+        const hpBase = cls.hp * 7 * (1 + (wave - 1) * 0.2);
+        m._castle = true; m.riseT = 1;
+        if (asBoss) {
+            m.isBoss = true; m.r = 32; m.name = 'BOSS ' + cls.name;
+            m.hp = m.maxHp = Math.floor(hpBase * (6 + wave * 0.3));
+            m.damage = Math.floor((cls.damage + Math.floor(wave / 3)) * 2); m.score = (cls.score + wave) * 25;
+        } else {
+            m.isBoss = false; m.r = 16; m.name = cls.name;
+            m.hp = m.maxHp = Math.floor(hpBase * 1.5);
+            m.damage = cls.damage + Math.floor(wave / 3); m.score = cls.score + wave;
+        }
+        return m;
+    }
+    function hwCastleTick() {
+        if (!player || NET.mode === 'client' || !isEventOn('halloween') || usingCustomMap) { hwHouses = []; return; }
+        const onStreet = currentWorld && currentWorld.id === 'trickstreet';
+        if (onStreet) {
+            if (!hwHouses.some(h => !h.done)) pickHouses();
+            for (const h of hwHouses) {
+                if (h.done || Math.hypot(player.x - h.x, player.y - h.y) >= 40) continue;
+                trickOrTreat(h); hwKnocks++;
+                if (!hwCastle) { loadEvent(EVENTS.halloween); showStatus(`🏚️ 🍬 ${evWallet} / ${hwStreetGoal} — double your candy to open the castle!`, '#ff9ff3'); }
+            }
+            // Keep going until your candy has doubled since the street began — then the castle.
+            if (!hwCastle) { loadEvent(EVENTS.halloween); if (evWallet >= hwStreetGoal) placeCastle(); }
+        } else hwHouses = [];
+        if (!hwCastle) return;
+        const c = hwCastle;
+        if (c.phase === 'closed' && Math.hypot(player.x - c.x, player.y - c.y) < 60) {
+            c.phase = 'guards';
+            for (let i = 0; i < 4; i++) spawnCastleMonster('Castle Guard', false);
+            showStatus('🏰 You enter the castle… 4 guards block the door!', '#a55eea');
+            addShake(10); SFX.scream && SFX.scream();
+        } else if (c.phase === 'guards' && !monsters.some(m => m._castle)) {
+            points += 10; savePoints();
+            c.boss = rollCastleBoss();
+            c.phase = 'boss';
+            spawnCastleMonster(c.boss, true);
+            showStatus(`🏆 +10 points! The door creaks open… it's ${c.boss.toUpperCase()}!`, '#feca57');
+            addShake(14);
+        } else if (c.phase === 'boss' && !monsters.some(m => m._castle)) {
+            c.phase = 'done';
+            addEventCur(40, EVENTS.halloween);
+            showStatus(`🏰 ${c.boss} is beaten! 🍬 +40 candy`, '#26de81');
+            SFX.pickup && SFX.pickup();
+        }
+    }
+    // A run starts: the street gets its houses; anywhere else the castle is a 5% find.
+    function hwCastleNewRun() {
+        hwHouses = []; hwKnocks = 0; hwCastle = null; hwStreetGoal = 0;
+        if (!isEventOn('halloween') || usingCustomMap || NET.mode === 'client') return;
+        if (currentWorld && currentWorld.id === 'trickstreet') {
+            // The goal: double the candy you have now (at least +20, so an empty bag still has a goal).
+            loadEvent(EVENTS.halloween);
+            hwStreetGoal = Math.max(evWallet * 2, evWallet + 20);
+            showStatus(`🏚️ Trick or treat! Walk the street and double your candy: 🍬 ${evWallet} → ${hwStreetGoal}`, '#ff8c1a');
+        } else if (Math.random() < 0.05) placeCastle();
+    }
+
     window.addEventListener('load', () => {
         refreshEventButton();
         // The arcade's event button opens the game with ?open=event (older links: ?open=halloween).
@@ -7471,7 +7618,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const S = BLDG_STYLES[styleId] || BLDG_STYLES.tower;
         const maze = S.maze ? buildMazeChunk(bs, rnd, ox, oy, S, styleId) : null;
         if (S.garage) buildGarageChunk(bs, rnd, ox, oy, S, styleId);
-        for (let i = 0; !S.maze && !S.garage && i < 70; i++) {
+        if (S.street) buildStreetChunk(bs, rnd, ox, oy, S, styleId, cx, cy);
+        for (let i = 0; !S.maze && !S.garage && !S.street && i < 70; i++) {
             // Footprint and height come from the world's archetype, so a Desert block is genuinely
             // low and wide while a Crystal spire is narrow and enormous — not the same box repainted.
             const w = S.w[0] + rnd()*(S.w[1]-S.w[0]), h = S.h[0] + rnd()*(S.h[1]-S.h[0]);
@@ -7618,6 +7766,27 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             if (Math.abs(j * C - WORLD_H/2) < C * 1.5) continue;
             add(i * C + 22, j * C - 11, (2 + Math.floor(rnd() * 2)) * C - 44, 22, { divider: true });
         }
+    }
+
+    // 🏚️ Trick-or-Treat Street: one endless straight road along x, houses packed shoulder to shoulder
+    // on both sides (no gaps, so the street is the only way), and in the start chunk a gate just behind
+    // where you begin — you can only go forward. Doors face the road (pickHouses).
+    const STREET_HALF = 180;   // half the road's width
+    // Monsters never spawn behind the gate at the start of Trick-or-Treat Street (they could never get round it).
+    const behindStreetGate = (x) => !!currentWorld && currentWorld.id === 'trickstreet' && !usingCustomMap && x < WORLD_W / 2 - 440;
+    function buildStreetChunk(bs, rnd, ox, oy, S, styleId, cx, cy) {
+        const roadY = WORLD_H / 2;
+        const hgtOf = () => Math.round((S.hgt[0] + rnd() * (S.hgt[1] - S.hgt[0])) / 20) * 20;
+        const add = (x, y, w, h, extra) => bs.push(Object.assign({ lx: x, ly: y, x: ox + x, y: oy + y, w, h, hgt: hgtOf(), st: styleId }, extra));
+        for (const side of [-1, 1]) {
+            for (let x = 0; x < WORLD_W; ) {
+                const w = Math.min(WORLD_W - x, Math.round(S.w[0] + rnd() * (S.w[1] - S.w[0])));
+                const h = Math.round(S.h[0] + rnd() * (S.h[1] - S.h[0]));
+                add(x, side < 0 ? roadY - STREET_HALF - h : roadY + STREET_HALF, w, h, { house: true });
+                x += w;
+            }
+        }
+        if (cx === 0 && cy === 0) add(WORLD_W / 2 - 520, roadY - STREET_HALF, 40, STREET_HALF * 2, { gate: true });
     }
 
     // ---- finding the way through the maze ----
@@ -7801,6 +7970,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Floor 1, the Parking Zone: an endless underground car park — a grid of concrete pillars,
         // parked cars in painted bays, the odd dividing wall (buildGarageChunk). Not a maze.
         concretemaze: { body:'concretewall', w:[22,360], h:[22,360], hgt:[110,110], tall:0, tallHgt:[110,110], facade:'concrete', gap:0, garage:true },
+        // 🎃 Trick-or-Treat Street (Halloween only): a street of small spooky houses to knock on.
+        hwhouse: { body:'brwall', w:[150,220], h:[160,210], hgt:[80,120], tall:0.1, tallHgt:[150,190], facade:'windows', gap:0, cap:'#3a1f12', street:true },
         // Floors 2–20 ('br2'…'br20'), built from BACKROOMS_FLOORS. Indoor layouts reach the 110 ceiling.
         ...Object.fromEntries(BACKROOMS_FLOORS.map(f => ['br' + f.n,
             f.layout === 'maze'    ? { body:'brwall', w:[22,360], h:[22,360], hgt:[110,110], tall:0, tallHgt:[110,110], facade:f.facade, gap:0, maze:true, loops:f.loops, cap:f.cap, pipes:!!f.pipes } :
@@ -7823,6 +7994,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         grove:'fairytree', storybook:'popup', astral:'runestone',
         backrooms:'backroom', backrooms2:'concretemaze',
         ..._brRows(f => 'br' + f.n),
+        trickstreet:'hwhouse',
     };
 
     function worldStyleId(w) { return (w && WORLD_BLDG_STYLE[w.id]) || 'tower'; }
@@ -8119,6 +8291,7 @@ const col = b.color || BLDG_COLORS[0];
         { st:'runestone',  emoji:'\ud83d\udd2e', name:'Runestone'  },
         { st:'backroom',   emoji:'\ud83d\udfe8', name:'Office Wall' },
         { st:'concretemaze', emoji:'\u2b1c', name:'Concrete Wall' },
+        { st:'hwhouse', emoji:'\ud83c\udfda\ufe0f', name:'Spooky House' },
         ...BACKROOMS_FLOORS.map(f => ({ st: 'br' + f.n, emoji: f.emoji, name: f.name })),   // Backrooms floors 2–20
     ];
     function mmActiveStyle() { return mmStyle || worldStyleId(currentWorld); }
@@ -12291,7 +12464,7 @@ const col = b.color || BLDG_COLORS[0];
             x = ref.x + Math.cos(a) * spawnDist;
             y = ref.y + Math.sin(a) * spawnDist;
             tries++;
-        } while (ptInBld(x, y, 20) && tries < 40); // don't drop them inside a building
+        } while ((ptInBld(x, y, 20) || behindStreetGate(x)) && tries < 40); // not inside a building (or behind the street's gate)
 
         const boss = isBossWave();
         const hpMult = (1 + (wave-1)*0.2) * (boss ? 12 + wave*0.5 : 1);
@@ -12572,6 +12745,7 @@ const col = b.color || BLDG_COLORS[0];
         tickTileHole();       // The Lobby: looking up through a fallen tile's hole unlocks Floor 1
         tickFloorExit();      // Floors 1–19: survive, then reach the exit to unlock the next floor
         tickEvGift();         // 🎉 the event's gift spot (trick-or-treat door / present)
+        hwCastleTick();       // 🏚️ trick-or-treat houses and the 🏰 candy castle (Halloween)
 
         // Timers
         if (p.frozen > 0) { p.frozen--; if (p.frozen===0) p.disableImmune = 120; }
@@ -12795,7 +12969,8 @@ const col = b.color || BLDG_COLORS[0];
 
         // Spawn
         spawnTimer--;
-        if (spawnTimer <= 0 && monstersSpawned < monstersToSpawn) { spawnMonster(); monstersSpawned++; spawnTimer = Math.max(15, 50 - wave*3); }
+        // (no new wave monsters while you fight inside the candy castle)
+        if (spawnTimer <= 0 && monstersSpawned < monstersToSpawn && !castleBusy()) { spawnMonster(); monstersSpawned++; spawnTimer = Math.max(15, 50 - wave*3); }
 
         // Bullets
         for (let i = bullets.length-1; i >= 0; i--) {
@@ -16352,6 +16527,8 @@ const col = b.color || BLDG_COLORS[0];
         for (const t of traps) sprites.push({ x:t.x, y:t.y, size: t.r*1.8, emoji: t.emoji, color: t.color });
         if (brExit && !brExit.done) sprites.push({ x:brExit.x, y:brExit.y, size: 60, emoji: brExit.emoji, color: '#feca57' });
         if (evGift && !evGift.done) sprites.push({ x:evGift.x, y:evGift.y, size: 50, emoji: EVENTS[evGift.ev].gift.emoji, color: EVENTS[evGift.ev].gift.color });
+        for (const h of hwHouses) if (!h.done) sprites.push({ x:h.x, y:h.y, size: 36, emoji: '🚪', color: '#ff8c1a' });
+        if (hwCastle && hwCastle.phase === 'closed') sprites.push({ x:hwCastle.x, y:hwCastle.y, size: 90, emoji: '🏰', color: '#a55eea' });
         for (const a of allies)   sprites.push({ x:a.x, y:a.y, size: 34, emoji: SUMMON_EMOJI[summonKind(a)], color: FRIEND_COL });
         for (const tu of turrets) sprites.push({ x:tu.x, y:tu.y, size: 34, emoji: '🤖' });
         for (const b of bullets)  sprites.push({ x:b.x, y:b.y, size: 14, emoji: b.bemoji || '•', color: b.color || '#ffcc00', hover: 22 });
@@ -16636,7 +16813,7 @@ const col = b.color || BLDG_COLORS[0];
     function setTimeOfDayForWave(w) {
         const idx = ((w - 1) % TIME_OF_DAY.length + TIME_OF_DAY.length) % TIME_OF_DAY.length;
         _timeOfDay = TIME_OF_DAY[idx];
-        if (typeof showStatus === 'function' && !isIndoors()) showStatus(`🕒 ${_timeOfDay.name}`, '#feca57');
+        if (typeof showStatus === 'function' && !isIndoors() && !(currentWorld && currentWorld.night)) showStatus(`🕒 ${_timeOfDay.name}`, '#feca57');
         applyTimeOfDayToScene();
     }
     // Backwards-compatible name (still called from generateBuildings on first map)
@@ -16647,10 +16824,14 @@ const col = b.color || BLDG_COLORS[0];
     // (The warm Early Morning tint was turning grey office carpet and white hospital floors brown.)
     const INDOOR_LIGHT = { name:'Indoors', skyTop:0x777777, skyBot:0x999999, sunCol:0xfffbea, sunInt:1.0, hemiTop:0xffffff, hemiBot:0x8c8c8c,
                            hemiInt:1.05, exposure:1.15, bgFallback:0x888888, groundTint:0xffffff, sunPos:[120,950,90] };
+    // Worlds that are always night (world.night — Trick-or-Treat Street): dim violet moonlight.
+    const NIGHT_LIGHT = { name:'Night', sunCol:0x9d8cff, sunInt:0.55, hemiTop:0x6a5acd, hemiBot:0x2a1a10, hemiInt:0.7,
+                          exposure:1.0, bgFallback:0x14061f, groundTint:0xa898b0, sunPos:[-500,420,-300] };
     const isIndoors = () => !!(typeof WORLD_CEILING !== 'undefined' && currentWorld && WORLD_CEILING[currentWorld.id]);
     function applyTimeOfDayToScene() {
         if (!_three) return; // 3D not initialized yet — init3D will pick up _timeOfDay
-        const tod = isIndoors() ? Object.assign({}, _timeOfDay, INDOOR_LIGHT) : _timeOfDay;
+        const tod = isIndoors() ? Object.assign({}, _timeOfDay, INDOOR_LIGHT)
+                  : (currentWorld && currentWorld.night) ? Object.assign({}, _timeOfDay, NIGHT_LIGHT) : _timeOfDay;
         // Sky shader uniforms
         if (_three_sky && _three_sky.material && _three_sky.material.uniforms) {
             const _ws = worldSky(currentWorld, tod);
@@ -16769,6 +16950,10 @@ const col = b.color || BLDG_COLORS[0];
         if (evGift && _three._giftEv !== evGift.ev && _three.giftMesh) { _three.scene.remove(_three.giftMesh); _three.giftMesh = null; }
         if (evGift) _three._giftEv = evGift.ev;
         placeGlowDoor3D('giftMesh', evGift, evGift ? EVENTS[evGift.ev].gift.glow : 0, evGift ? EVENTS[evGift.ev].gift.frame : 0);
+        // 🏰 the candy castle gate (big, purple) and the trick-or-treat doors (orange, 6 at most)
+        placeGlowDoor3D('castleMesh', hwCastle && hwCastle.phase === 'closed' ? hwCastle : null, 0xa55eea, 0x4a4a55);
+        if (_three.castleMesh) _three.castleMesh.scale.setScalar(1.8);
+        for (let i = 0; i < 6; i++) { const h = hwHouses[i]; placeGlowDoor3D('houseDoor' + i, h && !h.done ? h : null, 0xff8c1a, 0x3a1a0a); if (_three['houseDoor' + i]) _three['houseDoor' + i].scale.setScalar(0.7); }
     }
     // The hole a fallen ceiling tile leaves in the Lobby (only while the Floor 1 secret is live): a
     // dark opening just under the lid, fading to the grey concrete of the floor above in the middle.
@@ -16942,6 +17127,7 @@ const col = b.color || BLDG_COLORS[0];
         backrooms:'dampcarpet',   // the casino already owns 'carpet' (damask) — this is the moist office kind
         backrooms2:'wetconcrete', // bare concrete with standing puddles
         ..._brRows(f => f.art),
+        trickstreet:'deadgrass',
     };
     function groundArtOf(w) { return (w && WORLD_GROUND[w.id]) || 'asphalt'; }
 
@@ -16960,6 +17146,7 @@ const col = b.color || BLDG_COLORS[0];
         backrooms: '#a89468', // damp beige-brown office carpet
         backrooms2:'#51575c', // wet grey concrete
         ..._brRows(f => f.ground),
+        trickstreet:'#3a3226',
     };
     function worldFloorColor(w) { return (w && (WORLD_FLOOR[w.id] || w.ground)) || '#7ec8e3'; }
 
@@ -17003,6 +17190,7 @@ const col = b.color || BLDG_COLORS[0];
         backrooms:  { top:0xe6da9a, bot:0xf0e6b0 },
         backrooms2: { top:0x3a3934, bot:0x6b675c },   // a dark concrete ceiling, dim yellowish haze
         ..._brRows(f => f.sky),
+        trickstreet:{ top:0x14061f, bot:0x5a2a12, stars:true },   // a purple night going orange at the horizon
     };
     // Multiply a colour by the time-of-day tint so dawn and dusk still read on a custom sky.
     function _tintHex(hex, tintHex) {
@@ -17777,6 +17965,7 @@ const col = b.color || BLDG_COLORS[0];
         backrooms:['officeChair','ceilingTile','exitSign'],   // the lights are in the ceiling now
         backrooms2:['pipe','crate','barrel'],
         ..._brRows(f => f.props),
+        trickstreet:['jackolantern','gravestone','deadbush'],
     };
     function PROPS_FOR(w) {
         const set = (w && PROP_SETS[w.id]) || PROP_SETS.city;
@@ -19529,6 +19718,9 @@ const col = b.color || BLDG_COLORS[0];
         _vmCamWorld = new THREE.Vector3(); _vmOffset = new THREE.Vector3();
         // Born at 900x550. If we are ALREADY fullscreen, it has to catch up immediately.
         if (isFullscreen()) resize3DToDisplay();
+        // The scene was built from the plain time of day; give it this world's own light (indoor
+        // fluorescent, or always-night) straight away instead of waiting for the next wave.
+        applyTimeOfDayToScene();
     }
     // A unique 3D emblem placed on the weapon so every class weapon looks distinct
     function buildWeaponAccent(g, accent, col) {
@@ -21172,6 +21364,20 @@ const col = b.color || BLDG_COLORS[0];
             ctx.fillText(brExit.emoji, brExit.x, brExit.y);
             ctx.textBaseline = 'alphabetic';
         }
+        // 🏚️ Trick-or-treat house doors and the 🏰 candy castle (Halloween)
+        for (const h of hwHouses) {
+            if (h.done) continue;
+            const g = ctx.createRadialGradient(h.x, h.y, 3, h.x, h.y, 36);
+            g.addColorStop(0, 'rgba(255,140,26,0.6)'); g.addColorStop(1, 'rgba(255,140,26,0)');
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(h.x, h.y, 36, 0, Math.PI * 2); ctx.fill();
+            ctx.font = '24px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚪', h.x, h.y); ctx.textBaseline = 'alphabetic';
+        }
+        if (hwCastle && hwCastle.phase === 'closed') {   // (the gate goes once you are inside)
+            const g = ctx.createRadialGradient(hwCastle.x, hwCastle.y, 6, hwCastle.x, hwCastle.y, 90);
+            g.addColorStop(0, 'rgba(165,94,234,0.6)'); g.addColorStop(1, 'rgba(165,94,234,0)');
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(hwCastle.x, hwCastle.y, 90, 0, Math.PI * 2); ctx.fill();
+            ctx.font = '56px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🏰', hwCastle.x, hwCastle.y); ctx.textBaseline = 'alphabetic';
+        }
         // 🎉 The event's gift spot — a glow with its emoji (🚪 trick-or-treat door / 🎁 present)
         if (evGift && !evGift.done) {
             const G = EVENTS[evGift.ev].gift, pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
@@ -21615,7 +21821,7 @@ const col = b.color || BLDG_COLORS[0];
         _setHud('coins-display', `🍖 ${coinStr()}`);
         _setHud('score-display', `⭐ ${score}`);
         _setHud('points-display', `🏆 ${points}`);
-        _setHud('tod-display', `🕒 ${_timeOfDay.name}`);
+        _setHud('tod-display', (currentWorld && currentWorld.night) ? '🌙 Night' : isIndoors() ? '💡 Indoors' : `🕒 ${_timeOfDay.name}`);
         // Level + XP bar — the pill in the bottom-left corner of the game view. Both go through the
         // change-guarded setters, so the bar's width is only written when it actually moves rather
         // than every frame.
@@ -21928,6 +22134,13 @@ const col = b.color || BLDG_COLORS[0];
         // Traps — orange dots (active only)
         mctx.fillStyle = '#ff9f43';
         for (const t of traps) { if (t.cooldown <= 0) { mctx.beginPath(); mctx.arc(px2(t.x), py2(t.y), 1.6, 0, Math.PI*2); mctx.fill(); } }
+        // 🏰 the candy castle (purple) and trick-or-treat houses (small orange dots)
+        if (hwCastle && hwCastle.phase === 'closed') {
+            const cx2 = Math.max(7, Math.min(MW - 7, px2(hwCastle.x))), cy2 = Math.max(7, Math.min(MH - 7, py2(hwCastle.y)));
+            mctx.fillStyle = '#a55eea'; mctx.fillRect(cx2 - 5, cy2 - 5, 10, 10); mctx.strokeStyle = '#fff'; mctx.lineWidth = 1; mctx.strokeRect(cx2 - 5, cy2 - 5, 10, 10);
+        }
+        mctx.fillStyle = '#ff8c1a';
+        for (const h of hwHouses) if (!h.done) { mctx.beginPath(); mctx.arc(px2(h.x), py2(h.y), 3, 0, Math.PI * 2); mctx.fill(); }
         // 🎃 Trick-or-treat door — an orange dot, pinned to the edge when it is off the map
         if (evGift && !evGift.done) {
             const dx = Math.max(6, Math.min(MW - 6, px2(evGift.x))), dy = Math.max(6, Math.min(MH - 6, py2(evGift.y)));
@@ -22779,6 +22992,14 @@ const col = b.color || BLDG_COLORS[0];
               { type:'steampipe', emoji:'♨️', color:'#c8c8c0', dmg:8,  effect:'stun', duration:90,  label:'BURST PIPE!', art:'electric' },
               { type:'fallencrate',emoji:'📦', color:'#9c7b4f', dmg:12, effect:'knockback', duration:0, label:'FALLING CRATE!', art:'boom' },
           ] },
+        // 🎃 Event map: open while its event is on (isWorldUnlocked), not by a secret.
+        { id:'trickstreet', name:'Trick-or-Treat Street', emoji:'🏚️', special:true, event:'halloween', night:true, wavesNeeded:20,
+          hint:'Opens at Halloween', ground:'#3a3226', groundAlt:'#463b2c', fog:'#2a1428', fogDensity:0.0012,
+          bldgColors:['#5b3a29','#4a3b52','#3f4a3a','#6b4a2a','#3b3b4a'], shade:'rgba(20,0,30,0.12)', bosses:['Pumpkin King','Reaper'],
+          trapTypes:[
+              { type:'candytrap', emoji:'🍬', color:'#ff9ff3', dmg:3, effect:'slow', duration:150, label:'STICKY CANDY!', art:'pit' },
+              { type:'jumpscare', emoji:'🎃', color:'#ff8c1a', dmg:6, effect:'stun', duration:90, label:'BOO!', art:'electric' },
+          ] },
         ...BACKROOMS_FLOORS.map(f => ({ id: f.id, name: 'Floor ' + f.n + ': ' + f.name, emoji: f.emoji, special: true, floor: f.n,
           wavesNeeded: 20, hint: 'Find the exit on Floor ' + (f.n - 1),
           ground: f.ground, groundAlt: f.groundAlt, fog: f.fog, fogDensity: f.fogDensity,
@@ -22800,6 +23021,7 @@ const col = b.color || BLDG_COLORS[0];
     }
     function isWorldUnlocked(w) {
         if (!w) return false;
+        if (w.event) return isEventOn(w.event);   // an event map is open while its event is on
         if (w.special) return getSpecialMaps().indexOf(w.id) > -1;
         return highestWaveEver >= w.unlockWave;
     }
@@ -24585,6 +24807,7 @@ const col = b.color || BLDG_COLORS[0];
         do { player.x=WORLD_W/2-W/2+100+Math.random()*(W-200); player.y=WORLD_H/2-H/2+100+Math.random()*(H-200); att++; }
         while ((ptInBld(player.x,player.y,player.r)||(player.cls.sunBurn&&!isInShade(player.x,player.y))) && att<100);
         _astralSecret = null; astralSecretSpot();   // Astral Temple only: the hidden spot beside spawn
+        hwCastleNewRun();   // 🏰 Halloween: the castle is a 5% find (Trick-or-Treat Street reveals it after 5 houses)
         gsTrackGame();
         questTrack('games', 1);
         revengeRunStart(); MUSIC.start(); AMBIENCE.start(currentWorld && currentWorld.id);

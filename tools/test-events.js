@@ -327,6 +327,74 @@ check(q(`buyEvent('flesh')`) === false && q(`claimEvTier(0)`) === false && q('ev
 q(`renderEventScreen()`);
 check(/over/.test(q(`document.getElementById('event-days').textContent`)), 'and the menu says it is over');
 
+// ======================== 🏚️ TRICK-OR-TREAT STREET + 🏰 CANDY CASTLE ========================
+force('off');
+check(q(`isWorldUnlocked(findWorld('trickstreet'))`) === false && q(`selectWorld('trickstreet')`) === false, 'Trick-or-Treat Street is shut outside Halloween');
+force('halloween');
+check(q(`isWorldUnlocked(findWorld('trickstreet'))`) === true, 'and open at Halloween (no secret needed)');
+// The boss odds.
+const pick = (r) => q(`rollCastleBoss(${r})`);
+check(pick(0) === 'Slimy the Jelly' && pick(0.49) === 'Slimy the Jelly' && pick(0.5) === 'Biscuit the Cerberus' && pick(0.74) === 'Biscuit the Cerberus'
+      && pick(0.75) === 'Mr Roll' && pick(0.88) === 'Mr Roll' && pick(0.89) === 'Mr Blob' && pick(0.98) === 'Mr Blob' && pick(0.99) === 'Mrs Gum',
+      'castle bosses: Slimy 50%, Biscuit 25%, Mr Roll 14%, Mr Blob 10%, Mrs Gum 1%');
+const odds = JSON.parse(q(`(function(){ var c = {}; for (var i = 0; i < 20000; i++) { var b = rollCastleBoss(); c[b] = (c[b] || 0) + 1; } return JSON.stringify(c); })()`));
+check(odds['Slimy the Jelly'] > 9400 && odds['Slimy the Jelly'] < 10600 && odds['Mrs Gum'] > 100 && odds['Mrs Gum'] < 320, 'and the dice really roll like that', JSON.stringify(odds));
+check(q(`['Castle Guard','Slimy the Jelly','Biscuit the Cerberus','Mr Roll','Mr Blob','Mrs Gum'].every(function(n){ var c = MONSTER_CLASSES.find(function(x){ return x.name === n; }); return c && c.isBossOnly; })`), 'the guards and the five bosses exist (and never turn up as normal monsters)');
+// The street: one road between houses, a gate behind you, doors to knock on, double your candy -> castle.
+const street = JSON.parse(q(`(function(){
+  selectWorld('trickstreet'); localStorage.setItem('monster_attack_candy', '30'); gameRunning = false; startGame(); waveIntroTimer = 0; monsters = []; monstersSpawned = 0; monstersToSpawn = 99; __freezeMonsters = true;
+  var o = { goal: hwStreetGoal, startY: player.y };
+  // Houses shoulder to shoulder on both sides of the road, all along it.
+  var roadY = WORLD_H / 2, gaps = 0;
+  for (var x = player.x - 200; x < player.x + 3000; x += 15) { if (!ptInBld(x, roadY - 180 - 40, 2)) gaps++; if (!ptInBld(x, roadY + 180 + 40, 2)) gaps++; }
+  o.gaps = gaps; o.road = !ptInBld(player.x + 1000, roadY, 20);
+  o.gate = ptInBld(WORLD_W / 2 - 500, roadY, 5) && player.x > WORLD_W / 2 - 480;
+  var behind = 0; for (var i = 0; i < 300; i++) { spawnMonster(); var m = monsters.pop(); if (m.x < WORLD_W / 2 - 440) behind++; } o.spawnBehind = behind;
+  hwCastleTick(); o.houses = hwHouses.length; o.doorsOnRoad = hwHouses.every(function(h){ return Math.abs(h.y - roadY) < 180; });
+  var k = 0;
+  while (!hwCastle && k < 60) { var h = hwHouses.find(function(x){ return !x.done; }); if (!h) { hwCastleTick(); k++; continue; } player.x = h.x; player.y = h.y; hwCastleTick(); k++; }
+  loadEvent(); o.candy = evWallet; o.castle = !!hwCastle; o.castleOnRoad = hwCastle && Math.abs(hwCastle.y - roadY) < 20; o.knocks = hwKnocks;
+  __freezeMonsters = false; return JSON.stringify(o); })()`));
+check(street.goal === 60, 'the street starts with a goal: double your candy (30 -> 60)', street.goal);
+check(street.gaps === 0 && street.road, 'one road with houses packed along both sides (no way round)', JSON.stringify(street));
+check(street.gate && street.spawnBehind === 0, 'a gate behind the start (forward only) — and no monsters spawn behind it');
+check(street.houses === 6 && street.doorsOnRoad, 'the 6 nearest houses have doors on the road side');
+check(street.castle && street.candy >= 60 && street.castleOnRoad, 'knock until your candy has doubled — then the castle appears up the road', street.candy + ' candy, ' + street.knocks + ' knocks');
+check(q(`(function(){ var keep = hwCastle, c = localStorage.getItem('monster_attack_candy'); localStorage.setItem('monster_attack_candy', '0'); hwCastleNewRun(); var g = hwStreetGoal; hwCastle = keep; localStorage.setItem('monster_attack_candy', c); return g; })()`) === 20, 'an empty bag still has a goal (+20)');
+// Inside the castle.
+const fight = JSON.parse(q(`(function(){
+  __freezeMonsters = true; waveIntroTimer = 0; monsters = []; monstersSpawned = 0; monstersToSpawn = 99; points = 0; savePoints();
+  player.x = hwCastle.x; player.y = hwCastle.y; hwCastleTick();
+  var o = { phase1: hwCastle.phase, guards: monsters.filter(function(m){ return m._castle && m.name === 'Castle Guard'; }).length };
+  var before = monsters.length; spawnTimer = 0; update(); o.noWaveSpawns = monsters.length === before;
+  monsters.forEach(function(m){ m.hp = 1; m.hasShield = false; m.shieldUp = false; m.dodge = 0; });
+  for (var i = monsters.length - 1; i >= 0; i--) hitMonster(monsters[i], i, 99999);
+  hwCastleTick();
+  o.points = points; o.phase2 = hwCastle.phase; o.boss = hwCastle.boss;
+  var b = monsters.find(function(m){ return m._castle; }); o.bossIsBoss = !!(b && b.isBoss); o.bossName = b && b.name;
+  loadEvent(); var c0 = evWallet;
+  monsters.forEach(function(m){ m.hp = 1; m.hasShield = false; m.shieldUp = false; m.dodge = 0; });
+  for (var i = monsters.length - 1; i >= 0; i--) hitMonster(monsters[i], i, 99999);
+  pickups = []; hwCastleTick(); loadEvent();
+  o.phase3 = hwCastle.phase; o.bossCandy = evWallet - c0;
+  __freezeMonsters = false; return JSON.stringify(o); })()`));
+check(fight.phase1 === 'guards' && fight.guards === 4, 'entering the castle: 4 guards', JSON.stringify(fight));
+check(fight.noWaveSpawns, 'no wave monsters join while you are inside');
+check(fight.points === 10 && fight.phase2 === 'boss', 'beating the guards: 🏆 +10 points and the door opens');
+check(fight.bossIsBoss && /^BOSS (Slimy the Jelly|Biscuit the Cerberus|Mr Roll|Mr Blob|Mrs Gum)$/.test(fight.bossName), 'a candy boss is waiting', fight.bossName);
+check(fight.phase3 === 'done' && fight.bossCandy >= 40, 'beating it: 🍬 +40 candy (plus its candy bag)', fight.bossCandy + ' candy');
+// The castle in other maps: about 5% of Halloween runs.
+const finds = q(`(function(){ selectWorld('city'); gameRunning = false; startGame(); var n = 0; for (var i = 0; i < 2000; i++) { hwCastleNewRun(); if (hwCastle) n++; } return n; })()`);
+check(finds > 60 && finds < 145, 'in any other map the castle is a 5% find', finds + '/2000');
+force('off');
+check(q(`(function(){ var n = 0; for (var i = 0; i < 300; i++) { hwCastleNewRun(); if (hwCastle) n++; } return n; })()`) === 0, 'and never outside Halloween');
+force('halloween');
+// ☠️ The Grim Reaper challenge in the Halloween menu.
+q(`localStorage.removeItem('monster_attack_hw_reaper_next'); document.getElementById('event-daily').children.length = 0; renderEventScreen();`);
+const reaperBtn = q(`(function(){ var b = document.getElementById('event-daily').children.find(function(x){ return x.dataset && x.dataset.ev === 'reaper'; }); if (!b) return 'none'; b.onclick(); return localStorage.getItem('monster_attack_hw_reaper_next'); })()`);
+check(reaperBtn === '1', "the Halloween menu's ☠️ Grim Reaper button sends you to Buckshot's Reaper", reaperBtn);
+q(`localStorage.removeItem('monster_attack_hw_reaper_next')`);
+
 // ======================== 🎄 CHRISTMAS ========================
 force(null);
 check(q(`activeEvent(new Date(2026, 11, 1)).id`) === 'christmas' && q(`activeEvent(new Date(2026, 11, 25)).id`) === 'christmas' && q(`activeEvent(new Date(2027, 0, 7)).id`) === 'christmas',
