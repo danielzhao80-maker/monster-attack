@@ -505,6 +505,8 @@ Halloween extras: 🏚️ **Trick-or-Treat Street** (`trickstreet`, `event:'hall
 (`hwStreetGoal`, ≥ +20) → 🏰 castle up the road. No wave monsters there (`noWaveMonsters`) — only the castle's; you auto-run forward (hwCastleTick) until inside the castle, steering for the doors ahead; elsewhere the castle is a 5% find (hwCastleNewRun). Castle: walking into the gate
 puts you INSIDE (enterCastle → `castleRoom` replaces the world in refreshChunks; outside monsters wait) — a stone
 hall: 4 Castle Guards in the guard room (`m._castle`; no wave spawns meanwhile — `castleBusy()`) → 🏆 +10 points, the door opens (openCastleDoor) → a CASTLE_BOSSES roll in the chamber
-(Slimy 50 / Biscuit 25 / Mr Roll 14 / Mr Blob 10 / Mrs Gum 1) → 🍬 +40 → leaveCastle back outside. The other games use ArcadeShop.halloween
+(Slimy 50 / Biscuit 25 / Mr Roll 14 / Mr Blob 10 / Mrs Gum 1) → 🍬 +40 → leaveCastle back outside (on the street: a new double-your-candy goal for the next castle). Street details: traps
+lie on the road (no pebbles), no wave gift, no wave intro, the HUD shows the goal, the run pauses when stunned/
+frozen and halves when slowed; splits of castle monsters are castle monsters too. The other games use ArcadeShop.halloween
 (REBUILD first win, Track Run first win — one time each; Buckshot's ☠️ Grim Reaper: +50 once / −60 per loss);
 telling Nullp about "treats" (widget) sets `monster_attack_hw_treat_<year>` = +10% on those wins.

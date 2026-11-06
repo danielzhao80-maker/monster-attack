@@ -383,12 +383,15 @@ const fight = JSON.parse(q(`(function(){
   o.points = points; o.phase2 = hwCastle.phase; o.boss = hwCastle.boss; o.doorOpen = !buildings.some(function(b){ return b.castleDoor; });
   var b = monsters.find(function(m){ return m._castle; }); o.bossIsBoss = !!(b && b.isBoss); o.bossName = b && b.name; o.bossInChamber = !!b && b.x > gate.x + 100;
   loadEvent(); var c0 = evWallet;
-  monsters.forEach(function(m){ m.hp = 1; m.hasShield = false; m.shieldUp = false; m.dodge = 0; });
-  for (var i = monsters.length - 1; i >= 0; i--) hitMonster(monsters[i], i, 99999);
+  // (a splitting boss leaves blobs — they are part of the fight, so clear until the chamber is empty)
+  for (var round = 0; round < 8 && monsters.some(function(m){ return m._castle; }); round++) {
+    monsters.forEach(function(m){ m.hp = 1; m.hasShield = false; m.shieldUp = false; m.dodge = 0; });
+    for (var i = monsters.length - 1; i >= 0; i--) if (monsters[i]._castle) hitMonster(monsters[i], i, 99999);
+  }
   pickups = []; hwCastleTick(); loadEvent();
   o.phase3 = hwCastle.phase; o.bossCandy = evWallet - c0;
   for (var f = 0; f < 160; f++) hwCastleTick();
-  o.phase4 = hwCastle.phase; o.outside = !castleRoom && !buildings.some(function(b){ return b.st === 'hwcastle'; }) && Math.abs(player.x - gate.x) < 200;
+  o.phase4 = hwCastle ? hwCastle.phase : 'next'; o.nextGoal = hwStreetGoal; loadEvent(); o.wallet = evWallet; o.outside = !castleRoom && !buildings.some(function(b){ return b.st === 'hwcastle'; }) && Math.abs(player.x - gate.x) < 200;
   o.outsiderBack = monsters.some(function(m){ return m._mark === 'outside'; });
   __freezeMonsters = false; return JSON.stringify(o); })()`));
 check(fight.phase1 === 'guards' && fight.hall && fight.inGuardRoom, 'walking into the gate takes you INSIDE the castle hall', JSON.stringify(fight));
@@ -399,7 +402,8 @@ check(fight.noWaveSpawns, 'no wave monsters join while you are inside');
 check(fight.points === 10 && fight.phase2 === 'boss' && fight.doorOpen, 'beating the guards: 🏆 +10 points and the door opens');
 check(fight.bossIsBoss && fight.bossInChamber && /^BOSS (Slimy the Jelly|Biscuit the Cerberus|Mr Roll|Mr Blob|Mrs Gum)$/.test(fight.bossName), 'a candy boss waits in the chamber behind it', fight.bossName);
 check(fight.phase3 === 'won' && fight.bossCandy >= 40, 'beating it: 🍬 +40 candy', fight.bossCandy + ' candy');
-check(fight.phase4 === 'done' && fight.outside && fight.outsiderBack, 'then you come back out (the world and its monsters back as they were)');
+check(fight.outside && fight.outsiderBack, 'then you come back out (the world and its monsters back as they were)');
+check(fight.phase4 === 'next' && fight.nextGoal === Math.max(fight.wallet * 2, fight.wallet + 20), 'and the street goes on: double your candy again for the next castle', fight.wallet + ' -> ' + fight.nextGoal);
 const crowd = JSON.parse(q(`(function(){ selectWorld('trickstreet'); gameRunning = false; startGame(); var inside = 0, behind = 0, ahead = 0, n = 1500;
   for (var i = 0; i < n; i++) { spawnMonster(); var m = monsters.pop(); if (ptInBld(m.x, m.y, m.r)) inside++; if (m.x < WORLD_W / 2 - 440) behind++; if (m.x > player.x) ahead++; }
   return JSON.stringify({ inside: inside, behind: behind, ahead: ahead, n: n }); })()`));
@@ -431,6 +435,47 @@ check(run.moved > 600 && run.drift < 5, 'on the street you run forward by yourse
 check(run.doorsAhead >= 3, 'and new doors keep appearing ahead of you');
 check(run.phase === 'guards' && run.afterCastle === 0, 'the run stops once you are inside the castle');
 check(run.cityMoved === 0, 'other maps do not move you');
+
+// ---- fixes on the street ----
+const fx = JSON.parse(q(`(function(){ selectWorld('trickstreet'); gameRunning = false; startGame(); player.invincible = 1e9; player.hp = player.maxHp = 1e9;
+  var o = { intro: waveIntroTimer };
+  // traps lie on the road (and there are no poison pebbles)
+  var roadY = streetRoadY();
+  o.trapsOnRoad = traps.length > 0 && traps.every(function(t){ return Math.abs(t.y - (Math.floor(t.y / WORLD_H) * WORLD_H + WORLD_H / 2)) <= STREET_HALF; });
+  o.pebbles = traps.filter(function(t){ return t.type === 'pebble'; }).length;
+  traps = [];   // (keep the run below clean)
+  // the run stops while stunned / frozen, and slows on a sticky trap
+  var step = function(setup){ setup(); var x = player.x; hwCastleTick(); return Math.round((player.x - x) * 100) / 100; };
+  o.normal = step(function(){ player.stunned = 0; player.frozen = 0; player.slow = 0; });
+  o.stunned = step(function(){ player.stunned = 30; }); player.stunned = 0;
+  o.frozen = step(function(){ player.frozen = 30; }); player.frozen = 0;
+  o.slowed = step(function(){ player.slow = 30; }); player.slow = 0;
+  // no wave gift on the street; the HUD shows the goal, not a wave
+  tickEvGift(); o.gift = evGift;
+  updateHUD(); o.hud = document.getElementById('wave-display').textContent;
+  // after Continue the goal is set again (not 0 — which would open the castle at once)
+  hwStreetGoal = 0; hwCastle = null; hwCastleTick(); o.goalAfterLoad = hwStreetGoal; o.castleAfterLoad = !!hwCastle;
+  return JSON.stringify(o); })()`));
+check(fx.intro === 0, 'no 2-second wave intro on the street', JSON.stringify(fx));
+check(fx.trapsOnRoad && fx.pebbles === 0, 'its candy traps lie on the road (no poison pebbles)');
+check(fx.normal > 1 && fx.stunned === 0 && fx.frozen === 0 && Math.abs(fx.slowed - fx.normal / 2) < 0.01, 'the run stops while you are stunned or frozen, and halves on a sticky trap', fx.normal + ' / ' + fx.slowed);
+check(fx.gift === null, 'no wave gift spot here (the houses are the gifts)');
+check(/🏚️ 🍬 \d+ \/ \d+/.test(fx.hud) && !/Wave/.test(fx.hud), 'the HUD shows your candy goal instead of a wave', fx.hud);
+check(fx.goalAfterLoad > 0 && !fx.castleAfterLoad, 'after Continue the goal comes back (the castle does not just appear)');
+const blobs = JSON.parse(q(`(function(){ selectWorld('trickstreet'); gameRunning = false; startGame(); __freezeMonsters = true;
+  hwCastle = { x: player.x + 40, y: streetRoadY(), phase: 'closed' }; player.x = hwCastle.x; player.y = hwCastle.y; hwCastleTick();
+  monsters.forEach(function(m){ m.hp = 1; m.hasShield = false; m.shieldUp = false; m.dodge = 0; }); for (var i = monsters.length - 1; i >= 0; i--) hitMonster(monsters[i], i, 99999);
+  hwCastle.boss = 'Slimy the Jelly'; monsters = []; spawnCastleMonster('Slimy the Jelly', true, hwCastle.x + 480, hwCastle.y); hwCastle.phase = 'boss';
+  var b = monsters[0]; b.hp = 1; b.hasShield = false; hitMonster(b, 0, 99999);
+  var o = { blobs: monsters.filter(function(m){ return m._castle; }).length };
+  hwCastleTick(); o.phaseWithBlobs = hwCastle.phase;
+  monsters.forEach(function(m){ m.hp = 1; }); for (var i = monsters.length - 1; i >= 0; i--) hitMonster(monsters[i], i, 99999);
+  while (monsters.length) { monsters.forEach(function(m){ m.hp = 1; }); for (var i = monsters.length - 1; i >= 0; i--) hitMonster(monsters[i], i, 99999); }
+  hwCastleTick(); o.phaseAfter = hwCastle.phase;
+  for (var f = 0; f < 160; f++) hwCastleTick(); o.leftInside = monsters.length;
+  __freezeMonsters = false; return JSON.stringify(o); })()`));
+check(blobs.blobs >= 2 && blobs.phaseWithBlobs === 'boss', "a splitting boss (Slimy) isn't beaten while its blobs are still alive", JSON.stringify(blobs));
+check(blobs.phaseAfter === 'won' && blobs.leftInside === 0, 'and nothing from inside follows you back out');
 
 // The castle in other maps: about 5% of Halloween runs.
 const finds = q(`(function(){ selectWorld('city'); gameRunning = false; startGame(); var n = 0; for (var i = 0; i < 2000; i++) { hwCastleNewRun(); if (hwCastle) n++; } return n; })()`);

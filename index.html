@@ -5104,7 +5104,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     let evGift = null;
     function tickEvGift() {
         const ev = activeEvent();
-        if (!player || NET.mode === 'client' || !ev || usingCustomMap) { evGift = null; return; }
+        if (!player || NET.mode === 'client' || !ev || usingCustomMap || (currentWorld && currentWorld.id === 'trickstreet')) { evGift = null; return; }
         if (!evGift || evGift.wave !== wave || evGift.ev !== ev.id) {
             evGift = null;
             for (let k = 0; k < 60; k++) {
@@ -5333,8 +5333,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         else if (onStreet) {
             // 🏃 Auto-run: the street carries you forward (steer up/down for the doors) until you are
             // inside the castle. Doors you have run past are gone; new ones appear ahead.
-            if (!castleRoom && (!hwCastle || hwCastle.phase === 'closed')) {
-                const step = Math.max(1.5, (player.speed || 3) * 0.85);
+            if (!hwStreetGoal) { loadEvent(EVENTS.halloween); hwStreetGoal = Math.max(evWallet * 2, evWallet + 20); }   // (after Continue)
+            if (!castleRoom && (!hwCastle || hwCastle.phase === 'closed') && !(player.stunned > 0) && !(player.frozen > 0) && player.hp > 0) {
+                const step = Math.max(1.5, (player.speed || 3) * 0.85) * (player.slow > 0 ? 0.5 : 1);   // a sticky trap slows the run
                 if (!ptInBld(player.x + step, player.y, player.r) && !ptInWall(player.x + step, player.y, player.r)) player.x += step;
             }
             hwHouses = hwHouses.filter(h => !h.done && h.x > player.x - 60);   // (the one beside you can still be knocked)
@@ -5404,11 +5405,17 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function leaveCastle(c) {
         const back = castleRoom ? castleRoom.outside : [];
         castleRoom = null;
-        monsters = monsters.filter(m => !m._castle).concat(back);
+        monsters = back;                           // whatever was made inside the castle stays inside
         player.x = c.x + 140; player.y = c.y;      // out through the far side of the gate
         _loadedChunkKey = null; refreshChunks(true);
         c.phase = 'done';
-        showStatus('🏰 You leave the castle with your candy!', '#26de81');
+        if (currentWorld && currentWorld.id === 'trickstreet') {
+            // The street goes on: double your candy again for the next castle.
+            loadEvent(EVENTS.halloween);
+            hwStreetGoal = Math.max(evWallet * 2, evWallet + 20);
+            hwCastle = null;
+            showStatus(`🏰 Back on the street! Double your candy again for the next castle: 🍬 ${evWallet} → ${hwStreetGoal}`, '#26de81');
+        } else showStatus('🏰 You leave the castle with your candy!', '#26de81');
     }
     // A run starts: the street gets its houses; anywhere else the castle is a 5% find.
     function hwCastleNewRun() {
@@ -5419,6 +5426,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             loadEvent(EVENTS.halloween);
             hwStreetGoal = Math.max(evWallet * 2, evWallet + 20);
             if (player) player.y = streetRoadY();   // start in the middle of the road: steer to the doors
+            waveIntroTimer = 0;                      // no wave to introduce — there are no wave monsters here
             showStatus(`🏚️ Trick or treat! Walk the street and double your candy: 🍬 ${evWallet} → ${hwStreetGoal}`, '#ff8c1a');
         } else if (Math.random() < 0.05) placeCastle();
     }
@@ -7702,19 +7710,23 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const inBs = (px, py, r) => bs.some(b => px + r > b.lx && px - r < b.lx + b.w && py + r > b.ly && py - r < b.ly + b.h);
         const ts = [];
         const trapPool = currentWorld.trapTypes || (currentWorld.traps ? [currentWorld.traps] : []);
+        // On Trick-or-Treat Street the only open ground is the road, so its traps go ON the road (fewer of
+        // them — the street is narrow and you run it). Everywhere else: anywhere outside a building.
+        const spot = () => S.street ? [40 + rnd() * (WORLD_W - 80), WORLD_H / 2 + (rnd() - 0.5) * STREET_HALF * 1.2]
+                                    : [40 + rnd() * (WORLD_W - 80), 40 + rnd() * (WORLD_H - 80)];
         if (trapPool.length) {
-            for (let i = 0; i < 22; i++) {
+            for (let i = 0; i < (S.street ? 10 : 22); i++) {
                 let tx, ty, attempts = 0;
-                do { tx = 40 + rnd() * (WORLD_W - 80); ty = 40 + rnd() * (WORLD_H - 80); attempts++; }
+                do { [tx, ty] = spot(); attempts++; }
                 while (inBs(tx, ty, 15) && attempts < 50);
                 const t = trapPool[Math.floor(rnd() * trapPool.length)];
                 ts.push({ x: ox + tx, y: oy + ty, r: 18, type: t.type, emoji: t.emoji, color: t.color, dmg: t.dmg,
                           effect: t.effect, duration: t.duration, label: t.label, art: t.art || 'default', cooldown: 0, seed: rnd()*1000 });
             }
         }
-        for (let i = 0; i < 10; i++) { // poison pebbles
+        for (let i = 0; i < (S.street ? 0 : 10); i++) { // poison pebbles (not on the candy street)
             let tx, ty, attempts = 0;
-            do { tx = 40 + rnd() * (WORLD_W - 80); ty = 40 + rnd() * (WORLD_H - 80); attempts++; }
+            do { [tx, ty] = spot(); attempts++; }
             while (inBs(tx, ty, 15) && attempts < 50);
             ts.push({ x: ox + tx, y: oy + ty, r: 28, type:'pebble', emoji:'🪨', color:'#26de81', dmg: 0, effect:'poison', duration: 600, label:'POISONED 10s!', cooldown: 0 });
         }
@@ -8074,7 +8086,7 @@ const col = b.color || BLDG_COLORS[0];
         // Thirty worlds, thirty bodies — but from directly above, many read as the same few
         // silhouettes. Map each body to the family it belongs to; the handful with a genuinely
         // distinctive footprint get their own drawing below.
-        const _rawKind = bldgStyleOf(b).body || 'box';
+        const _rawKind = (b.st === 'hwhouse' || b.st === 'hwcastle') ? 'box' : (bldgStyleOf(b).body || 'box');   // street houses / castle walls: plain buildings from above
         const kind2 = ({
             igloo:'dome', cloud:'dome', glasslab:'dome', station:'dome', parasol:'dome',
             lavaspire:'shard', peak:'shard', stalag:'shard', obelisk:'shard',
@@ -9095,7 +9107,7 @@ const col = b.color || BLDG_COLORS[0];
                 for (let k=0;k<6;k++) particles.push({x:m.x,y:m.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:15,maxLife:15,color:'#26de81',r:3});
             }
             // Hydra splits into 2
-            if (m.splits) { spawnSplitMonster(m.x, m.y); spawnSplitMonster(m.x, m.y); }
+            if (m.splits) { const n0 = monsters.length; spawnSplitMonster(m.x, m.y); spawnSplitMonster(m.x, m.y); if (m._castle) for (let k = n0; k < monsters.length; k++) monsters[k]._castle = true; }
             monsters.splice(idx, 1);
         }
     }
@@ -21894,7 +21906,10 @@ const col = b.color || BLDG_COLORS[0];
         _setHud('class-display', `${titleTag}${p.cls.emoji} ${p.cls.name}`);
         _setHud('ammo-display', p.cls.type==='melee'?'🗡️ Melee':(p.reloading?'🔫 ...':'🔫 '+p.ammo));
         const mc = currentMonsterClass;
-        _setHud('wave-display', `☠️ Wave ${wave} — ${mc?mc.emoji+' '+mc.name:''}`);
+        if (currentWorld && currentWorld.id === 'trickstreet' && !usingCustomMap)   // no waves here — show the candy goal / castle
+            _setHud('wave-display', castleRoom ? `🏰 Castle — ${hwCastle && hwCastle.phase === 'guards' ? 'beat the 4 guards' : hwCastle && hwCastle.boss ? 'beat ' + hwCastle.boss : 'you won!'}`
+                                    : hwCastle ? '🏰 Run to the castle!' : `🏚️ 🍬 ${evWallet} / ${hwStreetGoal}`);
+        else _setHud('wave-display', `☠️ Wave ${wave} — ${mc?mc.emoji+' '+mc.name:''}`);
         _setHud('coins-display', `🍖 ${coinStr()}`);
         _setHud('score-display', `⭐ ${score}`);
         _setHud('points-display', `🏆 ${points}`);
