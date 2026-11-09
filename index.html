@@ -4987,7 +4987,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             how: `Monsters drop <b>🍬 candy</b> (bosses drop a bag) · beat the <b>🎃 Pumpkin King</b> on boss waves (25) · clear waves ·
                   knock on the glowing <b>🚪 trick-or-treat door</b> each wave (watch the minimap!) · the <b>🎁 daily treat</b> ·
                   <b>Halloween codes</b> on the main menu, each once a day — <b>TRICKORTREAT</b> is one, and there are 5 more to find!<br>
-                  🏚️ <b>Trick-or-Treat Street</b> (Worlds → ⭐ Special Maps): knock on houses, then storm the 🏰 candy castle (4 guards, then a candy boss!). The castle can turn up in any map too.<br>
+                  🏚️ <b>Trick-or-Treat Street</b> (Worlds → ⭐ Special Maps, <b>once</b> per Halloween): knock on houses, then storm the 🏰 candy castle (4 guards, then a candy boss worth 🍬 100!). The castle can turn up in any map too.<br>
                   🎮 Your first win in <b>REBUILD</b> and in <b>Track Run</b> gives candy (once each) — tell <b>Nullp</b> about <b>treats</b> first for +10%. ☠️ Beat the <b>Grim Reaper</b> in Buckshot for 50 (once)!`,
         },
         christmas: {
@@ -5254,6 +5254,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     let hwHouses = [], hwKnocks = 0, hwCastle = null, hwStreetGoal = 0;
     const streetRoadY = () => Math.floor(player.y / WORLD_H) * WORLD_H + WORLD_H / 2;   // the road you are on
+    // Trick-or-Treat Street is ONE TIME per Halloween: beating its castle boss uses it up.
+    const STREET_DONE_KEY = () => 'monster_attack_hw_street_done_' + EVENTS.halloween.year(new Date());
+    function streetDone() { try { return localStorage.getItem(STREET_DONE_KEY()) === '1'; } catch (e) { return false; } }
     const castleBusy = () => !!hwCastle && (hwCastle.phase === 'guards' || hwCastle.phase === 'boss' || hwCastle.phase === 'won');
     // Trick-or-Treat Street has no wave monsters: just houses to knock on, then the castle.
     const noWaveMonsters = () => !!currentWorld && currentWorld.id === 'trickstreet' && !usingCustomMap;
@@ -5334,7 +5337,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             // 🏃 Auto-run: the street carries you forward (steer up/down for the doors) until you are
             // inside the castle. Doors you have run past are gone; new ones appear ahead.
             if (!hwStreetGoal) { loadEvent(EVENTS.halloween); hwStreetGoal = Math.max(evWallet * 2, evWallet + 20); }   // (after Continue)
-            if (!castleRoom && (!hwCastle || hwCastle.phase === 'closed') && !(player.stunned > 0) && !(player.frozen > 0) && player.hp > 0) {
+            if (!castleRoom && (!hwCastle || hwCastle.phase === 'closed') && !streetDone() && !(player.stunned > 0) && !(player.frozen > 0) && player.hp > 0) {
                 const step = Math.max(1.5, (player.speed || 3) * 0.85) * (player.slow > 0 ? 0.5 : 1);   // a sticky trap slows the run
                 if (!ptInBld(player.x + step, player.y, player.r) && !ptInWall(player.x + step, player.y, player.r)) player.x += step;
             }
@@ -5362,8 +5365,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             addShake(14);
         } else if (c.phase === 'boss' && !monsters.some(m => m._castle)) {
             c.phase = 'won'; c.exitIn = 150;   // a moment to enjoy it, then back outside
-            addEventCur(40, EVENTS.halloween);
-            showStatus(`🏰 ${c.boss} is beaten! 🍬 +40 candy`, '#26de81');
+            addEventCur(100, EVENTS.halloween);
+            if (currentWorld && currentWorld.id === 'trickstreet') try { localStorage.setItem(STREET_DONE_KEY(), '1'); } catch (e) {}
+            showStatus(`🏰 ${c.boss} is beaten! 🍬 +100 candy`, '#26de81');
             SFX.pickup && SFX.pickup();
         } else if (c.phase === 'won' && --c.exitIn <= 0) {
             leaveCastle(c);
@@ -5409,13 +5413,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         player.x = c.x + 140; player.y = c.y;      // out through the far side of the gate
         _loadedChunkKey = null; refreshChunks(true);
         c.phase = 'done';
-        if (currentWorld && currentWorld.id === 'trickstreet') {
-            // The street goes on: double your candy again for the next castle.
-            loadEvent(EVENTS.halloween);
-            hwStreetGoal = Math.max(evWallet * 2, evWallet + 20);
-            hwCastle = null;
-            showStatus(`🏰 Back on the street! Double your candy again for the next castle: 🍬 ${evWallet} → ${hwStreetGoal}`, '#26de81');
-        } else showStatus('🏰 You leave the castle with your candy!', '#26de81');
+        if (currentWorld && currentWorld.id === 'trickstreet')   // one time only: the street is done for this Halloween
+            showStatus('🏰 Trick-or-Treat Street is done for this Halloween — happy Halloween! 🎃', '#26de81');
+        else showStatus('🏰 You leave the castle with your candy!', '#26de81');
     }
     // A run starts: the street gets its houses; anywhere else the castle is a 5% find.
     function hwCastleNewRun() {
@@ -21908,7 +21908,7 @@ const col = b.color || BLDG_COLORS[0];
         const mc = currentMonsterClass;
         if (currentWorld && currentWorld.id === 'trickstreet' && !usingCustomMap)   // no waves here — show the candy goal / castle
             _setHud('wave-display', castleRoom ? `🏰 Castle — ${hwCastle && hwCastle.phase === 'guards' ? 'beat the 4 guards' : hwCastle && hwCastle.boss ? 'beat ' + hwCastle.boss : 'you won!'}`
-                                    : hwCastle ? '🏰 Run to the castle!' : `🏚️ 🍬 ${evWallet} / ${hwStreetGoal}`);
+                                    : streetDone() ? '✅ Street done this Halloween' : hwCastle ? '🏰 Run to the castle!' : `🏚️ 🍬 ${evWallet} / ${hwStreetGoal}`);
         else _setHud('wave-display', `☠️ Wave ${wave} — ${mc?mc.emoji+' '+mc.name:''}`);
         _setHud('coins-display', `🍖 ${coinStr()}`);
         _setHud('score-display', `⭐ ${score}`);
@@ -23113,7 +23113,7 @@ const col = b.color || BLDG_COLORS[0];
     }
     function isWorldUnlocked(w) {
         if (!w) return false;
-        if (w.event) return isEventOn(w.event);   // an event map is open while its event is on
+        if (w.event) return isEventOn(w.event) && !(w.id === 'trickstreet' && streetDone());   // open while its event is on (the street: once)
         if (w.special) return getSpecialMaps().indexOf(w.id) > -1;
         return highestWaveEver >= w.unlockWave;
     }
@@ -23283,7 +23283,7 @@ const col = b.color || BLDG_COLORS[0];
                    <div class="world-status">${selected ? '✅ Selected' : 'Click to select'}</div>`
                 : `<div class="world-emoji">🔒</div>
                    <div class="world-name">???</div>
-                   <div class="world-lock">${w.hint || 'Find the secret in another game'}</div>`;
+                   <div class="world-lock">${w.id === 'trickstreet' && streetDone() && isEventOn('halloween') ? '✅ Done this Halloween — back next year' : (w.hint || 'Find the secret in another game')}</div>`;
             if (unlocked) {
                 card.onclick = () => { selectWorld(w.id); renderWorldGrid(); SFX.pickup(); };
             }
