@@ -196,6 +196,21 @@ q(`petsOwned.push({ name: 'Dragon', rank: 'SSS', ability: '💪 Damage Boost', e
 check(/LIMITED[\s\S]*SSS/.test(q(`document.getElementById('pets-collection').innerHTML`)), 'in 🐾 Pets the LIMITED pets come before SSS');
 check(q(`(function(){ var d = JSON.parse(localStorage.getItem(PETS_KEY)); d[0].rank = 'S'; localStorage.setItem(PETS_KEY, JSON.stringify(d)); loadPets(); return petsOwned[0].rank; })()`) === 'LIMITED', 'older saves: boss pets that were S become LIMITED');
 
+// ---- LIMITED pets don't take a battle-pet slot ----
+reset();
+q(`for (var k = 0; k < 5; k++) petsOwned.push({ name: 'Rat' + k, rank: 'F', ability: '💪 Damage Boost', element: 'Fire' }); petsOwned.push({ name: 'Extra', rank: 'SSS', ability: '💪 Damage Boost', element: 'Fire' }); savePets();
+   equippedPets = []; for (var k = 0; k < 5; k++) equipPet(k);`);
+check(q(`equippedPets.length`) === 5 && (q(`(function(){ equipPet(5); return equippedPets.length; })()`) === 5), '5 normal pets: the 6th normal one does not fit');
+q(`giveBlueSlime(); giveCookie(); giveRolly(); giveMrBlob(); giveGumdrop(); giveSnowSlime(); giveGingersnap(); giveJingle(); giveFiggy(); giveSnowdrop();`);
+check(q(`equippedPets.length`) === 15 && q(`normalEquippedCount()`) === 5, 'every LIMITED pet still goes out with you — they do not count toward the 5', q(`equippedPets.length`) + ' out');
+check(q(`(function(){ var i = specialIdx('rolly'); equipPet(i); var off = equippedPets.indexOf(i) < 0; equipPet(i); return off && equippedPets.indexOf(i) > -1; })()`), 'you can take a LIMITED pet off and put it back even with 5 normal pets out');
+q(`openPetsScreen();`);
+check(/Battle Pets 5\/5[\s\S]*\+ 10 LIMITED/.test(q(`document.getElementById('pets-equipped').innerHTML`)), 'the label says 5/5 + 10 LIMITED (free)');
+q(`saveEquippedPet(); equippedPets = []; loadEquippedPet();`);
+check(q(`equippedPets.length`) === 15 && q(`petRuntime.length`) === 15, 'and they all stay out after a reload');
+q(`gameRunning = false; startGame(); waveIntroTimer = 0; for (var k = 0; k < 5; k++) update(); draw();`);
+check(q(`petRuntime.length`) === 15, 'a game runs with all of them out');
+
 // ---- Christmas pets have the powers ----
 reset();
 q(`gameRunning = false; startGame(); waveIntroTimer = 0; monsters = []; equippedPets = []; rebuildPetRuntime(); var i = giveJingle(); if (equippedPets.indexOf(i) < 0) { equippedPets.push(i); rebuildPetRuntime(); }`);

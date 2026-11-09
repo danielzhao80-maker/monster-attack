@@ -5944,7 +5944,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     const PETS_KEY = 'monster_city_pets';
     const EQUIPPED_PET_KEY = 'monster_city_equipped_pet';
     let petsOwned = []; // array of { name, rank, ability, element }
-    const MAX_EQUIPPED_PETS = 5;
+    const MAX_EQUIPPED_PETS = 5;   // normal pets — LIMITED (boss) pets don't count toward it
+    const isLimitedPet = (p) => !!p && p.rank === 'LIMITED';
+    const normalEquippedCount = () => equippedPets.filter(i => !isLimitedPet(petsOwned[i])).length;
+    const roomToEquip = (idx) => isLimitedPet(petsOwned[idx]) || normalEquippedCount() < MAX_EQUIPPED_PETS;
     const PET_OFFSETS = [
         { dx:-28, dy:  0 },
         { dx:-22, dy:-20 },
@@ -5962,7 +5965,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             const d = JSON.parse(localStorage.getItem(EQUIPPED_PET_KEY));
             if (!d) return;
             if (Array.isArray(d)) {
-                equippedPets = d.filter(i => Number.isInteger(i) && i >= 0 && i < petsOwned.length).slice(0, MAX_EQUIPPED_PETS);
+                // Up to 5 normal pets, plus every LIMITED pet you had out.
+                let normal = 0;
+                equippedPets = d.filter(i => Number.isInteger(i) && i >= 0 && i < petsOwned.length)
+                    .filter((i, k, a) => a.indexOf(i) === k && (isLimitedPet(petsOwned[i]) || ++normal <= MAX_EQUIPPED_PETS));
             } else if (typeof d === 'object' && d.name) {
                 // Migrate old single-pet save → matching index
                 const idx = petsOwned.findIndex(p => p.name===d.name && p.ability===d.ability && p.element===d.element);
@@ -5993,7 +5999,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             </span>`;
         }).join('');
         lbl.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;">
-            <span style="color:#6c5ce7;">Battle Pets ${equippedPets.length}/${MAX_EQUIPPED_PETS}</span>${chips}</div>`;
+            <span style="color:#6c5ce7;">Battle Pets ${normalEquippedCount()}/${MAX_EQUIPPED_PETS}${equippedPets.length > normalEquippedCount() ? ` <span style="color:${PET_RANK_COLORS.LIMITED};">+ ${equippedPets.length - normalEquippedCount()} LIMITED (free)</span>` : ''}</span>${chips}</div>`;
         // The canvases only exist once the HTML above is in the document, so draw them after.
         equippedPets.forEach((i, n) => {
             const p = petsOwned[i]; if (!p) return;
@@ -6008,7 +6014,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             equippedPets.splice(existing, 1);
             showStatus(`Unequipped ${petsOwned[idx].name}`, '#888');
         } else {
-            if (equippedPets.length >= MAX_EQUIPPED_PETS) { showStatus(`Max ${MAX_EQUIPPED_PETS} pets!`, '#ff6b6b'); return; }
+            if (!roomToEquip(idx)) { showStatus(`Max ${MAX_EQUIPPED_PETS} pets! (LIMITED pets don't count)`, '#ff6b6b'); return; }
             equippedPets.push(idx);
             SFX.pickup();
             const pet = petsOwned[idx];
@@ -6260,7 +6266,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                       ability: '🫧 Eat & Return', element: 'Ice', level: 1, color: '#4aa8ff', hat: '' };
         petsOwned.push(pet); savePets();
         const idx = petsOwned.length - 1;
-        if (equippedPets.length < MAX_EQUIPPED_PETS) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }
+        if (roomToEquip(idx)) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }   // LIMITED: always room
         return idx;
     }
     function drawBlueSlime(pet, c2, cx, cy, s) {
@@ -6430,7 +6436,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                       ability: '🦴 Corpse Eater', element: 'Fire', level: 1, corpses: 0 };
         petsOwned.push(pet); savePets();
         const idx = petsOwned.length - 1;
-        if (equippedPets.length < MAX_EQUIPPED_PETS) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }
+        if (roomToEquip(idx)) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }   // LIMITED: always room
         return idx;
     }
     function drawCookieDog(pet, c2, cx, cy, s) {   // (❄️ Gingersnap: gingerbread brown with white icing)
@@ -6568,7 +6574,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                       ability: '🛡️ Roll Block', element: 'Earth', level: 1, blocks: 0 };
         petsOwned.push(pet); savePets();
         const idx = petsOwned.length - 1;
-        if (equippedPets.length < MAX_EQUIPPED_PETS) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }
+        if (roomToEquip(idx)) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }   // LIMITED: always room
         return idx;
     }
     function drawRolly(pet, c2, cx, cy, s) {   // a pink-and-white candy swirl with a face
@@ -6641,7 +6647,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                       ability: '🍮 Pudding Gulp', element: 'Earth', level: 1 };
         petsOwned.push(pet); savePets();
         const idx = petsOwned.length - 1;
-        if (equippedPets.length < MAX_EQUIPPED_PETS) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }
+        if (roomToEquip(idx)) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }   // LIMITED: always room
         return idx;
     }
     function drawMrBlob(pet, c2, cx, cy, s) {   // a wobbly chocolate pudding with a cream top and a crown
@@ -6784,7 +6790,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function givePetSpecial(pet) {
         petsOwned.push(pet); savePets();
         const idx = petsOwned.length - 1;
-        if (equippedPets.length < MAX_EQUIPPED_PETS) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }
+        if (roomToEquip(idx)) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }   // LIMITED: always room
         return idx;
     }
     const giveGumdrop = () => givePetSpecial({ name: 'Gumdrop', nickname: 'Gumdrop', special: 'gumdrop', rank: 'LIMITED',
@@ -25061,7 +25067,7 @@ const col = b.color || BLDG_COLORS[0];
         renderPetsCollection();
         // Auto-equip if there is room — that's why the user is granting it
         let extra = '';
-        if (equippedPets.length < MAX_EQUIPPED_PETS) {
+        if (roomToEquip(newIdx)) {
             equipPet(newIdx);
             extra = ' (equipped!)';
         } else {

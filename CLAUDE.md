@@ -610,3 +610,5 @@ Built like Trick-or-Treat Street (STREET_WORLDS / onStreetMap(): road, gate, no 
 No houses to knock: hwCastleTick places the ice castle up the road at once and rides you there. enterCastle on the
 sleigh road skips the guards — an XM_CASTLE_BOSSES boss straight away; beating it DOUBLES your snowflakes
 (+max(wallet, 20), exact — no title bonus).
+LIMITED pets don't take a battle-pet slot: MAX_EQUIPPED_PETS (5) counts only normal pets (normalEquippedCount /
+roomToEquip); every LIMITED pet can be out on top. loadEquippedPet keeps 5 normal + every LIMITED one.
