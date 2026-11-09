@@ -288,6 +288,19 @@ check(sr.phase === 'boss' && sr.guards === 0 && sr.bossOk, 'inside: STRAIGHT to 
 check(sr.after - sr.before >= 37 && sr.after >= 2 * 37, 'beat it: your ❄️ snowflakes DOUBLE', sr.before + ' → ' + sr.after);
 check(sr.done && sr.locked, 'once a Christmas: then the road is done');
 check(q(`(function(){ localStorage.setItem(SLEIGH_DONE_KEY(), '0'); localStorage.removeItem(SLEIGH_DONE_KEY()); loadEvent(EVENTS.christmas); evWallet = 0; saveEvent(); return Math.max(evWallet, 20); })()`) === 20, 'with an empty bag you still get at least +20');
+// ---- 🗺️ the event maps in the Admin Panel, the Owner Panel and [U] ----
+check(/adminEventMap\('sleighroad'\)/.test(html) && /ownerEventMap\('sleighroad'\)/.test(html) && /unlockAction\('sleighroad'\)/.test(html) && /ownerEventMap\('trickstreet'\)/.test(html), 'the Admin Panel, the Owner Panel and [U] all have the 🗺️ event maps');
+q(`localStorage.removeItem(SANTA_KEY()); localStorage.setItem(SLEIGH_DONE_KEY(), '1'); localStorage.removeItem(ADMIN_LIMITS_KEY);`);
+check(q(`isWorldUnlocked(findWorld('sleighroad'))`) === false, '(not opened, and already ridden)');
+check(q(`ownerEventMap('sleighroad')`) === true && q(`isWorldUnlocked(findWorld('sleighroad'))`) === true, '👑 Owner Panel: 🛷 Santa\'s Sleigh Road opened and ready to ride again');
+const lim = JSON.parse(q(`JSON.stringify(['sleighroad', 'trickstreet', 'sleighroad'].map(adminEventMap))`));
+check(lim.join() === 'true,true,false', '🛠️ Admin Panel: 2 a day', JSON.stringify(lim));
+force('halloween'); q(`localStorage.setItem(STREET_DONE_KEY(), '1');`);
+check(q(`isWorldUnlocked(findWorld('trickstreet'))`) === false && q(`ownerEventMap('trickstreet')`) === true && q(`isWorldUnlocked(findWorld('trickstreet'))`) === true, '🏚️ Trick-or-Treat Street can be ridden again too');
+q(`localStorage.setItem('daniels-arcade-v1', JSON.stringify({ owned: ['owner'] }));`);
+force('christmas'); q(`localStorage.setItem(SLEIGH_DONE_KEY(), '1');`);
+check(q(`unlockAction('sleighroad')`) === true && q(`isWorldUnlocked(findWorld('sleighroad'))`) === true, '[U] Admin Unlocks: the same');
+q(`localStorage.setItem('daniels-arcade-v1', '{}'); localStorage.removeItem(ADMIN_LIMITS_KEY);`);
 q(`gameRunning = false; selectWorld('city');`);
 force(null);
 

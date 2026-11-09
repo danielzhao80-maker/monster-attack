@@ -612,3 +612,6 @@ sleigh road skips the guards — an XM_CASTLE_BOSSES boss straight away; beating
 (+max(wallet, 20), exact — no title bonus).
 LIMITED pets don't take a battle-pet slot: MAX_EQUIPPED_PETS (5) counts only normal pets (normalEquippedCount /
 roomToEquip); every LIMITED pet can be out on top. loadEquippedPet keeps 5 normal + every LIMITED one.
+🗺️ Event maps in the panels: openEventMap('sleighroad' | 'trickstreet') opens the sleigh road (SANTA_KEY) and/or
+clears the once-a-year done flag — [U] unlockAction, 🛠️ Admin Panel (adminEventMap, 2 a day: ADMIN_CAPS.maps),
+👑 Owner Panel (ownerEventMap, no limit). The maps still only show while their event is on.
