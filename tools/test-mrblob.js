@@ -161,7 +161,7 @@ const eat = JSON.parse(q(`(function(){ var eaten = 0, jumps = 0, n = 3000; for (
 check(eat.rate > 0.55 && eat.rate < 0.65, 'Mr Blob eats about 60% of the attacks aimed at you', JSON.stringify(eat));
 check(eat.jump > 0.16 && eat.jump < 0.24, '…and about 20% of the time he does the giant jump');
 const jump = JSON.parse(q(`(function(){ monsters = []; for (var k = 0; k < 6; k++) spawnMonster(); monsters.forEach(function(m){ m.hp = m.maxHp = 500; });
-  var b = monsters[0]; b.isBoss = true; b.hp = b.maxHp = 4000;
+  var b = monsters[0]; b.isBoss = true; b.hp = b.maxHp = 4000; monsters.forEach(function(m){ m.hasShield = true; m.shieldUp = true; });
   blobJumpNext = petsOwned[mrBlobIdx()]; update();
   var alive = monsters.filter(function(m){ return m.hp > 0 && !m.isBoss; }).length;
   return JSON.stringify({ alive: alive, bossHp: b.hp, big: petsOwned[mrBlobIdx()]._jumpT }); })()`));
@@ -175,7 +175,7 @@ reset();
 q(`gameRunning = false; startGame(); waveIntroTimer = 0; petsOwned = [{ name: 'Rat', rank: 'F', ability: '💪 Damage Boost', element: 'Fire' }]; savePets(); localStorage.setItem(BLOBS_KEY, '3');`);
 const bl = JSON.parse(q(`(function(){ var blocked = 0; for (var k = 0; k < 5; k++) { player.hp = player.maxHp = 1e9; player.invincible = 0; player.petDodge = 0; var h = player.hp; playerHit(5, player, 'x'); if (player.hp === h) blocked++; } return JSON.stringify({ blocked: blocked, left: itemCount(BLOBS_KEY) }); })()`));
 check(bl.blocked === 3 && bl.left === 0, 'each Blob blocks one attack, then it is used up', JSON.stringify(bl));
-check(q(`(function(){ localStorage.setItem(BLOBS_KEY, '1'); blobBlocks(player, function(){ return 0.05; }); return petLevel(petsOwned[0]); })()`) === 2, '10%: a Blob levels up one of your pets');
+check(q(`(function(){ petsOwned[0].level = 1; localStorage.setItem(BLOBS_KEY, '1'); blobBlocks(player, function(){ return 0.05; }); return petLevel(petsOwned[0]); })()`) === 2, '10%: a Blob levels up one of your pets');
 check(q(`(function(){ localStorage.setItem(BLOBS_KEY, '1'); blobBlocks(player, function(){ return 0.15; }); return petLevel(petsOwned[0]); })()`) === 2, '…and above 10% it does not');
 
 // ---- 🤝 Friendship: hold F → Mr Gum ----

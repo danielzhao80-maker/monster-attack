@@ -358,7 +358,7 @@
     </div>
     <!-- 🔓 ADMIN UNLOCK MENU — [U] in a game, like the God Survival menu but for unlocks, not buffs.
          Only for players who have opened the arcade's 🛠️ Admin Panel (see isArcadeAdmin). -->
-    <div id="unlock-menu" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:20px;padding:25px 30px;display:none;flex-direction:column;align-items:center;gap:8px;z-index:30;box-shadow:0 10px 40px rgba(0,0,0,0.3);border:4px solid #a55eea;min-width:320px;">
+    <div id="unlock-menu" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:20px;padding:25px 30px;display:none;flex-direction:column;align-items:center;gap:8px;z-index:30;box-shadow:0 10px 40px rgba(0,0,0,0.3);border:4px solid #a55eea;min-width:320px;max-height:90vh;overflow-y:auto;">
         <h2 style="font-family:'Fredoka One',cursive;font-size:1.6em;color:#8854d0;letter-spacing:2px;">🔓 Admin Unlocks</h2>
         <div style="color:#636e72;font-size:0.8em;font-weight:700;margin-bottom:8px;">Press [U] to close</div>
         <button class="god-btn" id="unlock-cur100" onclick="unlockAction('cur100')">🍬 +100 Candy</button>
@@ -368,6 +368,11 @@
         <button class="god-btn" onclick="unlockAction('floors')">🌀 All Backrooms floors (0–20)</button>
         <button class="god-btn" onclick="unlockAction('flesh')">🍖 +10,000 Flesh</button>
         <button class="god-btn" onclick="unlockAction('points')">🏆 +100 Points</button>
+        <div style="font-weight:800;color:#8854d0;font-size:0.85em;margin-top:6px;">🏰 Candy-castle boss loot</div>
+        <button class="god-btn" onclick="unlockAction('bosspets')">🐾 All boss pets (💧 🐕 🍥 🍮 🐻 👑)</button>
+        <button class="god-btn" onclick="unlockAction('bossitems')">🎒 Boss items (💎 🩸 🍪 🧱 🟤 💠 👑)</button>
+        <button class="god-btn" onclick="unlockAction('bossskills')">✨ Boss skills (🍪🐕 Cookie Dogs, 🤝 Friendship)</button>
+        <button class="god-btn" onclick="unlockAction('bosscosmetics')">🏅 Boss titles &amp; avatar (👑 🍥 🏅)</button>
         <div id="unlock-msg" style="min-height:1.2em;font-weight:800;color:#8854d0;font-size:0.85em;"></div>
     </div>
     <!-- 🍪🐕 The Cookie Dogs skill (Biscuit the Cerberus drops it): click to summon 5 cookie dogs -->
@@ -589,6 +594,8 @@
         <p style="color:#636e72;font-weight:700;font-size:0.85em;margin:6px 0 14px;text-align:center;max-width:480px;">Each egg hatches into a pet!<br>F (50%) · C (9%) · B (25%) · A (10%) · S (5%) · SSS (1%)</p>
         <div style="font-weight:800;color:#c44569;font-size:1.1em;margin-bottom:6px;" id="pets-flesh">🍖 0</div>
         <div style="font-weight:800;color:#6c5ce7;font-size:0.85em;margin-bottom:6px;" id="pets-items"></div>
+        <!-- 💠 Mrs Gum's Candy Combination Crystal: the 4 boss pets → the Candy Lord -->
+        <button id="pets-combine" onclick="combineCandyLord()" style="display:none;margin:0 0 8px;background:linear-gradient(180deg,#a55eea,#6c3483);color:#fff;border:2px solid #f1c40f;border-radius:20px;padding:6px 14px;font-family:'Fredoka One',cursive;cursor:pointer;">💠 Combine the 4 boss pets → 👑 Candy Lord</button>
         <div style="font-weight:700;color:#6c5ce7;font-size:0.85em;margin-bottom:14px;text-align:center;" id="pets-equipped">No battle pet equipped</div>
         <div style="display:flex;flex-direction:column;gap:10px;align-items:center;">
             <button class="btn" onclick="buyEggs(1)" style="background:linear-gradient(180deg,#fd79a8,#c44569);box-shadow:0 4px 0 #7d1f3d;padding:12px 28px;min-width:240px;">🥚 Buy 1 Egg — 50 🍖</button>
@@ -4486,7 +4493,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
     function addXP(n) {
         if (!n || n <= 0) return;
-        if (rollyOut()) n *= 1.2;   // 🍥 Rolly: +20% XP while it is out
+        { const pw = petWithPower('rolly'); if (pw) n *= 1 + 0.2 * pw.boost; }   // 🍥 Rolly: +20% XP while it is out (Candy Lord +36%)
         if (plevel >= MAX_PLAYER_LEVEL) return;
         showXpGain(Math.round(n));
         pxp += Math.round(n);
@@ -6107,8 +6114,23 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     const setItemCount = (k, n) => { try { localStorage.setItem(k, String(Math.max(0, n))); } catch (e) {} };
     const PET_MAX_LEVEL = 100;
     const petLevel = (p) => Math.min(PET_MAX_LEVEL, Math.max(1, (p && p.level) || 1));
-    // A pet's bolts hit 15% harder per level.
-    const petLevelMult = (p) => 1 + 0.15 * (petLevel(p) - 1);
+    // The candy-castle boss pets' powers. 🐻 Gumdrop has all of them; the 👑 Candy Lord has all of them +80%.
+    const PET_POWERS = { blueslime: ['slime'], cookie: ['cookie'], rolly: ['rolly'], mrblob: ['blob'],
+                         gumdrop: ['slime', 'cookie', 'rolly', 'blob'], candylord: ['slime', 'cookie', 'rolly', 'blob'] };
+    const petBoost = (p) => (p && p.special === 'candylord') ? 1.8 : 1;
+    const hasPower = (p, power) => !!(p && PET_POWERS[p.special] && PET_POWERS[p.special].indexOf(power) > -1);
+    // The strongest EQUIPPED pet with this power: { idx, slot, pet, boost } (or null).
+    function petWithPower(power) {
+        let best = null;
+        equippedPets.forEach((idx, slot) => {
+            const pet = petsOwned[idx];
+            if (hasPower(pet, power) && (!best || petBoost(pet) > best.boost)) best = { idx, slot, pet, boost: petBoost(pet) };
+        });
+        return best;
+    }
+    const ownsPower = (power) => petsOwned.some(p => hasPower(p, power));
+    // A pet's bolts hit 15% harder per level (the Candy Lord's another 80%).
+    const petLevelMult = (p) => (1 + 0.15 * (petLevel(p) - 1)) * petBoost(p);
     function levelUpPet(idx) {
         const p = petsOwned[idx]; if (!p) return false;
         if (petLevel(p) >= PET_MAX_LEVEL) { showStatus(`💎 Already at the top level (${PET_MAX_LEVEL})`, '#6c5ce7'); return false; }
@@ -6122,7 +6144,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     function renderPetItems() {
         const el = document.getElementById('pets-items'); if (!el) return;
-        el.textContent = `💎 Upgrade Crystals: ${itemCount(CRYSTAL_KEY)} · 🩸 Blood: ${itemCount(BLOOD_KEY)} (64 = a blood wall — B) · 🍪 Crumbles: ${itemCount(CRUMBLE_KEY)} (T) · 🧱 Candy Blocks: ${itemCount(CANDYBLOCK_KEY)} (C) · 🟤 Blobs: ${itemCount(BLOBS_KEY)}` + (hasCookieDogs() ? ' · 🍪🐕 Cookie Dogs skill' : '') + (hasFriendship() ? ' · 🤝 Friendship skill (hold F)' : '');
+        el.textContent = `💎 Upgrade Crystals: ${itemCount(CRYSTAL_KEY)} · 🩸 Blood: ${itemCount(BLOOD_KEY)} (64 = a blood wall — B) · 🍪 Crumbles: ${itemCount(CRUMBLE_KEY)} (T) · 🧱 Candy Blocks: ${itemCount(CANDYBLOCK_KEY)} (C) · 🟤 Blobs: ${itemCount(BLOBS_KEY)} · 💠 Combination Crystals: ${itemCount(COMBINE_KEY)} · 👑 Boss Summons: ${itemCount(BOSS_SUMMON_KEY)} (H)` + (hasCookieDogs() ? ' · 🍪🐕 Cookie Dogs skill' : '') + (hasFriendship() ? ' · 🤝 Friendship skill (hold F)' : '');
+        const cb = document.getElementById('pets-combine');
+        if (cb) cb.style.display = itemCount(COMBINE_KEY) > 0 && candyLordIdx() < 0 ? 'inline-block' : 'none';
     }
     // ---- the Little Blue Slime ----
     const SLIME_COLORS = [['Blue', '#4aa8ff'], ['Teal', '#2ed3c6'], ['Purple', '#a55eea'], ['Green', '#26de81'], ['Pink', '#ff6bcb'], ['Gold', '#f1c40f']];
@@ -6187,10 +6211,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // The slime's power: 20% to eat an attack aimed at you (when it is out with you).
     function blueSlimeEats(p, dmg, src) {
         if (p !== player) return false;
-        const idx = blueSlimeIdx(); if (idx < 0) return false;
-        const slot = equippedPets.indexOf(idx); if (slot < 0) return false;
-        if (Math.random() >= 0.2) return false;
-        const pet = petsOwned[idx], rt = petRuntime[slot] || { x: p.x, y: p.y };
+        const pw = petWithPower('slime'); if (!pw) return false;
+        if (Math.random() >= Math.min(0.9, 0.2 * pw.boost)) return false;
+        const pet = pw.pet, rt = petRuntime[pw.slot] || { x: p.x, y: p.y };
         pet.level = Math.min(PET_MAX_LEVEL, petLevel(pet) + 1); savePets();
         // …and fire it back at whoever sent it (or the nearest monster).
         let target = null, best = Infinity;
@@ -6202,7 +6225,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (target) {
             const a = Math.atan2(target.y - rt.y, target.x - rt.x);
             bullets.push({ x: rt.x, y: rt.y, vx: Math.cos(a) * 9, vy: Math.sin(a) * 9, life: 90,
-                           damage: Math.round(dmg * 2 + 4 * petLevel(pet)), color: pet.color || '#4aa8ff', petElement: 'Ice' });
+                           damage: Math.round((dmg * 2 + 4 * petLevel(pet)) * pw.boost), color: pet.color || '#4aa8ff', petElement: 'Ice' });
         }
         p.invincible = Math.max(p.invincible || 0, 20);
         showStatus(`💧 ${pet.nickname || 'Your slime'} ATE the attack! Lv.${petLevel(pet)} — and fired it back!`, '#4aa8ff');
@@ -6273,12 +6296,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     // A kill near Cookie: it eats the corpse. Every 3 corpses = +1 level.
     function cookieEats(m) {
-        const idx = cookieIdx(); if (idx < 0) return false;
-        const slot = equippedPets.indexOf(idx); if (slot < 0) return false;
-        const rt = petRuntime[slot]; if (!rt || Math.hypot(m.x - rt.x, m.y - rt.y) > 260) return false;
-        const pet = petsOwned[idx];
+        const pw = petWithPower('cookie'); if (!pw) return false;
+        const rt = petRuntime[pw.slot]; if (!rt || Math.hypot(m.x - rt.x, m.y - rt.y) > 260) return false;
+        const pet = pw.pet;
         pet.corpses = (pet.corpses || 0) + 1;
-        if (pet.corpses % 3 === 0 && petLevel(pet) < PET_MAX_LEVEL) {
+        if (pet.corpses % Math.max(1, Math.round(3 / pw.boost)) === 0 && petLevel(pet) < PET_MAX_LEVEL) {
             pet.level = petLevel(pet) + 1;
             showStatus(`🦴 ${pet.nickname || 'Cookie'} ate a corpse — Lv.${pet.level}!`, '#d4a373');
         }
@@ -6287,7 +6309,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         return true;
     }
     // 🍪🐕 The Cookie Dogs skill (its button shows in a game once you have it).
-    function cookieDogsPct() { return 0.3 + (cookieIdx() >= 0 ? 0.2 : 0); }
+    function cookieDogsPct() { return 0.3 + (ownsPower('cookie') ? 0.2 : 0); }
     function summonCookieDogs(p) {
         p = p || player;
         if (!p || !gameRunning || !hasCookieDogs()) return false;
@@ -6352,7 +6374,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     //   🍥 The Master of Rolls title 50% — an arcade title; owning it = +3% candy (every game)
     const CANDYBLOCK_KEY = 'monster_attack_candy_blocks', CANDYBLOCK_HP = 20;
     const rollyIdx = () => petsOwned.findIndex(p => p && p.special === 'rolly');
-    const rollyOut = () => { const i = rollyIdx(); return i >= 0 && equippedPets.indexOf(i) > -1; };
+    const rollyOut = () => !!petWithPower('rolly');
     function giveRolly() {
         const pet = { name: 'Rolly', nickname: 'Rolly', special: 'rolly', rank: 'S',
                       ability: '🛡️ Roll Block', element: 'Earth', level: 1, blocks: 0 };
@@ -6373,10 +6395,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     // An attack aimed at you: if Rolly is out, 40% it rolls in the way and blocks it.
     function rollyBlocks(p) {
-        if (p !== player || !rollyOut() || Math.random() >= 0.4) return false;
-        const idx = rollyIdx(), pet = petsOwned[idx], rt = petRuntime[equippedPets.indexOf(idx)] || p;
+        const pw = p === player ? petWithPower('rolly') : null;
+        if (!pw || Math.random() >= Math.min(0.9, 0.4 * pw.boost)) return false;
+        const pet = pw.pet, rt = petRuntime[pw.slot] || p;
         pet.blocks = (pet.blocks || 0) + 1;
-        if (pet.blocks % 5 === 0 && petLevel(pet) < PET_MAX_LEVEL) { pet.level = petLevel(pet) + 1; showStatus(`🍥 ${pet.nickname || 'Rolly'} levelled up blocking — Lv.${pet.level}!`, '#ff7eb6'); }
+        if (pet.blocks % Math.max(1, Math.round(5 / pw.boost)) === 0 && petLevel(pet) < PET_MAX_LEVEL) { pet.level = petLevel(pet) + 1; showStatus(`🍥 ${pet.nickname || 'Rolly'} levelled up blocking — Lv.${pet.level}!`, '#ff7eb6'); }
         savePets();
         p.invincible = Math.max(p.invincible || 0, 15);
         for (let i = 0; i < 6; i++) particles.push({ x: rt.x, y: rt.y, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, life: 14, maxLife: 14, color: i % 2 ? '#fff' : '#ff7eb6', r: 3 });
@@ -6447,6 +6470,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         pet._jumpT = 40;
         for (let i = monsters.length - 1; i >= 0; i--) {
             const m = monsters[i]; if (!m || m.hp <= 0) continue;
+            m.shieldUp = false;   // a giant pudding landing on you goes straight through a shield
             hitMonster(m, i, m.isBoss ? Math.ceil(m.maxHp * 0.25) : m.hp + 1);
         }
         addShake(22); SFX.scream && SFX.scream();
@@ -6456,11 +6480,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function mrBlobEats(p, rnd) {
         rnd = rnd || Math.random;
         if (p !== player) return false;
-        const idx = mrBlobIdx(); if (idx < 0 || equippedPets.indexOf(idx) < 0) return false;
-        if (rnd() >= 0.6) return false;
-        const pet = petsOwned[idx];
+        const pw = petWithPower('blob'); if (!pw) return false;
+        if (rnd() >= Math.min(0.9, 0.6 * pw.boost)) return false;
+        const pet = pw.pet;
         p.invincible = Math.max(p.invincible || 0, 15);
-        if (rnd() < 0.2) blobJumpNext = pet;   // done in friendshipTick, not mid-way through the monster loop
+        if (rnd() < 0.2 * pw.boost) blobJumpNext = pet;   // done in friendshipTick, not mid-way through the monster loop
         return true;
     }
     // 🟤 A Blob in your bag blocks the next attack (and is used up); 10% it levels up one of your pets.
@@ -6504,9 +6528,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (blobJumpNext) { const pet = blobJumpNext; blobJumpNext = null; mrBlobJump(pet); }
         if (fHeld >= 0 && ++fHeld === F_HOLD) summonMrGum(player);
     }
-    function makeGummyMesh3D() {   // 🧸 Mr Gum: a see-through red gummy bear
+    function makeGummyMesh3D(col) {   // 🧸 Mr Gum: a see-through red gummy bear (Gumdrop green, the Candy Lord purple)
+        col = col || 0xff4757;
         const g = new THREE.Group(), add = _summonParts(g);
-        const gum = _pf('gummy', () => new THREE.MeshStandardMaterial({ color: 0xff4757, roughness: 0.15, transparent: true, opacity: 0.85, emissive: 0x6b0010, emissiveIntensity: 0.3 }));
+        const gum = _pf('gummy|' + col, () => new THREE.MeshStandardMaterial({ color: col, roughness: 0.15, transparent: true, opacity: 0.85, emissive: new THREE.Color(col).multiplyScalar(0.25), emissiveIntensity: 0.3 }));
         const eye = _pf('pf-eyeb', () => new THREE.MeshStandardMaterial({ color: 0x14181f, roughness: 0.3 }));
         add(TG.Sphere(9, 14, 12), gum, 0, 12, 0, 'body', 1, 1.25, 0.9);
         add(TG.Sphere(6.5, 14, 12), gum, 0, 27, 0, 'head');
@@ -6528,6 +6553,97 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (rnd() < 0.40 && !hasFriendship()) { try { localStorage.setItem(FRIENDSHIP_KEY, '1'); } catch (e) {} got.push('🤝 the Friendship skill (hold F: Mr Gum)'); }
         if (rnd() < 0.60) { setItemCount(BLOBS_KEY, itemCount(BLOBS_KEY) + 3); got.push('🟤 3 Blobs (each blocks an attack)'); }
         if (got.length) setTimeout(() => showStatus('🍮 Mr Blob dropped: ' + got.join(' · '), '#c56b2c'), 1200);
+        return got;
+    }
+
+    // ======================== 🐻 MRS GUM'S LOOT: Gumdrop, the Candy Lord, Boss Summons ========================
+    // Beating Mrs Gum (the 1% candy-castle boss) rolls each drop on its own (mrsGumDrops):
+    //   🐻 Gumdrop 10% — a gummy-bear pet that does EVERYTHING the other boss pets do (PET_POWERS)
+    //   💠 Candy Combination Crystal 5% — in 🐾 Pets, fuses the 4 boss pets (Little Blue Slime, Cookie, Rolly,
+    //        Mr Blob) into the CANDY LORD, a titan with all four powers boosted 80%
+    //   💎 3 Upgrade Crystals 20%
+    //   👑 1 Boss Summon 40% — [H]: a random candy boss fights for you (50% of its boss stats, 30 s)
+    //   🍖 50000 flesh + 🪙 5 arcade points 50%
+    const COMBINE_KEY = 'monster_attack_combine_crystals', BOSS_SUMMON_KEY = 'monster_attack_boss_summons';
+    const BOSS_PET_SPECIALS = ['blueslime', 'cookie', 'rolly', 'mrblob'];
+    const gumdropIdx = () => petsOwned.findIndex(p => p && p.special === 'gumdrop');
+    const candyLordIdx = () => petsOwned.findIndex(p => p && p.special === 'candylord');
+    function givePetSpecial(pet) {
+        petsOwned.push(pet); savePets();
+        const idx = petsOwned.length - 1;
+        if (equippedPets.length < MAX_EQUIPPED_PETS) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }
+        return idx;
+    }
+    const giveGumdrop = () => givePetSpecial({ name: 'Gumdrop', nickname: 'Gumdrop', special: 'gumdrop', rank: 'S',
+                                               ability: '🍬 Every Candy Power', element: 'Earth', level: 1 });
+    function drawGummyBear(c2, cx, cy, s, col, edge, crown) {
+        c2.save(); c2.translate(cx, cy); c2.globalAlpha = 0.92;
+        c2.fillStyle = col; c2.strokeStyle = edge; c2.lineWidth = 1.3 * s;
+        for (const [x, y, r] of [[0, 5, 9], [0, -6, 6.5], [-5, -11, 2.6], [5, -11, 2.6], [-8, 3, 3.2], [8, 3, 3.2], [-5, 13, 3.4], [5, 13, 3.4]]) { c2.beginPath(); c2.arc(x * s, y * s, r * s, 0, Math.PI * 2); c2.fill(); c2.stroke(); }
+        c2.globalAlpha = 1; c2.fillStyle = '#14181f';
+        c2.beginPath(); c2.arc(-2.4 * s, -7 * s, 1.1 * s, 0, Math.PI * 2); c2.arc(2.4 * s, -7 * s, 1.1 * s, 0, Math.PI * 2); c2.fill();
+        if (crown) { c2.font = `${Math.round(9 * s)}px serif`; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText('👑', 0, -15 * s); c2.textBaseline = 'alphabetic'; }
+        c2.restore();
+    }
+    // 💠 The Candy Combination Crystal: the 4 boss pets → the Candy Lord (keeps the highest of their levels).
+    const canCombineCandyLord = () => itemCount(COMBINE_KEY) > 0 && candyLordIdx() < 0 && BOSS_PET_SPECIALS.every(sp => petsOwned.some(p => p && p.special === sp));
+    function combineCandyLord() {
+        if (!canCombineCandyLord()) {
+            showStatus(itemCount(COMBINE_KEY) < 1 ? '💠 You need a Candy Combination Crystal' : '💠 You need all 4 boss pets: 💧 Little Blue Slime, 🐕 Cookie, 🍥 Rolly, 🍮 Mr Blob', '#a55eea');
+            return false;
+        }
+        const idxs = BOSS_PET_SPECIALS.map(sp => petsOwned.findIndex(p => p && p.special === sp)).sort((a, b) => b - a);
+        const level = Math.max(...idxs.map(i => petLevel(petsOwned[i])));
+        for (const idx of idxs) {
+            petsOwned.splice(idx, 1);
+            equippedPets = equippedPets.filter(i => i !== idx).map(i => (i > idx ? i - 1 : i));
+        }
+        setItemCount(COMBINE_KEY, itemCount(COMBINE_KEY) - 1);
+        saveEquippedPet();
+        givePetSpecial({ name: 'Candy Lord', nickname: 'Candy Lord', special: 'candylord', rank: 'S',
+                         ability: '👑 Candy Titan (all powers +80%)', element: 'Fire', level });
+        if (player) applyPetAbility(player);
+        updatePetsEquippedLabel && updatePetsEquippedLabel();
+        renderPetsCollection && renderPetsCollection(); renderPetItems();
+        showStatus('💠 The four boss pets fuse… 👑 THE CANDY LORD RISES! (every power +80%)', '#f1c40f');
+        return true;
+    }
+    // 👑 [H]: a Boss Summon — a random candy boss fights for you with 50% of its boss stats, for 30 s.
+    function useBossSummon(p, pick) {
+        p = p || player; if (!p || !gameRunning) return false;
+        const have = itemCount(BOSS_SUMMON_KEY);
+        if (have < 1) { if (p === player) showStatus('👑 No Boss Summons left', '#f1c40f'); return false; }
+        const name = pick || CASTLE_BOSSES[Math.floor(Math.random() * CASTLE_BOSSES.length)][0];
+        const cls = MONSTER_CLASSES.find(c => c.name === name); if (!cls) return false;
+        const hp = Math.floor(cls.hp * 7 * (1 + (wave - 1) * 0.2) * (6 + wave * 0.3));
+        const dmg = Math.floor((cls.damage + Math.floor(wave / 3)) * 2);
+        setItemCount(BOSS_SUMMON_KEY, have - 1);
+        allies.push({ x: p.x + Math.cos(p.angle || 0) * 60, y: p.y + Math.sin(p.angle || 0) * 60, r: 22, speed: 2.4,
+                      damage: Math.max(1, Math.round(dmg * 0.5)), color: cls.color, hp: Math.round(hp * 0.5), maxHp: Math.round(hp * 0.5),
+                      life: 30 * 60, atkCd: 0, kind: 'candyboss', boss: name, emoji: cls.emoji, body: cls.body });
+        addShake(10); SFX.scream && SFX.scream();
+        showStatus(`👑 You summoned ${name.toUpperCase()} to fight for you! (${have - 1} summons left)`, '#f1c40f');
+        return true;
+    }
+    function addArcadePoints(n) {   // 🪙 play coins in the arcade wallet (every game shares it)
+        const add = (s) => { s.coins = (Number(s.coins) || 0) + n; };
+        try {
+            if (window.ArcadeShop && window.ArcadeShop.update) window.ArcadeShop.update(add);
+            else { const k = 'daniels-arcade-v1'; const s2 = JSON.parse(localStorage.getItem(k) || '{}'); add(s2); localStorage.setItem(k, JSON.stringify(s2)); }
+            return true;
+        } catch (e) { return false; }
+    }
+    // Beating Mrs Gum: each drop rolls on its own. (rnd is for tests.)
+    function mrsGumDrops(m, rnd) {
+        if (!m || !m.isBoss || !/Mrs Gum/.test(m.name || '')) return [];
+        rnd = rnd || Math.random;
+        const got = [];
+        if (rnd() < 0.10 && gumdropIdx() < 0) { giveGumdrop(); got.push('🐻 Gumdrop (every boss pet\'s power!)'); }
+        if (rnd() < 0.05) { setItemCount(COMBINE_KEY, itemCount(COMBINE_KEY) + 1); got.push('💠 a Candy Combination Crystal (🐾 Pets)'); }
+        if (rnd() < 0.20) { setItemCount(CRYSTAL_KEY, itemCount(CRYSTAL_KEY) + 3); got.push('💎 3 Upgrade Crystals'); }
+        if (rnd() < 0.40) { setItemCount(BOSS_SUMMON_KEY, itemCount(BOSS_SUMMON_KEY) + 1); got.push('👑 a Boss Summon (H)'); }
+        if (rnd() < 0.50) { addCoins(50000); addArcadePoints(5); got.push('🍖 50000 flesh + 🪙 5 arcade points'); }
+        if (got.length) setTimeout(() => showStatus('🐻 Mrs Gum dropped: ' + got.join(' · '), '#ff6b81'), 1200);
         return got;
     }
 
@@ -7316,6 +7432,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (pet.special === 'blueslime') { drawBlueSlime(pet, c2, cx, cy, s); return; }   // its own look (name, colour, hat)
         if (pet.special === 'cookie') { drawCookieDog(pet, c2, cx, cy, s); return; }        // 🐕 Cookie the Cerberus
         if (pet.special === 'rolly') { drawRolly(pet, c2, cx, cy, s); return; }             // 🍥 Rolly
+        if (pet.special === 'gumdrop') { drawGummyBear(c2, cx, cy, s, '#2ecc71', '#1e8449', false); return; }   // 🐻 Gumdrop
+        if (pet.special === 'candylord') { drawGummyBear(c2, cx, cy, s * 1.35, '#a55eea', '#f1c40f', true); return; }   // 👑 the Candy Lord
         if (pet.special === 'mrblob') { if (pet._jumpT > 0) pet._jumpT--; drawMrBlob(pet, c2, cx, cy, s); return; }   // 🍮 Mr Blob
         drawPet(pet.name, c2, cx, cy, s);
         // Element overlay decorations
@@ -9570,6 +9688,7 @@ const col = b.color || BLDG_COLORS[0];
             biscuitDrops(m);  // 🍪 Biscuit the Cerberus's loot (Cookie, Cookie Dogs, Crumbles, Cookie King)
             mrRollDrops(m);   // 🍬 Mr Roll's loot (Rolly, Candy Blocks, flesh, Master of Rolls)
             mrBlobDrops(m);   // 🍮 Mr Blob's loot (Mr Blob, Candy Grinding, Friendship, Blobs)
+            mrsGumDrops(m);   // 🐻 Mrs Gum's loot (Gumdrop, Combination Crystal, crystals, Boss Summon, flesh)
             cookieEats(m);    // 🦴 Cookie the Cerberus eats the corpse (if it is out and close)
             revengeOnKill(m);   // ⚔️ the Reaper that killed you last match — after the XP, so its banner wins
             if (player.cls.canCopy && bySelf) { player.copiedPower = true; player.copyTimer = 600; player.copySpeedBonus = 1.5; player.copiedMonsterName = m.name || ''; showStatus(`COPIED: ${m.name}`, '#ffeaa7'); }
@@ -16507,7 +16626,7 @@ const col = b.color || BLDG_COLORS[0];
     // (stamped where it is created) and gets its own drawing. Every one stands on a GREEN ring so a
     // kid can tell "mine" from "a monster" at a glance. Looks only: size, speed and damage are untouched.
     const SUMMON_KINDS = ['skeleton', 'wolf', 'clone', 'decoy', 'gangster', 'ghost'];
-    const SUMMON_EMOJI = { skeleton: '💀', wolf: '🐺', clone: '🥷', decoy: '🪞', gangster: '🕴️', ghost: '👻', cookiedog: '🍪', gum: '🧸' };
+    const SUMMON_EMOJI = { skeleton: '💀', wolf: '🐺', clone: '🥷', decoy: '🪞', gangster: '🕴️', ghost: '👻', cookiedog: '🍪', gum: '🧸', candyboss: '👑' };
     const FRIEND_COL = '#26de81';
     function summonKind(a) { return (a && SUMMON_EMOJI[a.kind]) ? a.kind : 'skeleton'; }
     function summonClass(a) {
@@ -16687,6 +16806,12 @@ const col = b.color || BLDG_COLORS[0];
         _friendRing2D(a.x, a.y, r);
         switch (kind) {
             case 'wolf':     _drawWolf2D(a, a.x, a.y, r, ang); break;
+            case 'candyboss': {   // 👑 a summoned candy boss: its emoji, big, with a gold ring
+                ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(a.x, a.y, r + 3, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = a.color || '#ff6b81'; ctx.beginPath(); ctx.arc(a.x, a.y, r, 0, Math.PI * 2); ctx.fill();
+                ctx.font = `${Math.round(r * 1.4)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(a.emoji || '👑', a.x, a.y); ctx.textBaseline = 'alphabetic';
+                break;
+            }
             case 'gum': {   // 🧸 Mr Gum: a red gummy bear
                 ctx.save(); ctx.translate(a.x, a.y); ctx.globalAlpha = 0.9;
                 ctx.fillStyle = '#ff4757'; ctx.strokeStyle = '#a4161a'; ctx.lineWidth = 1.5;
@@ -18892,6 +19017,16 @@ const col = b.color || BLDG_COLORS[0];
     function makePetMesh3D(pet) {
         const g = new THREE.Group();
         const r = 7;
+        if (pet && (pet.special === 'gumdrop' || pet.special === 'candylord')) {   // 🐻 a gummy bear (the Candy Lord: a big purple one with a gold crown)
+            const lord = pet.special === 'candylord';
+            const bear = makeGummyMesh3D(lord ? 0xa55eea : 0x2ecc71); bear.scale.setScalar(lord ? 0.62 : 0.4); g.add(bear);
+            if (lord) {
+                const gold = _pf('lord-gold', () => new THREE.MeshStandardMaterial({ color: 0xf1c40f, metalness: 0.8, roughness: 0.25, emissive: 0x6b4f00, emissiveIntensity: 0.4 }));
+                const crown = new THREE.Mesh(TG.Cylinder(3, 3.4, 2.4, 8, 1, true), gold); crown.position.y = 23; g.add(crown);
+            }
+            g.userData.head = bear;
+            return g;
+        }
         if (pet && pet.special === 'mrblob') {   // 🍮 Mr Blob: a chocolate pudding with cream and a cherry
             const choc = _pf('mrblob-choc', () => new THREE.MeshStandardMaterial({ color: 0x6b3a17, roughness: 0.25, metalness: 0.05 }));
             const cream = _pf('mrblob-cream', () => new THREE.MeshStandardMaterial({ color: 0xf8ecd4, roughness: 0.6 }));
@@ -19283,6 +19418,7 @@ const col = b.color || BLDG_COLORS[0];
         wolf:     () => makeWolfMesh3D(),
         cookiedog: () => makeWolfMesh3D('cookie'),
         gum:      () => makeGummyMesh3D(),
+        candyboss: a => { const b = makeBossMesh({ name: 'BOSS ' + (a.boss || ''), body: a.body, color: a.color, r: 26 }); return b || makeGummyMesh3D(); },
         clone:    a => makeCloneMesh3D(summonClass(a), false),
         decoy:    a => makeCloneMesh3D(summonClass(a), true),
         gangster: () => makeGangsterMesh3D(),
@@ -23124,6 +23260,25 @@ const col = b.color || BLDG_COLORS[0];
         else if (kind === 'floors') { FLOOR_IDS.forEach(unlockSpecialMap); say('🌀 All 21 Backrooms floors unlocked — Worlds → ⭐ Special Maps'); }
         else if (kind === 'flesh') { addCoins(10000); say('🍖 +10,000 flesh'); }
         else if (kind === 'points') { points += 100; savePoints(); say('🏆 +100 points'); }
+        // 🏰 The candy-castle bosses' loot (Slimy, Biscuit, Mr Roll, Mr Blob, Mrs Gum).
+        else if (kind === 'bosspets') {
+            const give = { blueslime: giveBlueSlime, cookie: giveCookie, rolly: giveRolly, mrblob: giveMrBlob, gumdrop: giveGumdrop,
+                           candylord: () => givePetSpecial({ name: 'Candy Lord', nickname: 'Candy Lord', special: 'candylord', rank: 'S', ability: '👑 Candy Titan (all powers +80%)', element: 'Fire', level: 1 }) };
+            const got = Object.keys(give).filter(sp => !petsOwned.some(p => p && p.special === sp));
+            got.forEach(sp => give[sp]());
+            say(got.length ? `🐾 +${got.length} boss pet${got.length === 1 ? '' : 's'} — see 🐾 Pets` : '🐾 You already have every boss pet');
+        }
+        else if (kind === 'bossitems') {
+            [[CRYSTAL_KEY, 10], [BLOOD_KEY, 640], [CRUMBLE_KEY, 10], [CANDYBLOCK_KEY, 10], [BLOBS_KEY, 10], [COMBINE_KEY, 1], [BOSS_SUMMON_KEY, 5]]
+                .forEach(([k, n]) => setItemCount(k, itemCount(k) + n));
+            say('🎒 +10 💎 crystals, +640 🩸 blood, +10 🍪 crumbles, +10 🧱 candy blocks, +10 🟤 blobs, +1 💠 combination crystal, +5 👑 boss summons');
+        }
+        else if (kind === 'bossskills') {
+            try { localStorage.setItem(COOKIEDOGS_KEY, '1'); localStorage.setItem(FRIENDSHIP_KEY, '1'); } catch (e) {}
+            refreshCookieDogsBtn();
+            say('✨ 🍪🐕 Cookie Dogs (its button) and 🤝 Friendship (hold F) unlocked');
+        }
+        else if (kind === 'bosscosmetics') { ['cookieking', 'rollmaster', 'candygrinder'].forEach(grantArcadeItem); say('🏅 Cookie King avatar, Master of Rolls and Master of Candy Grinding titles unlocked'); }
         else return false;
         SFX.pickup && SFX.pickup();
         refreshEventButton();
@@ -25550,6 +25705,7 @@ const col = b.color || BLDG_COLORS[0];
         if (k==='b' && gameRunning && !gamePaused && NET.mode !== 'client') { buildBloodWall(player); return; }   // 🩸 blood wall (64 blood)
         if (k==='t' && gameRunning && !gamePaused && NET.mode !== 'client') { throwCrumble(player); return; }     // 🍪 throw a Crumble
         if (k==='c' && gameRunning && !gamePaused && NET.mode !== 'client') { placeCandyBlock(player); return; }  // 🧱 a Candy Block
+        if (k==='h' && gameRunning && !gamePaused && NET.mode !== 'client') { useBossSummon(player); return; }    // 👑 a Boss Summon
         if (k==='v' && gameRunning) { cycleCameraMode(); return; }
         if (k==='f' && gameRunning) {
             if (hasFriendship() && !gamePaused) { if (!e.repeat && fHeld < 0) fHeld = 0; return; }   // 🤝 hold = Mr Gum, tap = fullscreen (on key up)

@@ -121,6 +121,7 @@ node tools/test-slimy.js index.html         # 🍮 Slimy's loot: Blue Slime pet,
 node tools/test-biscuit.js index.html        # 🍪 Biscuit's loot: Cookie pet, Cookie Dogs, Crumbles, Cookie King
 node tools/test-mrroll.js index.html        # 🍬 Mr Roll's loot: Rolly, Candy Blocks, Master of Rolls (+3% candy)
 node tools/test-mrblob.js index.html        # 🍮 Mr Blob's loot: Mr Blob pet, Candy Grinding, Friendship (hold F), Blobs
+node tools/test-mrsgum.js index.html        # 🐻 Mrs Gum's loot: Gumdrop, Candy Lord, Boss Summons; [U] boss loot
 node tools/test-events.js index.html        # 🎉 Halloween + Christmas events: dates, currency, bosses, decorations, pass, shop, codes
 ```
 
@@ -558,3 +559,19 @@ Friendship (`monster_attack_friendship` = '1'): holding F for F_HOLD (60 frames)
 With the skill, F is handled on keyup: a quick tap is still fullscreen.
 Candy titles stack: rollMasterCandy adds +3% (rollmaster) and +10% (candygrinder); ArcadeShop.halloween.winCandy too.
 Tests: tools/test-mrblob.js.
+
+### 🐻 Mrs Gum's loot (mrsGumDrops, on the boss kill) + boss pet powers
+Each rolls on its own: 🐻 Gumdrop pet 10% · 💠 Candy Combination Crystal (`monster_attack_combine_crystals`) 5% ·
+💎 3 Upgrade Crystals 20% · 👑 1 Boss Summon (`monster_attack_boss_summons`) 40% · 🍖 50000 flesh + 🪙 5 arcade play
+coins (addArcadePoints) 50%.
+Boss pet powers go through PET_POWERS / petWithPower(power) (the strongest EQUIPPED pet with it) / ownsPower:
+slime (blueSlimeEats), cookie (cookieEats, Cookie Dogs +20%), rolly (rollyBlocks, +XP), blob (mrBlobEats).
+Gumdrop (`special:'gumdrop'`) has all four; the Candy Lord (`special:'candylord'`) has all four with petBoost 1.8:
+chances ×1.8 (capped 90%), XP +36%, corpse/block levels faster, shots (petLevelMult) ×1.8.
+💠 combineCandyLord (the #pets-combine button in 🐾 Pets): uses a crystal, removes the 4 boss pets (blueslime,
+cookie, rolly, mrblob; equippedPets re-indexed like releasePet) and adds the Candy Lord at their best level. One only.
+👑 [H] useBossSummon: an ally `kind:'candyboss'` (a.boss, emoji, makeBossMesh in 3D) with 50% of that castle boss's
+stats this wave, for 30 s. mrBlobJump knocks shields down first (shieldUp = false).
+[U] Admin Unlocks (admins/owners) has 🏰 boss loot buttons: bosspets, bossitems, bossskills, bosscosmetics.
+The arcade's own Admin Panel lists every catalog item, so the boss titles/avatar are there already.
+Tests: tools/test-mrsgum.js.
