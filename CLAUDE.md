@@ -119,6 +119,7 @@ node tools/test-summons-look.js index.html  # summons: one 2D+3D look per kind, 
 node tools/test-special-maps.js index.html  # ⭐ Special Maps: lock/unlock, Backrooms run, save, City fallback
 node tools/test-slimy.js index.html         # 🍮 Slimy's loot: Blue Slime pet, Upgrade Crystals, blood walls
 node tools/test-biscuit.js index.html        # 🍪 Biscuit's loot: Cookie pet, Cookie Dogs, Crumbles, Cookie King
+node tools/test-mrroll.js index.html        # 🍬 Mr Roll's loot: Rolly, Candy Blocks, Master of Rolls (+3% candy)
 node tools/test-events.js index.html        # 🎉 Halloween + Christmas events: dates, currency, bosses, decorations, pass, shop, codes
 ```
 
@@ -533,3 +534,13 @@ start screen) → summonCookieDogs: 5 allies `kind:'cookiedog'` with 30% of your
 Cookie), 20 s life, 45 s cooldown (cookieDogsCd).
 Crumbles (`monster_attack_crumbles`): [T] throwCrumble → 25 damage within 55 px where it lands + a `kind:'cookie'`
 wall with 6 HP. Tests: tools/test-biscuit.js.
+
+### 🍬 Mr Roll's loot (mrRollDrops, on the boss kill)
+Each rolls on its own: 🍥 Rolly pet 10% · 🧱 10 Candy Blocks 30% · 🍖 3000 flesh + 3 Candy Blocks 40% ·
+🍥 Master of Rolls arcade title (`rollmaster`) 50%.
+Rolly is a pet with `special:'rolly'` (drawRolly / its own 3D candy roll). While it is out: playerHit → rollyBlocks,
+40% it blocks the hit (every 5 blocks = +1 level, cap 100), and addXP gives +20% XP.
+Candy Blocks (`monster_attack_candy_blocks`): [C] placeCandyBlock → a `kind:'candy'` wall with 20 HP (20 shots).
+Master of Rolls = +3% candy: addEventCur → rollMasterCandy (Halloween only, fractions carried in
+`monster_attack_rollmaster_carry`); the other games get it via ArcadeShop.halloween.winCandy (rollMaster()).
+Tests: tools/test-mrroll.js.

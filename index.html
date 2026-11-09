@@ -4486,6 +4486,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
     function addXP(n) {
         if (!n || n <= 0) return;
+        if (rollyOut()) n *= 1.2;   // 🍥 Rolly: +20% XP while it is out
         if (plevel >= MAX_PLAYER_LEVEL) return;
         showXpGain(Math.round(n));
         pxp += Math.round(n);
@@ -5067,7 +5068,17 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // pick), so every change re-reads storage first instead of writing a stale number back.
     function addEventCur(n, ev) {
         ev = ev || activeEvent(); if (!ev) return;
+        n = rollMasterCandy(n, ev);
         loadEvent(ev); evWallet += n; evEarned += n; saveEvent(); refreshEventButton();
+    }
+    // 🍥 The Master of Rolls title (Mr Roll's drop): +3% candy. The leftover fraction is carried over,
+    // so even +1 candy pickups add up (every ~33 candy gives 1 extra).
+    function rollMasterCandy(n, ev) {
+        if (!(n > 0) || !ev || ev.id !== 'halloween' || !arcadeOwns('rollmaster')) return n;
+        let carry = 0; try { carry = parseFloat(localStorage.getItem('monster_attack_rollmaster_carry')) || 0; } catch (e) {}
+        const extra = n * 0.03 + carry, whole = Math.floor(extra);
+        try { localStorage.setItem('monster_attack_rollmaster_carry', String(extra - whole)); } catch (e) {}
+        return n + whole;
     }
     loadEvent();
 
@@ -6110,7 +6121,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     function renderPetItems() {
         const el = document.getElementById('pets-items'); if (!el) return;
-        el.textContent = `💎 Upgrade Crystals: ${itemCount(CRYSTAL_KEY)} · 🩸 Blood: ${itemCount(BLOOD_KEY)} (64 = a blood wall — B) · 🍪 Crumbles: ${itemCount(CRUMBLE_KEY)} (T)` + (hasCookieDogs() ? ' · 🍪🐕 Cookie Dogs skill' : '');
+        el.textContent = `💎 Upgrade Crystals: ${itemCount(CRYSTAL_KEY)} · 🩸 Blood: ${itemCount(BLOOD_KEY)} (64 = a blood wall — B) · 🍪 Crumbles: ${itemCount(CRUMBLE_KEY)} (T) · 🧱 Candy Blocks: ${itemCount(CANDYBLOCK_KEY)} (C)` + (hasCookieDogs() ? ' · 🍪🐕 Cookie Dogs skill' : '');
     }
     // ---- the Little Blue Slime ----
     const SLIME_COLORS = [['Blue', '#4aa8ff'], ['Teal', '#2ed3c6'], ['Purple', '#a55eea'], ['Green', '#26de81'], ['Pink', '#ff6bcb'], ['Gold', '#f1c40f']];
@@ -6328,6 +6339,71 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (rnd() < 0.40 && !arcadeOwns('cookieking')) { grantArcadeItem('cookieking'); got.push('👑 the Cookie King avatar'); }
         if (got.length) setTimeout(() => showStatus('🍪 Biscuit dropped: ' + got.join(' · '), '#d4a373'), 1200);
         refreshCookieDogsBtn();
+        return got;
+    }
+
+    // ======================== 🍬 MR ROLL'S LOOT: Rolly, Candy Blocks, Master of Rolls ========================
+    // Beating Mr Roll (a candy-castle boss) rolls each drop on its own (mrRollDrops):
+    //   🍥 Rolly 10% — a little candy-roll pet: 40% it BLOCKS an attack aimed at you (every 5 blocks = +1 level),
+    //        and while it is out you earn 20% more XP
+    //   🧱 10 Candy Blocks 30% — [C] puts one down: a candy wall that takes 20 shots
+    //   🍖 3000 flesh + 3 Candy Blocks 40%
+    //   🍥 The Master of Rolls title 50% — an arcade title; owning it = +3% candy (every game)
+    const CANDYBLOCK_KEY = 'monster_attack_candy_blocks', CANDYBLOCK_HP = 20;
+    const rollyIdx = () => petsOwned.findIndex(p => p && p.special === 'rolly');
+    const rollyOut = () => { const i = rollyIdx(); return i >= 0 && equippedPets.indexOf(i) > -1; };
+    function giveRolly() {
+        const pet = { name: 'Rolly', nickname: 'Rolly', special: 'rolly', rank: 'S',
+                      ability: '🛡️ Roll Block', element: 'Earth', level: 1, blocks: 0 };
+        petsOwned.push(pet); savePets();
+        const idx = petsOwned.length - 1;
+        if (equippedPets.length < MAX_EQUIPPED_PETS) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }
+        return idx;
+    }
+    function drawRolly(pet, c2, cx, cy, s) {   // a pink-and-white candy swirl with a face
+        c2.save(); c2.translate(cx, cy);
+        c2.fillStyle = '#ff7eb6'; c2.strokeStyle = '#b8336a'; c2.lineWidth = 1.4 * s;
+        c2.beginPath(); c2.arc(0, 2 * s, 11 * s, 0, Math.PI * 2); c2.fill(); c2.stroke();
+        c2.strokeStyle = '#fff'; c2.lineWidth = 2.4 * s; c2.beginPath();
+        for (let t = 0; t < Math.PI * 5; t += 0.2) { const r = t * 0.65 * s; const x = Math.cos(t) * r, y = 2 * s + Math.sin(t) * r; t ? c2.lineTo(x, y) : c2.moveTo(x, y); }
+        c2.stroke();
+        c2.fillStyle = '#14181f'; c2.beginPath(); c2.arc(-3.5 * s, -1 * s, 1.2 * s, 0, Math.PI * 2); c2.arc(3.5 * s, -1 * s, 1.2 * s, 0, Math.PI * 2); c2.fill();
+        c2.restore();
+    }
+    // An attack aimed at you: if Rolly is out, 40% it rolls in the way and blocks it.
+    function rollyBlocks(p) {
+        if (p !== player || !rollyOut() || Math.random() >= 0.4) return false;
+        const idx = rollyIdx(), pet = petsOwned[idx], rt = petRuntime[equippedPets.indexOf(idx)] || p;
+        pet.blocks = (pet.blocks || 0) + 1;
+        if (pet.blocks % 5 === 0 && petLevel(pet) < PET_MAX_LEVEL) { pet.level = petLevel(pet) + 1; showStatus(`🍥 ${pet.nickname || 'Rolly'} levelled up blocking — Lv.${pet.level}!`, '#ff7eb6'); }
+        savePets();
+        p.invincible = Math.max(p.invincible || 0, 15);
+        for (let i = 0; i < 6; i++) particles.push({ x: rt.x, y: rt.y, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, life: 14, maxLife: 14, color: i % 2 ? '#fff' : '#ff7eb6', r: 3 });
+        return true;
+    }
+    // [C]: put down a Candy Block — a candy wall that takes 20 shots.
+    function placeCandyBlock(p) {
+        p = p || player; if (!p) return false;
+        const have = itemCount(CANDYBLOCK_KEY);
+        if (have < 1) { if (p === player) showStatus('🧱 No Candy Blocks left', '#ff7eb6'); return false; }
+        const wx = p.x + Math.cos(p.angle || 0) * 40, wy = p.y + Math.sin(p.angle || 0) * 40;
+        if (ptInBld(wx, wy, 15)) { if (p === player) showStatus('🧱 No room for a block there.', '#b2bec3'); return false; }
+        setItemCount(CANDYBLOCK_KEY, have - 1);
+        walls.push({ x: wx, y: wy, hp: CANDYBLOCK_HP, maxHp: CANDYBLOCK_HP, kind: 'candy' });
+        SFX.build && SFX.build();
+        if (p === player) showStatus(`🧱 Candy Block down! (takes 20 shots) — ${have - 1} left`, '#ff7eb6');
+        return true;
+    }
+    // Beating Mr Roll: each drop rolls on its own. (rnd is for tests.)
+    function mrRollDrops(m, rnd) {
+        if (!m || !m.isBoss || !/Mr Roll/.test(m.name || '')) return [];
+        rnd = rnd || Math.random;
+        const got = [];
+        if (rnd() < 0.10 && rollyIdx() < 0) { giveRolly(); got.push('🍥 Rolly (blocks attacks, +20% XP)'); }
+        if (rnd() < 0.30) { setItemCount(CANDYBLOCK_KEY, itemCount(CANDYBLOCK_KEY) + 10); got.push('🧱 10 Candy Blocks (C)'); }
+        if (rnd() < 0.40) { addCoins(3000); setItemCount(CANDYBLOCK_KEY, itemCount(CANDYBLOCK_KEY) + 3); got.push('🍖 3000 flesh + 🧱 3 Candy Blocks'); }
+        if (rnd() < 0.50 && !arcadeOwns('rollmaster')) { grantArcadeItem('rollmaster'); got.push('🍥 the Master of Rolls title (+3% candy)'); }
+        if (got.length) setTimeout(() => showStatus('🍬 Mr Roll dropped: ' + got.join(' · '), '#ff7eb6'), 1200);
         return got;
     }
 
@@ -7115,6 +7191,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Base pet
         if (pet.special === 'blueslime') { drawBlueSlime(pet, c2, cx, cy, s); return; }   // its own look (name, colour, hat)
         if (pet.special === 'cookie') { drawCookieDog(pet, c2, cx, cy, s); return; }        // 🐕 Cookie the Cerberus
+        if (pet.special === 'rolly') { drawRolly(pet, c2, cx, cy, s); return; }             // 🍥 Rolly
         drawPet(pet.name, c2, cx, cy, s);
         // Element overlay decorations
         if (pet.element) drawPetElementOverlay(pet.element, c2, cx, cy, s);
@@ -9366,6 +9443,7 @@ const col = b.color || BLDG_COLORS[0];
             eventOnKill(m);   // 🎉 event currency (candy / snowflakes) while an event is on
             slimyDrops(m);    // 🍮 Slimy the Jelly's loot (crystal, blood, the Little Blue Slime, flesh)
             biscuitDrops(m);  // 🍪 Biscuit the Cerberus's loot (Cookie, Cookie Dogs, Crumbles, Cookie King)
+            mrRollDrops(m);   // 🍬 Mr Roll's loot (Rolly, Candy Blocks, flesh, Master of Rolls)
             cookieEats(m);    // 🦴 Cookie the Cerberus eats the corpse (if it is out and close)
             revengeOnKill(m);   // ⚔️ the Reaper that killed you last match — after the XP, so its banner wins
             if (player.cls.canCopy && bySelf) { player.copiedPower = true; player.copyTimer = 600; player.copySpeedBonus = 1.5; player.copiedMonsterName = m.name || ''; showStatus(`COPIED: ${m.name}`, '#ffeaa7'); }
@@ -14204,6 +14282,7 @@ const col = b.color || BLDG_COLORS[0];
         if (p) p._lastHitBy = src || null;
         if (p === player && cheats.godMode) { p.invincible = 10; return; }
         if (blueSlimeEats(p, dmg, src)) return;   // 💧 the Little Blue Slime ate it (and fires it back)
+        if (rollyBlocks(p)) return;               // 🍥 Rolly rolled in the way and blocked it
         // Dodge chance (pets / weapon buffs) — avoid the hit entirely (capped at 80% so you're never invincible)
         if (p.petDodge && Math.random() < Math.min(0.8, p.petDodge)) {
             p.invincible = 20;
@@ -16495,6 +16574,16 @@ const col = b.color || BLDG_COLORS[0];
         const x0 = w.x - 15, y0 = w.y - 15;
         ctx.save();
         ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x0 + 3, y0 + 4, 30, 30);
+        if (w.kind === 'candy') {   // 🧱 a pink-and-white striped candy block with an HP bar (20 HP)
+            ctx.fillStyle = '#ff7eb6'; ctx.fillRect(x0, y0, 30, 30);
+            ctx.fillStyle = '#fff';
+            for (let k = -30; k < 30; k += 10) { ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, 30, 30); ctx.clip(); ctx.fillRect(x0 + k, y0, 4, 30); ctx.restore(); }
+            ctx.strokeStyle = '#b8336a'; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, 30, 30);
+            ctx.fillStyle = '#4a0f2a'; ctx.fillRect(x0, y0 + 33, 30, 4);
+            ctx.fillStyle = '#ffd1e6'; ctx.fillRect(x0, y0 + 33, 30 * Math.max(0, w.hp) / (w.maxHp || CANDYBLOCK_HP), 4);
+            ctx.restore();
+            return;
+        }
         if (w.kind === 'cookie') {   // 🍪 a big cookie wall with chocolate chips and an HP bar
             ctx.fillStyle = '#d4a373'; ctx.beginPath(); ctx.arc(w.x, w.y, 16, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = '#7b4a24'; ctx.lineWidth = 2; ctx.stroke();
@@ -18667,6 +18756,16 @@ const col = b.color || BLDG_COLORS[0];
     function makePetMesh3D(pet) {
         const g = new THREE.Group();
         const r = 7;
+        if (pet && pet.special === 'rolly') {   // 🍥 Rolly: a pink candy roll on its edge, white swirl stripes, eyes
+            const pink = _pf('rolly-pink', () => new THREE.MeshStandardMaterial({ color: 0xff7eb6, roughness: 0.35 }));
+            const white = _pf('rolly-white', () => new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 }));
+            const eyeB = _pf('pf-eyeb', () => new THREE.MeshStandardMaterial({ color: 0x14181f, roughness: 0.3 }));
+            const body = new THREE.Mesh(TG.Cylinder(r * 0.8, r * 0.8, r * 0.7, 20), pink); body.rotation.x = Math.PI / 2; body.position.y = r * 0.8; g.add(body);
+            for (const rr of [0.55, 0.3]) for (const sz of [-1, 1]) { const t = new THREE.Mesh(TG.Torus(r * rr, r * 0.06, 6, 20), white); t.position.set(0, r * 0.8, sz * r * 0.36); g.add(t); }
+            for (const sx of [-1, 1]) { const e = new THREE.Mesh(TG.Sphere(r * 0.1, 8, 6), eyeB); e.position.set(sx * r * 0.3, r * 1.0, r * 0.4); g.add(e); }
+            g.userData.head = body;
+            return g;
+        }
         if (pet && pet.special === 'cookie') {   // 🐕 Cookie the Cerberus: a cookie-coloured dog with three heads
             const dog = makeWolfMesh3D('cookie'); dog.scale.setScalar(0.62); g.add(dog);
             const cookieM = _pf('wolf-fur|cookie', () => new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.85 }));
@@ -19080,6 +19179,13 @@ const col = b.color || BLDG_COLORS[0];
     // riveted steel. A small green pennant on top says "ours".
     function makeWallMesh3D(kind) {
         const g = new THREE.Group(), add = _summonParts(g);
+        if (kind === 'candy') {   // 🧱 a pink block with white candy stripes round it
+            const pink = _pf('wall-candy', () => new THREE.MeshStandardMaterial({ color: 0xff7eb6, roughness: 0.3 }));
+            const white = _pf('wall-candy-w', () => new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 }));
+            add(TG.Box(30, 50, 30), pink, 0, 25, 0, 'block').receiveShadow = true;
+            for (const y of [8, 20, 32, 44]) add(TG.Box(31, 4, 31), white, 0, y, 0, 'stripe');
+            return g;
+        }
         if (kind === 'cookie') {   // 🍪 a giant cookie standing on its edge, chocolate chips on it
             const dough = _pf('wall-cookie', () => new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.9 }));
             const chip = _pf('wall-chip', () => new THREE.MeshStandardMaterial({ color: 0x4a2a10, roughness: 0.7 }));
@@ -25294,6 +25400,7 @@ const col = b.color || BLDG_COLORS[0];
         if (k==='u' && gameRunning) { toggleUnlockMenu(); return; }   // 🔓 admin unlocks (arcade admins only)
         if (k==='b' && gameRunning && !gamePaused && NET.mode !== 'client') { buildBloodWall(player); return; }   // 🩸 blood wall (64 blood)
         if (k==='t' && gameRunning && !gamePaused && NET.mode !== 'client') { throwCrumble(player); return; }     // 🍪 throw a Crumble
+        if (k==='c' && gameRunning && !gamePaused && NET.mode !== 'client') { placeCandyBlock(player); return; }  // 🧱 a Candy Block
         if (k==='v' && gameRunning) { cycleCameraMode(); return; }
         if (k==='f' && gameRunning) { toggleFullscreen(); return; }
         if (k==='m' && gameRunning) { _mpDiagOn = !_mpDiagOn; renderMpDiag(); return; }   // multiplayer diagnostics
