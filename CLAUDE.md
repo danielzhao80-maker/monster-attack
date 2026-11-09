@@ -118,6 +118,7 @@ node tools/test-world-styles.js index.html  # per-world architecture across all 
 node tools/test-summons-look.js index.html  # summons: one 2D+3D look per kind, mechanics unchanged
 node tools/test-special-maps.js index.html  # ⭐ Special Maps: lock/unlock, Backrooms run, save, City fallback
 node tools/test-slimy.js index.html         # 🍮 Slimy's loot: Blue Slime pet, Upgrade Crystals, blood walls
+node tools/test-biscuit.js index.html        # 🍪 Biscuit's loot: Cookie pet, Cookie Dogs, Crumbles, Cookie King
 node tools/test-events.js index.html        # 🎉 Halloween + Christmas events: dates, currency, bosses, decorations, pass, shop, codes
 ```
 
@@ -521,3 +522,14 @@ The slime is a pet with `special:'blueslime'`, `nickname`, `color`, `hat` (slime
 3D blob); while equipped, playerHit → blueSlimeEats: 20% it eats the hit, levels up and fires it back.
 Blood (`monster_attack_blood`): [B] builds a `kind:'blood'` wall with 10 HP for 64 blood (buildBloodWall).
 
+
+### 🍪 Biscuit the Cerberus's loot (biscuitDrops, on the boss kill)
+Each rolls on its own: 🐕 Cookie the Cerberus pet 10% · 🍪🐕 Cookie Dogs skill 20% · 🍪 10 Crumbles 30% ·
+👑 Cookie King arcade avatar (`cookieking` in arcade-shop.js) 40%.
+Cookie is a pet with `special:'cookie'` (drawCookieDog, 3D = makeWolfMesh3D('cookie') + 2 extra heads). Every kill
+calls cookieEats(m): if Cookie is out and within 260 px it eats the corpse; every 3 corpses = +1 level (cap 100).
+Cookie Dogs (`monster_attack_cookiedogs` = '1'): the #cookiedogs-btn button (shown only in a game, never over the
+start screen) → summonCookieDogs: 5 allies `kind:'cookiedog'` with 30% of your damage/max HP (50% if you own
+Cookie), 20 s life, 45 s cooldown (cookieDogsCd).
+Crumbles (`monster_attack_crumbles`): [T] throwCrumble → 25 damage within 55 px where it lands + a `kind:'cookie'`
+wall with 6 HP. Tests: tools/test-biscuit.js.

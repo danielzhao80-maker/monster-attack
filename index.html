@@ -370,6 +370,8 @@
         <button class="god-btn" onclick="unlockAction('points')">🏆 +100 Points</button>
         <div id="unlock-msg" style="min-height:1.2em;font-weight:800;color:#8854d0;font-size:0.85em;"></div>
     </div>
+    <!-- 🍪🐕 The Cookie Dogs skill (Biscuit the Cerberus drops it): click to summon 5 cookie dogs -->
+    <button id="cookiedogs-btn" onclick="summonCookieDogs()" style="display:none;position:fixed;right:18px;bottom:150px;z-index:25;background:linear-gradient(180deg,#d4a373,#7b4a24);border:3px solid #fff;color:#fff;padding:10px 16px;font-family:'Fredoka One',cursive;font-size:0.9em;border-radius:40px;cursor:pointer;box-shadow:0 4px 0 #4a2a10;">🍪🐕 Cookie Dogs</button>
     <button id="lb-btn" onclick="openLeaderboard()">Leaderboard</button>
     <button id="tut-btn" onclick="openTutorial()">Tutorial</button>
     <button id="season-quick-btn" onclick="openSeasonScreen()">🎟️ Season Pass</button>
@@ -3354,6 +3356,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         document.getElementById('mp-menu').style.display='none';
         document.getElementById('start-screen').style.display='flex';
         if (gameRunning) { transferBackpackOnLeave(); revengeRunEnd(null); gameRunning=false; cancelAnimationFrame(animFrame); }
+        { const cb = document.getElementById('cookiedogs-btn'); if (cb) cb.style.display = 'none'; }
     }
 
     // Public servers start themselves.
@@ -6107,7 +6110,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     function renderPetItems() {
         const el = document.getElementById('pets-items'); if (!el) return;
-        el.textContent = `💎 Upgrade Crystals: ${itemCount(CRYSTAL_KEY)} · 🩸 Blood: ${itemCount(BLOOD_KEY)} (64 = a blood wall — press B in a game)`;
+        el.textContent = `💎 Upgrade Crystals: ${itemCount(CRYSTAL_KEY)} · 🩸 Blood: ${itemCount(BLOOD_KEY)} (64 = a blood wall — B) · 🍪 Crumbles: ${itemCount(CRUMBLE_KEY)} (T)` + (hasCookieDogs() ? ' · 🍪🐕 Cookie Dogs skill' : '');
     }
     // ---- the Little Blue Slime ----
     const SLIME_COLORS = [['Blue', '#4aa8ff'], ['Teal', '#2ed3c6'], ['Purple', '#a55eea'], ['Green', '#26de81'], ['Pink', '#ff6bcb'], ['Gold', '#f1c40f']];
@@ -6219,6 +6222,112 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (rnd() < 0.30) { setItemCount(BLOOD_KEY, itemCount(BLOOD_KEY) + 64); got.push('🩸 64 blood (B = blood wall)'); }
         if (rnd() < 0.60) { addCoins(500); points += 5; savePoints(); got.push('🍖 500 flesh + 🏆 5 points'); }
         if (got.length) setTimeout(() => showStatus('🍮 Slimy dropped: ' + got.join(' · '), '#4aa8ff'), 1200);
+        return got;
+    }
+
+    // ======================== 🍪 BISCUIT'S LOOT: Cookie the Cerberus, Cookie Dogs, Crumbles ========================
+    // Beating Biscuit the Cerberus (a candy-castle boss) rolls each drop on its own (biscuitDrops):
+    //   🐕 Cookie the Cerberus 10% — a pet that EATS the corpses of monsters killed near it (every 3 = +1 level)
+    //   🍪🐕 Cookie Dogs 20% — a skill: click its button to summon 5 cookie dogs with 30% of your stats
+    //        (50% if Cookie is one of your pets); 45 s cooldown
+    //   🍪 10 Crumbles 30% — [T] throws one: it smashes (hurts monsters where it lands) into a cookie wall
+    //   👑 Cookie King avatar 40% — an arcade avatar (every game)
+    const CRUMBLE_KEY = 'monster_attack_crumbles', COOKIEDOGS_KEY = 'monster_attack_cookiedogs';
+    const COOKIEDOG_CD = 45 * 60, COOKIEDOG_LIFE = 20 * 60;
+    const cookieIdx = () => petsOwned.findIndex(p => p && p.special === 'cookie');
+    const hasCookieDogs = () => { try { return localStorage.getItem(COOKIEDOGS_KEY) === '1'; } catch (e) { return false; } };
+    let cookieDogsCd = 0;
+    function giveCookie() {
+        const pet = { name: 'Cookie the Cerberus', nickname: 'Cookie', special: 'cookie', rank: 'S',
+                      ability: '🦴 Corpse Eater', element: 'Fire', level: 1, corpses: 0 };
+        petsOwned.push(pet); savePets();
+        const idx = petsOwned.length - 1;
+        if (equippedPets.length < MAX_EQUIPPED_PETS) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }
+        return idx;
+    }
+    function drawCookieDog(pet, c2, cx, cy, s) {
+        c2.save(); c2.translate(cx, cy);
+        const cookie = '#d4a373', dark = '#7b4a24';
+        c2.fillStyle = cookie; c2.strokeStyle = dark; c2.lineWidth = 1.2 * s;
+        c2.beginPath(); c2.ellipse(0, 6 * s, 12 * s, 8 * s, 0, 0, Math.PI * 2); c2.fill(); c2.stroke();       // body
+        for (const [hx, hy] of [[-9, -5], [0, -8], [9, -5]]) {                                             // three heads
+            c2.fillStyle = cookie; c2.beginPath(); c2.arc(hx * s, hy * s, 5.2 * s, 0, Math.PI * 2); c2.fill(); c2.stroke();
+            c2.fillStyle = '#14181f'; c2.beginPath(); c2.arc((hx - 1.8) * s, (hy - 1) * s, 0.9 * s, 0, Math.PI * 2); c2.arc((hx + 1.8) * s, (hy - 1) * s, 0.9 * s, 0, Math.PI * 2); c2.fill();
+            c2.fillStyle = dark; c2.beginPath(); c2.arc(hx * s, (hy + 1.6) * s, 1 * s, 0, Math.PI * 2); c2.fill();
+        }
+        c2.fillStyle = dark;                                                                                // choc chips
+        for (const [x, y] of [[-6, 6], [3, 4], [6, 9], [-2, 10]]) { c2.beginPath(); c2.arc(x * s, y * s, 1.1 * s, 0, Math.PI * 2); c2.fill(); }
+        c2.restore();
+    }
+    // A kill near Cookie: it eats the corpse. Every 3 corpses = +1 level.
+    function cookieEats(m) {
+        const idx = cookieIdx(); if (idx < 0) return false;
+        const slot = equippedPets.indexOf(idx); if (slot < 0) return false;
+        const rt = petRuntime[slot]; if (!rt || Math.hypot(m.x - rt.x, m.y - rt.y) > 260) return false;
+        const pet = petsOwned[idx];
+        pet.corpses = (pet.corpses || 0) + 1;
+        if (pet.corpses % 3 === 0 && petLevel(pet) < PET_MAX_LEVEL) {
+            pet.level = petLevel(pet) + 1;
+            showStatus(`🦴 ${pet.nickname || 'Cookie'} ate a corpse — Lv.${pet.level}!`, '#d4a373');
+        }
+        savePets();
+        for (let i = 0; i < 6; i++) particles.push({ x: m.x, y: m.y, vx: (rt.x - m.x) * 0.04 + (Math.random() - 0.5) * 2, vy: (rt.y - m.y) * 0.04 + (Math.random() - 0.5) * 2, life: 20, maxLife: 20, color: '#d4a373', r: 3 });
+        return true;
+    }
+    // 🍪🐕 The Cookie Dogs skill (its button shows in a game once you have it).
+    function cookieDogsPct() { return 0.3 + (cookieIdx() >= 0 ? 0.2 : 0); }
+    function summonCookieDogs(p) {
+        p = p || player;
+        if (!p || !gameRunning || !hasCookieDogs()) return false;
+        if (cookieDogsCd > 0) { showStatus(`🍪🐕 Cookie Dogs ready in ${Math.ceil(cookieDogsCd / 60)}s`, '#d4a373'); return false; }
+        const pct = cookieDogsPct();
+        for (let i = 0; i < 5; i++) {
+            const a = (Math.PI * 2 / 5) * i;
+            allies.push({ x: p.x + Math.cos(a) * 55, y: p.y + Math.sin(a) * 55, r: 11, speed: 3.4,
+                          damage: Math.max(1, Math.round(p.damage * pct)), color: '#d4a373',
+                          hp: Math.max(5, Math.round(p.maxHp * pct)), maxHp: Math.max(5, Math.round(p.maxHp * pct)),
+                          life: COOKIEDOG_LIFE, atkCd: 0, kind: 'cookiedog' });
+        }
+        cookieDogsCd = COOKIEDOG_CD;
+        showStatus(`🍪🐕 5 Cookie Dogs! (${Math.round(pct * 100)}% of your stats${pct > 0.3 ? ' — Cookie\'s +20%' : ''})`, '#d4a373');
+        SFX.pickup && SFX.pickup();
+        refreshCookieDogsBtn();
+        return true;
+    }
+    function refreshCookieDogsBtn() {
+        const b = document.getElementById('cookiedogs-btn'); if (!b) return;
+        const menu = document.getElementById('start-screen');
+        const show = gameRunning && hasCookieDogs() && !(menu && menu.style.display === 'flex');   // never over the menu
+        b.style.display = show ? 'block' : 'none';
+        if (show) b.textContent = cookieDogsCd > 0 ? `🍪🐕 ${Math.ceil(cookieDogsCd / 60)}s` : '🍪🐕 Cookie Dogs';
+    }
+    // 🍪 [T]: throw a Crumble. It smashes where it lands (hurting monsters there) into a cookie wall.
+    function throwCrumble(p) {
+        p = p || player; if (!p) return false;
+        const have = itemCount(CRUMBLE_KEY);
+        if (have < 1) { if (p === player) showStatus('🍪 No Crumbles left', '#d4a373'); return false; }
+        let d = 150, x, y;
+        do { x = p.x + Math.cos(p.angle || 0) * d; y = p.y + Math.sin(p.angle || 0) * d; d -= 20; } while (d > 30 && (ptInBld(x, y, 15) || ptInWall(x, y, 15)));
+        if (ptInBld(x, y, 15)) { if (p === player) showStatus('🍪 No room to throw it there', '#b2bec3'); return false; }
+        setItemCount(CRUMBLE_KEY, have - 1);
+        for (let i = monsters.length - 1; i >= 0; i--) if (Math.hypot(monsters[i].x - x, monsters[i].y - y) < 55) hitMonster(monsters[i], i, 25);
+        walls.push({ x, y, hp: 6, maxHp: 6, kind: 'cookie' });
+        for (let i = 0; i < 14; i++) { const a = Math.random() * Math.PI * 2; particles.push({ x, y, vx: Math.cos(a) * 4, vy: Math.sin(a) * 4, life: 18, maxLife: 18, color: i % 2 ? '#d4a373' : '#7b4a24', r: 3 }); }
+        addShake(5);
+        if (p === player) showStatus(`🍪 CRUMBLE! A cookie wall (🍪 ${have - 1} left)`, '#d4a373');
+        return true;
+    }
+    // Beating Biscuit the Cerberus: each drop rolls on its own. (rnd is for tests.)
+    function biscuitDrops(m, rnd) {
+        if (!m || !m.isBoss || !/Biscuit the Cerberus/.test(m.name || '')) return [];
+        rnd = rnd || Math.random;
+        const got = [];
+        if (rnd() < 0.10 && cookieIdx() < 0) { giveCookie(); got.push('🐕 Cookie the Cerberus (a pet that eats corpses!)'); }
+        if (rnd() < 0.20 && !hasCookieDogs()) { try { localStorage.setItem(COOKIEDOGS_KEY, '1'); } catch (e) {} got.push('🍪🐕 the Cookie Dogs skill (click its button!)'); }
+        if (rnd() < 0.30) { setItemCount(CRUMBLE_KEY, itemCount(CRUMBLE_KEY) + 10); got.push('🍪 10 Crumbles (T to throw)'); }
+        if (rnd() < 0.40 && !arcadeOwns('cookieking')) { grantArcadeItem('cookieking'); got.push('👑 the Cookie King avatar'); }
+        if (got.length) setTimeout(() => showStatus('🍪 Biscuit dropped: ' + got.join(' · '), '#d4a373'), 1200);
+        refreshCookieDogsBtn();
         return got;
     }
 
@@ -7005,6 +7114,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         }
         // Base pet
         if (pet.special === 'blueslime') { drawBlueSlime(pet, c2, cx, cy, s); return; }   // its own look (name, colour, hat)
+        if (pet.special === 'cookie') { drawCookieDog(pet, c2, cx, cy, s); return; }        // 🐕 Cookie the Cerberus
         drawPet(pet.name, c2, cx, cy, s);
         // Element overlay decorations
         if (pet.element) drawPetElementOverlay(pet.element, c2, cx, cy, s);
@@ -9255,6 +9365,8 @@ const col = b.color || BLDG_COLORS[0];
             spawnPickup(m.x, m.y);
             eventOnKill(m);   // 🎉 event currency (candy / snowflakes) while an event is on
             slimyDrops(m);    // 🍮 Slimy the Jelly's loot (crystal, blood, the Little Blue Slime, flesh)
+            biscuitDrops(m);  // 🍪 Biscuit the Cerberus's loot (Cookie, Cookie Dogs, Crumbles, Cookie King)
+            cookieEats(m);    // 🦴 Cookie the Cerberus eats the corpse (if it is out and close)
             revengeOnKill(m);   // ⚔️ the Reaper that killed you last match — after the XP, so its banner wins
             if (player.cls.canCopy && bySelf) { player.copiedPower = true; player.copyTimer = 600; player.copySpeedBonus = 1.5; player.copiedMonsterName = m.name || ''; showStatus(`COPIED: ${m.name}`, '#ffeaa7'); }
             // Sikuna: every 10 kills spawns a Sikuna finger (up to 30 lifetime)
@@ -13042,6 +13154,8 @@ const col = b.color || BLDG_COLORS[0];
             if (p.poisoned % 30 === 0 && !p.cls.fireImmune && p.invincible <= 0) playerHit(1, p);
             if (p.poisoned === 0 && p===player) showStatus('POISON GONE', '#26de81');
         }
+        if (cookieDogsCd > 0) cookieDogsCd--;
+        if (cookieDogsCd % 60 === 0) refreshCookieDogsBtn();   // 🍪🐕 the button's countdown (and shows it)
         // Battle pets follow + elemental attacks (up to 5)
         for (let pi = 0; pi < equippedPets.length; pi++) {
             const pet = petsOwned[equippedPets[pi]]; if (!pet) continue;
@@ -16185,7 +16299,7 @@ const col = b.color || BLDG_COLORS[0];
     // (stamped where it is created) and gets its own drawing. Every one stands on a GREEN ring so a
     // kid can tell "mine" from "a monster" at a glance. Looks only: size, speed and damage are untouched.
     const SUMMON_KINDS = ['skeleton', 'wolf', 'clone', 'decoy', 'gangster', 'ghost'];
-    const SUMMON_EMOJI = { skeleton: '💀', wolf: '🐺', clone: '🥷', decoy: '🪞', gangster: '🕴️', ghost: '👻' };
+    const SUMMON_EMOJI = { skeleton: '💀', wolf: '🐺', clone: '🥷', decoy: '🪞', gangster: '🕴️', ghost: '👻', cookiedog: '🍪' };
     const FRIEND_COL = '#26de81';
     function summonKind(a) { return (a && SUMMON_EMOJI[a.kind]) ? a.kind : 'skeleton'; }
     function summonClass(a) {
@@ -16365,6 +16479,7 @@ const col = b.color || BLDG_COLORS[0];
         _friendRing2D(a.x, a.y, r);
         switch (kind) {
             case 'wolf':     _drawWolf2D(a, a.x, a.y, r, ang); break;
+            case 'cookiedog': _drawWolf2D(a, a.x, a.y, r, ang); ctx.font = `${Math.round(r * 1.1)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍪', a.x, a.y); ctx.textBaseline = 'alphabetic'; break;
             case 'clone':    _drawClone2D(a, a.x, a.y, r, ang, false); break;
             case 'decoy':    _drawClone2D(a, a.x, a.y, r, ang, true); break;
             case 'gangster': _drawGangster2D(a, a.x, a.y, r, ang); break;
@@ -16380,6 +16495,15 @@ const col = b.color || BLDG_COLORS[0];
         const x0 = w.x - 15, y0 = w.y - 15;
         ctx.save();
         ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x0 + 3, y0 + 4, 30, 30);
+        if (w.kind === 'cookie') {   // 🍪 a big cookie wall with chocolate chips and an HP bar
+            ctx.fillStyle = '#d4a373'; ctx.beginPath(); ctx.arc(w.x, w.y, 16, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#7b4a24'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = '#5d3a1a'; for (const [cx2, cy2] of [[-6, -4], [5, -6], [2, 5], [-4, 7], [8, 3]]) { ctx.beginPath(); ctx.arc(w.x + cx2, w.y + cy2, 2.2, 0, Math.PI * 2); ctx.fill(); }
+            ctx.fillStyle = '#3d2410'; ctx.fillRect(x0, y0 + 33, 30, 4);
+            ctx.fillStyle = '#f3dcb4'; ctx.fillRect(x0, y0 + 33, 30 * Math.max(0, w.hp) / (w.maxHp || 6), 4);
+            ctx.restore();
+            return;
+        }
         if (w.kind === 'blood') {   // 🩸 a glossy blood wall with an HP bar (10 HP)
             const g = ctx.createLinearGradient(x0, y0, x0 + 30, y0 + 30);
             g.addColorStop(0, '#ff4d4d'); g.addColorStop(0.5, '#b31217'); g.addColorStop(1, '#5a0005');
@@ -18543,6 +18667,13 @@ const col = b.color || BLDG_COLORS[0];
     function makePetMesh3D(pet) {
         const g = new THREE.Group();
         const r = 7;
+        if (pet && pet.special === 'cookie') {   // 🐕 Cookie the Cerberus: a cookie-coloured dog with three heads
+            const dog = makeWolfMesh3D('cookie'); dog.scale.setScalar(0.62); g.add(dog);
+            const cookieM = _pf('wolf-fur|cookie', () => new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.85 }));
+            for (const sx of [-1, 1]) { const h = new THREE.Mesh(TG.Sphere(3.1 * 0.62, 12, 10), cookieM); h.position.set(sx * 2.6, 12 * 0.62, 7.6 * 0.62); g.add(h); }
+            g.userData.head = dog;
+            return g;
+        }
         if (pet && pet.special === 'blueslime') {   // 💧 a wobbly see-through blob with eyes, in its chosen colour
             const col = _hex(pet.color || '#4aa8ff');
             const jelly = _pf('slime|' + col, () => new THREE.MeshStandardMaterial({ color: col, roughness: 0.15, metalness: 0.05, transparent: true, opacity: 0.82, emissive: col, emissiveIntensity: 0.18 }));
@@ -18786,11 +18917,13 @@ const col = b.color || BLDG_COLORS[0];
         return g;
     }
     // A real four-legged wolf: long body, four legs, a head with a snout, pointed ears, a bushy tail.
-    function makeWolfMesh3D() {
+    function makeWolfMesh3D(palette) {
         const g = new THREE.Group(), add = _summonParts(g);
-        const fur   = _pf('wolf-fur',   () => new THREE.MeshStandardMaterial({ color: 0x8a7d6b, roughness: 0.85 }));
-        const light = _pf('wolf-light', () => new THREE.MeshStandardMaterial({ color: 0xcfc2ad, roughness: 0.85 }));
-        const dark  = _pf('wolf-dark',  () => new THREE.MeshStandardMaterial({ color: 0x4a4038, roughness: 0.85 }));
+        // 'cookie' = the same dog baked: biscuit body, cream chest, chocolate-chip dark (Cookie Dogs, Cookie).
+        const ck = palette === 'cookie', key = ck ? '|cookie' : '';
+        const fur   = _pf('wolf-fur' + key,   () => new THREE.MeshStandardMaterial({ color: ck ? 0xd4a373 : 0x8a7d6b, roughness: 0.85 }));
+        const light = _pf('wolf-light' + key, () => new THREE.MeshStandardMaterial({ color: ck ? 0xf3dcb4 : 0xcfc2ad, roughness: 0.85 }));
+        const dark  = _pf('wolf-dark' + key,  () => new THREE.MeshStandardMaterial({ color: ck ? 0x5d3a1a : 0x4a4038, roughness: 0.85 }));
         const eye   = _pf('wolf-eye',   () => new THREE.MeshBasicMaterial({ color: 0xffd32a }));
         add(TG.Sphere(5, 14, 10), fur, 0, 8, 0, 'body', 0.78, 0.72, 1.5);
         add(TG.Sphere(3.6, 10, 8), dark, 0, 10.6, -0.5, 'saddle', 0.8, 0.4, 1.6);
@@ -18901,6 +19034,7 @@ const col = b.color || BLDG_COLORS[0];
     const SUMMON_BUILDERS = {
         skeleton: a => makeSkeletonMesh3D(a && a.color),
         wolf:     () => makeWolfMesh3D(),
+        cookiedog: () => makeWolfMesh3D('cookie'),
         clone:    a => makeCloneMesh3D(summonClass(a), false),
         decoy:    a => makeCloneMesh3D(summonClass(a), true),
         gangster: () => makeGangsterMesh3D(),
@@ -18946,6 +19080,13 @@ const col = b.color || BLDG_COLORS[0];
     // riveted steel. A small green pennant on top says "ours".
     function makeWallMesh3D(kind) {
         const g = new THREE.Group(), add = _summonParts(g);
+        if (kind === 'cookie') {   // 🍪 a giant cookie standing on its edge, chocolate chips on it
+            const dough = _pf('wall-cookie', () => new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.9 }));
+            const chip = _pf('wall-chip', () => new THREE.MeshStandardMaterial({ color: 0x4a2a10, roughness: 0.7 }));
+            const disc = add(TG.Cylinder(20, 20, 7, 24), dough, 0, 21, 0, 'block'); disc.rotation.x = Math.PI / 2;
+            for (const [cx2, cy2] of [[-8, 26], [6, 32], [3, 16], [-5, 12], [10, 22]]) add(TG.Sphere(2.2, 6, 5), chip, cx2, cy2, 4, 'chip');
+            return g;
+        }
         if (kind === 'blood') {   // 🩸 a glossy dark-red block
             const blood = _pf('wall-blood', () => new THREE.MeshStandardMaterial({ color: 0xa3111a, roughness: 0.18, metalness: 0.15, emissive: 0x3a0005, emissiveIntensity: 0.4 }));
             add(TG.Box(30, 50, 30), blood, 0, 25, 0, 'block').receiveShadow = true;
@@ -25072,7 +25213,7 @@ const col = b.color || BLDG_COLORS[0];
 
     function startGame() {
         if (!chosenClass) return;
-        brExit = null; evGift = null;
+        brExit = null; evGift = null; cookieDogsCd = 0; setTimeout(refreshCookieDogsBtn, 0);
         ensureWorldAllowed();
         if (isPlayerBanned(playerName)) { alert('You are BANNED! Contact an Admin or Owner.'); return; }
         document.getElementById('roll-screen').style.display = 'none';
@@ -25131,6 +25272,7 @@ const col = b.color || BLDG_COLORS[0];
         // you already carried out. The cap is the only thing that ever loses you any.
         transferBackpackOnLeave();
         SFX.gameOver();
+        { const cb = document.getElementById('cookiedogs-btn'); if (cb) cb.style.display = 'none'; }
         AMBIENCE.stop();   // the air goes out of the world with you
         if (NET.mode === 'single') deleteSave();
         if (NET.mode === 'single') addToLeaderboard(score, wave, chosenClass.name, chosenClass.emoji);
@@ -25151,6 +25293,7 @@ const col = b.color || BLDG_COLORS[0];
         if (k==='g' && gameRunning) { toggleGodMenu(); return; }
         if (k==='u' && gameRunning) { toggleUnlockMenu(); return; }   // 🔓 admin unlocks (arcade admins only)
         if (k==='b' && gameRunning && !gamePaused && NET.mode !== 'client') { buildBloodWall(player); return; }   // 🩸 blood wall (64 blood)
+        if (k==='t' && gameRunning && !gamePaused && NET.mode !== 'client') { throwCrumble(player); return; }     // 🍪 throw a Crumble
         if (k==='v' && gameRunning) { cycleCameraMode(); return; }
         if (k==='f' && gameRunning) { toggleFullscreen(); return; }
         if (k==='m' && gameRunning) { _mpDiagOn = !_mpDiagOn; renderMpDiag(); return; }   // multiplayer diagnostics
