@@ -183,8 +183,10 @@ const fightRes = JSON.parse(q(`(function(){ gameRunning = false; startGame(); wa
   return JSON.stringify({ rate: eaten / n, back: back, eaten: eaten, levels: petLevel(petsOwned[i]) - lv0 }); })()`));
 check(fightRes.rate > 0.16 && fightRes.rate < 0.24, 'the slime eats about 20% of the attacks aimed at you', JSON.stringify(fightRes));
 check(fightRes.back === fightRes.eaten, '…fires every one it eats back at the monster');
-check(fightRes.levels === Math.min(fightRes.eaten, 99), '…and levels itself up each time (up to level 100)', fightRes.levels + ' levels');
-check(q(`petLevel(petsOwned[blueSlimeIdx()])`) <= 100, 'pet levels stop at 100');
+check(fightRes.levels === Math.min(fightRes.eaten, 9), '…and levels itself up each time (up to level 10)', fightRes.levels + ' levels');
+check(q(`petLevel(petsOwned[blueSlimeIdx()])`) === 10 && q('PET_MAX_LEVEL') === 10, 'pet levels stop at 10');
+check(q(`(function(){ var i = blueSlimeIdx(); localStorage.setItem(CRYSTAL_KEY, '5'); var ok = levelUpPet(i); return ok + '/' + itemCount(CRYSTAL_KEY); })()`) === 'false/5', 'a crystal cannot push a pet past 10 (and is not used up)');
+check(q(`(function(){ petsOwned[blueSlimeIdx()].level = 57; savePets(); loadPets(); return petsOwned[blueSlimeIdx()].level; })()`) === 10, 'old saves with pets above 10 are brought down to 10');
 q(`equippedPets = []; rebuildPetRuntime();`);
 check(q(`(function(){ var n = 0; for (var k = 0; k < 300; k++) { player.hp = player.maxHp = 1e9; player.invincible = 0; var h = player.hp; playerHit(5, player, 'x'); if (player.hp === h) n++; } return n; })()`) === 0, 'it only helps while it is out with you');
 

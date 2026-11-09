@@ -6099,6 +6099,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                 // Backfill element on older saves
                 for (const inst of petsOwned) {
                     if (!inst.element) inst.element = ELEMENTS[Math.floor(Math.random()*ELEMENTS.length)].name;
+                    if (inst.level > 10) inst.level = 10;   // the pet level cap is 10 now (it used to be 100)
                 }
                 return;
             }
@@ -6132,7 +6133,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     const BLOOD_WALL_COST = 64, BLOOD_WALL_HP = 10;
     const itemCount = (k) => { try { return Math.max(0, parseInt(localStorage.getItem(k)) || 0); } catch (e) { return 0; } };
     const setItemCount = (k, n) => { try { localStorage.setItem(k, String(Math.max(0, n))); } catch (e) {} };
-    const PET_MAX_LEVEL = 100;
+    const PET_MAX_LEVEL = 10;   // pets level 1 → 10 (crystals, eating, blocking, corpses…)
     const petLevel = (p) => Math.min(PET_MAX_LEVEL, Math.max(1, (p && p.level) || 1));
     // The candy-castle boss pets' powers. 🐻 Gumdrop has all of them; the 👑 Candy Lord has all of them +80%.
     const PET_POWERS = { blueslime: ['slime'], cookie: ['cookie'], rolly: ['rolly'], mrblob: ['blob'],
@@ -7748,7 +7749,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             return `<div style="background:${equipped?'#fff7d6':'#fff'};border:3px solid ${c};border-radius:12px;padding:8px 10px;text-align:center;min-width:112px;${equipped?'box-shadow:0 0 12px '+c+';':''}">
                 <canvas id="pet-coll-${idx}" width="56" height="56" style="display:block;margin:0 auto;background:linear-gradient(135deg,${c}33,${c}11);border-radius:8px;"></canvas>
                 <div style="font-weight:800;font-size:0.78em;color:${c};margin-top:4px;">${p.rank}</div>
-                <div style="font-size:0.72em;color:#636e72;font-weight:700;">${p.special === 'blueslime' ? '💧 ' + (p.nickname || p.name) : p.name} <span style="color:#6c5ce7;">Lv.${petLevel(p)}</span></div>
+                <div style="font-size:0.72em;color:#636e72;font-weight:700;">${p.special === 'blueslime' ? '💧 ' + (p.nickname || p.name) : p.name} <span style="color:#6c5ce7;">Lv.${petLevel(p)}${petLevel(p) >= PET_MAX_LEVEL ? ' MAX' : ''}</span></div>
                 <div style="font-size:0.62em;color:#c44569;font-weight:700;margin-top:1px;">${p.ability}</div>
                 <div style="font-size:0.62em;color:${elem.color||'#636e72'};font-weight:700;">${elem.emoji} ${p.element||''}</div>
                 <button data-pet-idx="${idx}" onclick="equipPet(${idx})" style="margin-top:4px;background:linear-gradient(180deg,${c},${c}cc);border:none;color:#fff;padding:4px 10px;font-family:'Fredoka One',cursive;font-size:0.65em;cursor:pointer;border-radius:30px;letter-spacing:1px;">${equipped?'Unequip':'Equip'}</button>

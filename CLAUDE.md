@@ -519,7 +519,7 @@ telling Nullp about "treats" (widget) sets `monster_attack_hw_treat_<year>` = +1
 
 ### 🍮 Slimy the Jelly's loot (slimyDrops, on the boss kill)
 Each rolls on its own: 💧 Little Blue Slime 25% (owned already → 50% it levels up) · 💎 Upgrade Crystal 10% ·
-🩸 64 blood 30% · 🍖 500 flesh + 🏆 5 points 60%. Pets now have `level` (petLevel, cap PET_MAX_LEVEL 100; shots
+🩸 64 blood 30% · 🍖 500 flesh + 🏆 5 points 60%. Pets now have `level` (petLevel, cap PET_MAX_LEVEL 10; shots
 +15%/level, petLevelMult); a crystal (`monster_attack_upgrade_crystals`) levels any pet from the Pets screen.
 The slime is a pet with `special:'blueslime'`, `nickname`, `color`, `hat` (slime-modal; drawBlueSlime / its own
 3D blob); while equipped, playerHit → blueSlimeEats: 20% it eats the hit, levels up and fires it back.
@@ -530,7 +530,7 @@ Blood (`monster_attack_blood`): [B] builds a `kind:'blood'` wall with 10 HP for 
 Each rolls on its own: 🐕 Cookie the Cerberus pet 10% · 🍪🐕 Cookie Dogs skill 20% · 🍪 10 Crumbles 30% ·
 👑 Cookie King arcade avatar (`cookieking` in arcade-shop.js) 40%.
 Cookie is a pet with `special:'cookie'` (drawCookieDog, 3D = makeWolfMesh3D('cookie') + 2 extra heads). Every kill
-calls cookieEats(m): if Cookie is out and within 260 px it eats the corpse; every 3 corpses = +1 level (cap 100).
+calls cookieEats(m): if Cookie is out and within 260 px it eats the corpse; every 3 corpses = +1 level (cap 10).
 Cookie Dogs (`monster_attack_cookiedogs` = '1'): the #cookiedogs-btn button (shown only in a game, never over the
 start screen) → summonCookieDogs: 5 allies `kind:'cookiedog'` with 30% of your damage/max HP (50% if you own
 Cookie), 20 s life, 45 s cooldown (cookieDogsCd).
@@ -541,7 +541,7 @@ wall with 6 HP. Tests: tools/test-biscuit.js.
 Each rolls on its own: 🍥 Rolly pet 10% · 🧱 10 Candy Blocks 30% · 🍖 3000 flesh + 3 Candy Blocks 40% ·
 🍥 Master of Rolls arcade title (`rollmaster`) 50%.
 Rolly is a pet with `special:'rolly'` (drawRolly / its own 3D candy roll). While it is out: playerHit → rollyBlocks,
-40% it blocks the hit (every 5 blocks = +1 level, cap 100), and addXP gives +20% XP.
+40% it blocks the hit (every 5 blocks = +1 level, cap 10), and addXP gives +20% XP.
 Candy Blocks (`monster_attack_candy_blocks`): [C] placeCandyBlock → a `kind:'candy'` wall with 20 HP (20 shots).
 Master of Rolls = +3% candy: addEventCur → rollMasterCandy (Halloween only, fractions carried in
 `monster_attack_rollmaster_carry`); the other games get it via ArcadeShop.halloween.winCandy (rollMaster()).

@@ -160,7 +160,7 @@ check(q(`rollyOut()`), 'Rolly joins you as a pet');
 const blk = JSON.parse(q(`(function(){ var blocked = 0, n = 2000; for (var k = 0; k < n; k++) { player.hp = player.maxHp = 1e9; player.invincible = 0; player.petDodge = 0; var h = player.hp; playerHit(5, player, 'x'); if (player.hp === h) blocked++; }
   var p = petsOwned[rollyIdx()]; return JSON.stringify({ rate: blocked / n, blocks: p.blocks, lv: petLevel(p) }); })()`));
 check(blk.rate > 0.35 && blk.rate < 0.45, 'it blocks about 40% of the attacks aimed at you', JSON.stringify(blk));
-check(blk.lv === Math.min(100, 1 + Math.floor(blk.blocks / 5)), 'it levels up from blocking (every 5 blocks, up to 100)');
+check(blk.lv === Math.min(10, 1 + Math.floor(blk.blocks / 5)), 'it levels up from blocking (every 5 blocks, up to 10)');
 const xp = JSON.parse(q(`(function(){ plevel = 1; pxp = 0; addXP(100); var a = pxp; equippedPets = []; rebuildPetRuntime(); plevel = 1; pxp = 0; addXP(100); return JSON.stringify([a, pxp]); })()`));
 check(xp[0] === 120 && xp[1] === 100, 'while Rolly is out you get 20% more XP', JSON.stringify(xp));
 check(q(`(function(){ var n = 0; for (var k = 0; k < 300; k++) { player.hp = player.maxHp = 1e9; player.invincible = 0; var h = player.hp; playerHit(5, player, 'x'); if (player.hp === h) n++; } return n; })()`) === 0, 'it only blocks while it is out with you');
