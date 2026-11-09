@@ -861,6 +861,16 @@
             <div style="color:#888;font-size:0.72em;margin-top:4px;">Admin is capped at Lv.10. Setting a level does not grant its rewards.</div>
         </div>
         <div class="admin-section">
+            <h3>🏰 Candy-Castle Boss Loot <span class="cap-badge" id="cap-bossloot"></span></h3>
+            <div style="color:#aaa;font-size:0.72em;font-weight:700;margin-bottom:6px;">Slimy, Biscuit, Mr Roll, Mr Blob &amp; Mrs Gum's drops: pets 💧🐕🍥🍮🐻👑 · items 💎🩸🍪🧱🟤💠👑 · Cookie Dogs &amp; Friendship · Cookie King, Master of Rolls, Master of Candy Grinding</div>
+            <div class="admin-row" style="flex-wrap:wrap;">
+                <button class="admin-btn gold" onclick="adminBossLoot('bosspets')">🐾 All boss pets</button>
+                <button class="admin-btn" onclick="adminBossLoot('bossitems')">🎒 Boss items</button>
+                <button class="admin-btn green" onclick="adminBossLoot('bossskills')">✨ Boss skills</button>
+                <button class="admin-btn" onclick="adminBossLoot('bosscosmetics')">🏅 Boss titles &amp; avatar</button>
+            </div>
+        </div>
+        <div class="admin-section">
             <h3>Reset</h3>
             <div class="admin-row">
                 <button class="admin-btn red" onclick="adminResetCodes()">Reset All Codes</button>
@@ -1027,6 +1037,16 @@
                 <div class="admin-row" style="margin-top:4px;">
                     <button class="admin-btn red" onclick="adminClearPets()">Clear All Pets</button>
                 </div>
+            </div>
+        </div>
+        <div class="admin-section">
+            <h3>🏰 Candy-Castle Boss Loot <span class="nocap-badge">no limit</span></h3>
+            <div style="color:#aaa;font-size:0.72em;font-weight:700;margin-bottom:6px;">Slimy, Biscuit, Mr Roll, Mr Blob &amp; Mrs Gum's drops: pets 💧🐕🍥🍮🐻👑 · items 💎🩸🍪🧱🟤💠👑 · Cookie Dogs &amp; Friendship · Cookie King, Master of Rolls, Master of Candy Grinding</div>
+            <div class="admin-row" style="flex-wrap:wrap;">
+                <button class="admin-btn gold" onclick="ownerBossLoot('bosspets')">🐾 All boss pets</button>
+                <button class="admin-btn" onclick="ownerBossLoot('bossitems')">🎒 Boss items</button>
+                <button class="admin-btn green" onclick="ownerBossLoot('bossskills')">✨ Boss skills</button>
+                <button class="admin-btn" onclick="ownerBossLoot('bosscosmetics')">🏅 Boss titles &amp; avatar</button>
             </div>
         </div>
         <div class="admin-section">
@@ -23260,8 +23280,19 @@ const col = b.color || BLDG_COLORS[0];
         else if (kind === 'floors') { FLOOR_IDS.forEach(unlockSpecialMap); say('🌀 All 21 Backrooms floors unlocked — Worlds → ⭐ Special Maps'); }
         else if (kind === 'flesh') { addCoins(10000); say('🍖 +10,000 flesh'); }
         else if (kind === 'points') { points += 100; savePoints(); say('🏆 +100 points'); }
-        // 🏰 The candy-castle bosses' loot (Slimy, Biscuit, Mr Roll, Mr Blob, Mrs Gum).
-        else if (kind === 'bosspets') {
+        else if (BOSS_LOOT_KINDS.indexOf(kind) > -1) say(giveBossLoot(kind));
+        else return false;
+        SFX.pickup && SFX.pickup();
+        refreshEventButton();
+        return true;
+    }
+    // 🏰 The candy-castle bosses' loot (Slimy, Biscuit, Mr Roll, Mr Blob, Mrs Gum) — for [U] Admin Unlocks,
+    // the Admin Panel (once a day each: ADMIN_CAPS.bossloot) and the Owner Panel (no limit). Returns a message.
+    const BOSS_LOOT_KINDS = ['bosspets', 'bossitems', 'bossskills', 'bosscosmetics'];
+    function giveBossLoot(kind) {
+        let msg = '';
+        const say = (t) => { msg = t; };
+        if (kind === 'bosspets') {
             const give = { blueslime: giveBlueSlime, cookie: giveCookie, rolly: giveRolly, mrblob: giveMrBlob, gumdrop: giveGumdrop,
                            candylord: () => givePetSpecial({ name: 'Candy Lord', nickname: 'Candy Lord', special: 'candylord', rank: 'S', ability: '👑 Candy Titan (all powers +80%)', element: 'Fire', level: 1 }) };
             const got = Object.keys(give).filter(sp => !petsOwned.some(p => p && p.special === sp));
@@ -23279,10 +23310,18 @@ const col = b.color || BLDG_COLORS[0];
             say('✨ 🍪🐕 Cookie Dogs (its button) and 🤝 Friendship (hold F) unlocked');
         }
         else if (kind === 'bosscosmetics') { ['cookieking', 'rollmaster', 'candygrinder'].forEach(grantArcadeItem); say('🏅 Cookie King avatar, Master of Rolls and Master of Candy Grinding titles unlocked'); }
-        else return false;
-        SFX.pickup && SFX.pickup();
-        refreshEventButton();
-        return true;
+        renderPetItems();
+        return msg;
+    }
+    function adminBossLoot(kind) {   // 🛠️ Admin Panel: 4 a day (ADMIN_CAPS.bossloot)
+        if (BOSS_LOOT_KINDS.indexOf(kind) < 0 || !adminTrySpend('bossloot', 1)) return false;
+        adminMsg(giveBossLoot(kind) + ` · ${adminLeftToday('bossloot')} left today`);
+        SFX.pickup && SFX.pickup(); return true;
+    }
+    function ownerBossLoot(kind) {   // 👑 Owner Panel: no limit
+        if (BOSS_LOOT_KINDS.indexOf(kind) < 0) return false;
+        adminMsg(giveBossLoot(kind));
+        SFX.pickup && SFX.pickup(); return true;
     }
 
     function togglePause() {
@@ -24088,7 +24127,6 @@ const col = b.color || BLDG_COLORS[0];
         'FREEROLL':   { reward: 'coins', amount: 200, msg: 'Free Roll! +200 Rotten Flesh!' },
         'THANKSFORJOINING': { reward: 'coins', amount: 300, msg: '+300 Rotten Flesh! Thanks for joining! Rotten Flesh!' },
         'NOP2WGAMES': { reward: 'panel', msg: 'Admin Panel unlocked!' },
-        'CROWNKEEPER67': { reward: 'ownerpanel', msg: '👑 OWNER PANEL unlocked — no limits!' },
         'RESET': { reward: 'resetcodes', msg: 'All codes reset!' },
         '6767': { reward: 'mythical', amount: 100, msg: 'MYTHICAL + 100 Points!' },
         'MOVES': { reward: 'move', msg: 'Pick a class, then pick Z or X to unlock!' },
@@ -24194,6 +24232,16 @@ const col = b.color || BLDG_COLORS[0];
         location.reload();
     }
 
+    // 👑 The Owner Panel code is NOT written here (this page is public on GitHub) — only its hash is.
+    const OWNER_CODE_HASH = '1nzwpznwvfj';
+    const OWNER_REWARD = { reward: 'ownerpanel', msg: '👑 OWNER PANEL unlocked — no limits!' };
+    function codeHash(str, seed = 67) {   // cyrb53: a quick one-way hash
+        let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+        for (let i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+        h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507); h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507); h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+        return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+    }
     function redeemCode() {
         const input = document.getElementById('code-input');
         const msgEl = document.getElementById('code-msg');
@@ -24202,7 +24250,7 @@ const col = b.color || BLDG_COLORS[0];
 
         if (!code) { msgEl.style.color = '#636e72'; msgEl.textContent = 'Enter a code!'; return; }
 
-        const reward = CODES[code];
+        const reward = CODES[code] || (codeHash(code) === OWNER_CODE_HASH ? OWNER_REWARD : undefined);
         const usesToday = getCodeUsesToday(code);
         // The Owner Panel code just opens a panel — it isn't a reward, so the 10/day limit would
         // only serve to lock the Owner out of their own panel. Exempt it.
@@ -24222,7 +24270,7 @@ const col = b.color || BLDG_COLORS[0];
             if (usesToday > 0) { msgEl.style.color = '#ff6b6b'; msgEl.textContent = '🎃 Already used today — try tomorrow!'; return; }
         }
 
-        markCodeUsed(code);
+        if (reward.reward !== 'ownerpanel') markCodeUsed(code);   // the owner code is never saved anywhere
         SFX.rollResult('legendary');
 
         if (reward.reward === 'coins') {
@@ -24785,7 +24833,7 @@ const col = b.color || BLDG_COLORS[0];
 
     // ======================== OWNER PANEL ========================
     // Same actions as the Admin Panel plus everything the Admin Panel doesn't get — all uncapped.
-    // Unlocked with the CROWNKEEPER67 code (exempt from the 10-uses-per-day code limit).
+    // Unlocked with the owner code (only its hash is in this file: OWNER_CODE_HASH; exempt from the 10/day limit).
     function openOwnerPanel() {
         document.getElementById('admin-panel').style.display = 'none';
         document.getElementById('start-screen').style.display = 'none';
@@ -24892,8 +24940,8 @@ const col = b.color || BLDG_COLORS[0];
     // The Admin Panel is rate-limited per day. The Owner Panel runs the SAME actions with no cap —
     // every owner*() function below is just the admin one called with unlimited=true.
     const ADMIN_LIMITS_KEY = 'monster_city_admin_limits';
-    const ADMIN_CAPS   = { flesh:500, points:500, classes:25, xp:100, abilities:1, pets:50 };
-    const ADMIN_CAP_LBL= { flesh:'🍖 Flesh', points:'🏆 Points', classes:'Class unlocks', xp:'Season XP', abilities:'Ability upgrades', pets:'Pets' };
+    const ADMIN_CAPS   = { flesh:500, points:500, classes:25, xp:100, abilities:1, pets:50, bossloot:4 };
+    const ADMIN_CAP_LBL= { flesh:'🍖 Flesh', points:'🏆 Points', classes:'Class unlocks', xp:'Season XP', abilities:'Ability upgrades', pets:'Pets', bossloot:'🏰 Boss loot' };
     function loadAdminLimits() {
         try {
             const d = JSON.parse(localStorage.getItem(ADMIN_LIMITS_KEY) || '{}');

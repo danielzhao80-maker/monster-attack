@@ -572,6 +572,10 @@ chances ×1.8 (capped 90%), XP +36%, corpse/block levels faster, shots (petLevel
 cookie, rolly, mrblob; equippedPets re-indexed like releasePet) and adds the Candy Lord at their best level. One only.
 👑 [H] useBossSummon: an ally `kind:'candyboss'` (a.boss, emoji, makeBossMesh in 3D) with 50% of that castle boss's
 stats this wave, for 30 s. mrBlobJump knocks shields down first (shieldUp = false).
-[U] Admin Unlocks (admins/owners) has 🏰 boss loot buttons: bosspets, bossitems, bossskills, bosscosmetics.
+giveBossLoot(kind) (bosspets, bossitems, bossskills, bosscosmetics) is shared by [U] Admin Unlocks, the 🛠️ Admin Panel
+(adminBossLoot, 4 a day: ADMIN_CAPS.bossloot) and the 👑 Owner Panel (ownerBossLoot, no limit).
+The Owner Panel code is NOT in the source: only OWNER_CODE_HASH (cyrb53 codeHash of the upper-cased code, seed 67);
+redeemCode checks it after CODES and never saves it to the used-codes list. Run test-mrsgum.js with OWNER_CODE=... to
+check the real code. Never write the code itself into this repo (it is public).
 The arcade's own Admin Panel lists every catalog item, so the boss titles/avatar are there already.
 Tests: tools/test-mrsgum.js.

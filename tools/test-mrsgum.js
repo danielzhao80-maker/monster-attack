@@ -206,5 +206,25 @@ q(`localStorage.setItem('daniels-arcade-v1', '{}'); petsOwned = [];`);
 check(q(`unlockAction('bosspets')`) === false && q(`petsOwned.length`) === 0, 'not for players who are not admins or owners');
 check(/mrsGumDrops\(m\)/.test(code), 'every kill is checked');
 
+// ---- 🛠️ Admin Panel (4 a day) and 👑 Owner Panel (no limit) ----
+reset();
+q(`localStorage.removeItem(ADMIN_LIMITS_KEY)`);
+check(/adminBossLoot\('bosspets'\)/.test(html) && /ownerBossLoot\('bosscosmetics'\)/.test(html) && /id="cap-bossloot"/.test(html), 'both panels have a 🏰 boss loot section');
+const ad = JSON.parse(q(`(function(){ var r = ['bosspets', 'bossitems', 'bossskills', 'bosscosmetics', 'bossitems'].map(adminBossLoot); return JSON.stringify({ r: r, summons: itemCount(BOSS_SUMMON_KEY), pets: petsOwned.length, msg: document.getElementById('admin-msg').textContent }); })()`));
+check(ad.r.join() === 'true,true,true,true,false' && ad.summons === 5 && ad.pets === 6, 'Admin Panel: boss loot, 4 a day', JSON.stringify(ad));
+check(/Daily limit/.test(ad.msg), '…then it says the daily limit is reached');
+check(q(`ownerBossLoot('bossitems') && ownerBossLoot('bossitems') && ownerBossLoot('bossitems')`) && q(`itemCount(BOSS_SUMMON_KEY)`) === 20, 'Owner Panel: no limit');
+q(`localStorage.removeItem(ADMIN_LIMITS_KEY)`);
+
+// ---- 👑 the owner code: only its hash is in the page ----
+check(!/CROWNKEEPER67/.test(html) && /OWNER_CODE_HASH = '[0-9a-z]+'/.test(code), 'the old public code is gone; only a hash of the owner code is in the page');
+const tryCode = (c) => q(`(function(){ var opened = false; var keep = openOwnerPanel; openOwnerPanel = function(){ opened = true; }; var st = setTimeout; setTimeout = function(f){ f(); return 1; };
+  document.getElementById('code-input').value = ${JSON.stringify(c)}; redeemCode(); openOwnerPanel = keep; setTimeout = st; return opened; })()`);
+check(tryCode('CROWNKEEPER67') === false && tryCode('ownerpanel') === false, 'wrong codes do not open the Owner Panel');
+if (process.env.OWNER_CODE) {
+  check(tryCode(process.env.OWNER_CODE.toLowerCase()) === true, 'the real owner code opens the Owner Panel (any case)');
+  check(!q(`localStorage.getItem(USED_CODES_KEY) || ''`).toUpperCase().includes(process.env.OWNER_CODE.toUpperCase()), '…and is never saved in the used-codes list');
+} else console.log('  (skip) set OWNER_CODE=... to check the real owner code');
+
 console.log('\n' + (ok ? 'MRS GUM PASS' : 'MRS GUM FAIL'));
 process.exit(ok ? 0 : 1);
