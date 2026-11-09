@@ -5074,9 +5074,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // 🍥 The Master of Rolls title (Mr Roll's drop): +3% candy. The leftover fraction is carried over,
     // so even +1 candy pickups add up (every ~33 candy gives 1 extra).
     function rollMasterCandy(n, ev) {
-        if (!(n > 0) || !ev || ev.id !== 'halloween' || !arcadeOwns('rollmaster')) return n;
+        const pct = (arcadeOwns('rollmaster') ? 0.03 : 0) + (arcadeOwns('candygrinder') ? 0.10 : 0);   // 🏅 Candy Grinding +10%
+        if (!(n > 0) || !ev || ev.id !== 'halloween' || !pct) return n;
         let carry = 0; try { carry = parseFloat(localStorage.getItem('monster_attack_rollmaster_carry')) || 0; } catch (e) {}
-        const extra = n * 0.03 + carry, whole = Math.floor(extra);
+        const extra = n * pct + carry, whole = Math.floor(extra);
         try { localStorage.setItem('monster_attack_rollmaster_carry', String(extra - whole)); } catch (e) {}
         return n + whole;
     }
@@ -6121,7 +6122,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     function renderPetItems() {
         const el = document.getElementById('pets-items'); if (!el) return;
-        el.textContent = `💎 Upgrade Crystals: ${itemCount(CRYSTAL_KEY)} · 🩸 Blood: ${itemCount(BLOOD_KEY)} (64 = a blood wall — B) · 🍪 Crumbles: ${itemCount(CRUMBLE_KEY)} (T) · 🧱 Candy Blocks: ${itemCount(CANDYBLOCK_KEY)} (C)` + (hasCookieDogs() ? ' · 🍪🐕 Cookie Dogs skill' : '');
+        el.textContent = `💎 Upgrade Crystals: ${itemCount(CRYSTAL_KEY)} · 🩸 Blood: ${itemCount(BLOOD_KEY)} (64 = a blood wall — B) · 🍪 Crumbles: ${itemCount(CRUMBLE_KEY)} (T) · 🧱 Candy Blocks: ${itemCount(CANDYBLOCK_KEY)} (C) · 🟤 Blobs: ${itemCount(BLOBS_KEY)}` + (hasCookieDogs() ? ' · 🍪🐕 Cookie Dogs skill' : '') + (hasFriendship() ? ' · 🤝 Friendship skill (hold F)' : '');
     }
     // ---- the Little Blue Slime ----
     const SLIME_COLORS = [['Blue', '#4aa8ff'], ['Teal', '#2ed3c6'], ['Purple', '#a55eea'], ['Green', '#26de81'], ['Pink', '#ff6bcb'], ['Gold', '#f1c40f']];
@@ -6404,6 +6405,129 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (rnd() < 0.40) { addCoins(3000); setItemCount(CANDYBLOCK_KEY, itemCount(CANDYBLOCK_KEY) + 3); got.push('🍖 3000 flesh + 🧱 3 Candy Blocks'); }
         if (rnd() < 0.50 && !arcadeOwns('rollmaster')) { grantArcadeItem('rollmaster'); got.push('🍥 the Master of Rolls title (+3% candy)'); }
         if (got.length) setTimeout(() => showStatus('🍬 Mr Roll dropped: ' + got.join(' · '), '#ff7eb6'), 1200);
+        return got;
+    }
+
+    // ======================== 🍮 MR BLOB'S LOOT: Mr Blob, Candy Grinding, Friendship, Blobs ========================
+    // Beating Mr Blob (a candy-castle boss) rolls each drop on its own (mrBlobDrops):
+    //   🍮 Mr Blob 10% — a chocolate-pudding pet: it EATS 60% of the attacks aimed at you, and each time it eats
+    //        one there is a 20% chance it turns GIANT and jumps: every monster dies (a boss loses 25% of its HP)
+    //   🏅 The Master of Candy Grinding title 30% — an arcade title; owning it = +10% candy (every game)
+    //   🤝 Friendship 40% — a skill: HOLD [F] (1 s) to summon Mr Gum, with 20% of Mrs Gum's (the boss's) stats
+    //        (a quick tap of F is still fullscreen); 30 s cooldown
+    //   🟤 3 Blobs 60% — each blocks 1 attack aimed at you (used up), with a 10% chance to level up one of your pets
+    const BLOBS_KEY = 'monster_attack_blobs', FRIENDSHIP_KEY = 'monster_attack_friendship';
+    const MRGUM_CD = 30 * 60, MRGUM_LIFE = 30 * 60, F_HOLD = 60;
+    const mrBlobIdx = () => petsOwned.findIndex(p => p && p.special === 'mrblob');
+    const hasFriendship = () => { try { return localStorage.getItem(FRIENDSHIP_KEY) === '1'; } catch (e) { return false; } };
+    let mrGumCd = 0, fHeld = -1;   // fHeld: frames F has been held (-1 = not held)
+    let blobJumpNext = null;       // 🍮 Mr Blob decided to jump (it happens at the start of the next update)
+    function giveMrBlob() {
+        const pet = { name: 'Mr Blob', nickname: 'Mr Blob', special: 'mrblob', rank: 'S',
+                      ability: '🍮 Pudding Gulp', element: 'Earth', level: 1 };
+        petsOwned.push(pet); savePets();
+        const idx = petsOwned.length - 1;
+        if (equippedPets.length < MAX_EQUIPPED_PETS) { equippedPets.push(idx); saveEquippedPet(); rebuildPetRuntime(); }
+        return idx;
+    }
+    function drawMrBlob(pet, c2, cx, cy, s) {   // a wobbly chocolate pudding with a cream top and a crown
+        const big = pet._jumpT > 0 ? 1 + 1.5 * Math.sin(Math.PI * pet._jumpT / 40) : 1;
+        s *= big;
+        c2.save(); c2.translate(cx, cy - (big - 1) * 14 * s / big);
+        c2.fillStyle = '#6b3a17'; c2.strokeStyle = '#3d1f0a'; c2.lineWidth = 1.3 * s;
+        c2.beginPath(); c2.moveTo(-12 * s, 10 * s); c2.quadraticCurveTo(-13 * s, -8 * s, 0, -9 * s); c2.quadraticCurveTo(13 * s, -8 * s, 12 * s, 10 * s); c2.closePath(); c2.fill(); c2.stroke();
+        c2.fillStyle = '#f8ecd4'; c2.beginPath(); c2.ellipse(0, -7 * s, 8 * s, 3.2 * s, 0, 0, Math.PI * 2); c2.fill();   // cream
+        c2.fillStyle = '#e84118'; c2.beginPath(); c2.arc(0, -10 * s, 2 * s, 0, Math.PI * 2); c2.fill();                  // cherry
+        c2.fillStyle = '#fff'; c2.beginPath(); c2.arc(-4 * s, 1 * s, 2.2 * s, 0, Math.PI * 2); c2.arc(4 * s, 1 * s, 2.2 * s, 0, Math.PI * 2); c2.fill();
+        c2.fillStyle = '#14181f'; c2.beginPath(); c2.arc(-4 * s, 1.4 * s, 1.1 * s, 0, Math.PI * 2); c2.arc(4 * s, 1.4 * s, 1.1 * s, 0, Math.PI * 2); c2.fill();
+        c2.restore();
+    }
+    // 🍮 Mr Blob's GIANT JUMP: every monster dies (a boss loses a quarter of its HP instead).
+    function mrBlobJump(pet) {
+        pet._jumpT = 40;
+        for (let i = monsters.length - 1; i >= 0; i--) {
+            const m = monsters[i]; if (!m || m.hp <= 0) continue;
+            hitMonster(m, i, m.isBoss ? Math.ceil(m.maxHp * 0.25) : m.hp + 1);
+        }
+        addShake(22); SFX.scream && SFX.scream();
+        showStatus(`🍮 ${pet.nickname || 'Mr Blob'} went GIANT and JUMPED — SPLAT! Every monster is squashed!`, '#c56b2c');
+    }
+    // An attack aimed at you: if Mr Blob is out, 60% he gulps it down (then 20% he does the giant jump).
+    function mrBlobEats(p, rnd) {
+        rnd = rnd || Math.random;
+        if (p !== player) return false;
+        const idx = mrBlobIdx(); if (idx < 0 || equippedPets.indexOf(idx) < 0) return false;
+        if (rnd() >= 0.6) return false;
+        const pet = petsOwned[idx];
+        p.invincible = Math.max(p.invincible || 0, 15);
+        if (rnd() < 0.2) blobJumpNext = pet;   // done in friendshipTick, not mid-way through the monster loop
+        return true;
+    }
+    // 🟤 A Blob in your bag blocks the next attack (and is used up); 10% it levels up one of your pets.
+    function blobBlocks(p, rnd) {
+        rnd = rnd || Math.random;
+        if (p !== player) return false;
+        const have = itemCount(BLOBS_KEY); if (have < 1) return false;
+        setItemCount(BLOBS_KEY, have - 1);
+        p.invincible = Math.max(p.invincible || 0, 15);
+        let msg = `🟤 A Blob blocked the attack! (${have - 1} left)`;
+        const pets = petsOwned.map((x, i) => i).filter(i => petLevel(petsOwned[i]) < PET_MAX_LEVEL);
+        if (pets.length && rnd() < 0.1) {
+            const pet = petsOwned[pets[Math.floor(rnd() * pets.length) % pets.length]];
+            pet.level = petLevel(pet) + 1; savePets();
+            msg += ` …and ${pet.nickname || pet.name} levelled up to Lv.${pet.level}!`;
+        }
+        showStatus(msg, '#a0643c');
+        return true;
+    }
+    // 🤝 Friendship: hold F to summon Mr Gum — 20% of Mrs Gum the boss's stats (as she would be this wave).
+    function mrGumStats() {
+        const cls = MONSTER_CLASSES.find(c => c.name === 'Mrs Gum') || { hp: 90, damage: 18 };
+        const hp = Math.floor(cls.hp * 7 * (1 + (wave - 1) * 0.2) * (6 + wave * 0.3));
+        const dmg = Math.floor((cls.damage + Math.floor(wave / 3)) * 2);
+        return { hp: Math.max(5, Math.round(hp * 0.2)), damage: Math.max(1, Math.round(dmg * 0.2)) };
+    }
+    function summonMrGum(p) {
+        p = p || player;
+        if (!p || !gameRunning || !hasFriendship()) return false;
+        if (mrGumCd > 0) { showStatus(`🤝 Mr Gum is resting — ${Math.ceil(mrGumCd / 60)}s`, '#ff6b81'); return false; }
+        const st = mrGumStats();
+        allies.push({ x: p.x + Math.cos(p.angle || 0) * 50, y: p.y + Math.sin(p.angle || 0) * 50, r: 16, speed: 2.6,
+                      damage: st.damage, color: '#ff6b81', hp: st.hp, maxHp: st.hp, life: MRGUM_LIFE, atkCd: 0, kind: 'gum' });
+        mrGumCd = MRGUM_CD;
+        showStatus(`🤝 FRIENDSHIP! Mr Gum is here (${st.hp} HP, ${st.damage} damage — 20% of Mrs Gum)`, '#ff6b81');
+        SFX.pickup && SFX.pickup();
+        return true;
+    }
+    function friendshipTick() {   // in update(): the F-hold timer, Mr Gum's cooldown, Mr Blob's jump
+        if (mrGumCd > 0) mrGumCd--;
+        if (blobJumpNext) { const pet = blobJumpNext; blobJumpNext = null; mrBlobJump(pet); }
+        if (fHeld >= 0 && ++fHeld === F_HOLD) summonMrGum(player);
+    }
+    function makeGummyMesh3D() {   // 🧸 Mr Gum: a see-through red gummy bear
+        const g = new THREE.Group(), add = _summonParts(g);
+        const gum = _pf('gummy', () => new THREE.MeshStandardMaterial({ color: 0xff4757, roughness: 0.15, transparent: true, opacity: 0.85, emissive: 0x6b0010, emissiveIntensity: 0.3 }));
+        const eye = _pf('pf-eyeb', () => new THREE.MeshStandardMaterial({ color: 0x14181f, roughness: 0.3 }));
+        add(TG.Sphere(9, 14, 12), gum, 0, 12, 0, 'body', 1, 1.25, 0.9);
+        add(TG.Sphere(6.5, 14, 12), gum, 0, 27, 0, 'head');
+        for (const sx of [-1, 1]) {
+            add(TG.Sphere(2.6, 10, 8), gum, sx * 5, 32, 0, 'ear');
+            add(TG.Sphere(3.4, 10, 8), gum, sx * 9, 15, 0, 'arm');
+            add(TG.Sphere(3.8, 10, 8), gum, sx * 5, 3, 0, 'leg');
+            add(TG.Sphere(0.9, 6, 5), eye, sx * 2.4, 28, 5.8, 'eye');
+        }
+        return g;
+    }
+    // Beating Mr Blob: each drop rolls on its own. (rnd is for tests.)
+    function mrBlobDrops(m, rnd) {
+        if (!m || !m.isBoss || !/Mr Blob/.test(m.name || '')) return [];
+        rnd = rnd || Math.random;
+        const got = [];
+        if (rnd() < 0.10 && mrBlobIdx() < 0) { giveMrBlob(); got.push('🍮 Mr Blob (eats attacks, giant jumps!)'); }
+        if (rnd() < 0.30 && !arcadeOwns('candygrinder')) { grantArcadeItem('candygrinder'); got.push('🏅 the Master of Candy Grinding title (+10% candy)'); }
+        if (rnd() < 0.40 && !hasFriendship()) { try { localStorage.setItem(FRIENDSHIP_KEY, '1'); } catch (e) {} got.push('🤝 the Friendship skill (hold F: Mr Gum)'); }
+        if (rnd() < 0.60) { setItemCount(BLOBS_KEY, itemCount(BLOBS_KEY) + 3); got.push('🟤 3 Blobs (each blocks an attack)'); }
+        if (got.length) setTimeout(() => showStatus('🍮 Mr Blob dropped: ' + got.join(' · '), '#c56b2c'), 1200);
         return got;
     }
 
@@ -7192,6 +7316,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (pet.special === 'blueslime') { drawBlueSlime(pet, c2, cx, cy, s); return; }   // its own look (name, colour, hat)
         if (pet.special === 'cookie') { drawCookieDog(pet, c2, cx, cy, s); return; }        // 🐕 Cookie the Cerberus
         if (pet.special === 'rolly') { drawRolly(pet, c2, cx, cy, s); return; }             // 🍥 Rolly
+        if (pet.special === 'mrblob') { if (pet._jumpT > 0) pet._jumpT--; drawMrBlob(pet, c2, cx, cy, s); return; }   // 🍮 Mr Blob
         drawPet(pet.name, c2, cx, cy, s);
         // Element overlay decorations
         if (pet.element) drawPetElementOverlay(pet.element, c2, cx, cy, s);
@@ -9444,6 +9569,7 @@ const col = b.color || BLDG_COLORS[0];
             slimyDrops(m);    // 🍮 Slimy the Jelly's loot (crystal, blood, the Little Blue Slime, flesh)
             biscuitDrops(m);  // 🍪 Biscuit the Cerberus's loot (Cookie, Cookie Dogs, Crumbles, Cookie King)
             mrRollDrops(m);   // 🍬 Mr Roll's loot (Rolly, Candy Blocks, flesh, Master of Rolls)
+            mrBlobDrops(m);   // 🍮 Mr Blob's loot (Mr Blob, Candy Grinding, Friendship, Blobs)
             cookieEats(m);    // 🦴 Cookie the Cerberus eats the corpse (if it is out and close)
             revengeOnKill(m);   // ⚔️ the Reaper that killed you last match — after the XP, so its banner wins
             if (player.cls.canCopy && bySelf) { player.copiedPower = true; player.copyTimer = 600; player.copySpeedBonus = 1.5; player.copiedMonsterName = m.name || ''; showStatus(`COPIED: ${m.name}`, '#ffeaa7'); }
@@ -13233,6 +13359,7 @@ const col = b.color || BLDG_COLORS[0];
             if (p.poisoned === 0 && p===player) showStatus('POISON GONE', '#26de81');
         }
         if (cookieDogsCd > 0) cookieDogsCd--;
+        friendshipTick();   // 🤝 hold F → Mr Gum
         if (cookieDogsCd % 60 === 0) refreshCookieDogsBtn();   // 🍪🐕 the button's countdown (and shows it)
         // Battle pets follow + elemental attacks (up to 5)
         for (let pi = 0; pi < equippedPets.length; pi++) {
@@ -14283,6 +14410,8 @@ const col = b.color || BLDG_COLORS[0];
         if (p === player && cheats.godMode) { p.invincible = 10; return; }
         if (blueSlimeEats(p, dmg, src)) return;   // 💧 the Little Blue Slime ate it (and fires it back)
         if (rollyBlocks(p)) return;               // 🍥 Rolly rolled in the way and blocked it
+        if (mrBlobEats(p)) return;                // 🍮 Mr Blob gulped it (and maybe giant-jumped)
+        if (blobBlocks(p)) return;                // 🟤 a Blob from your bag blocked it
         // Dodge chance (pets / weapon buffs) — avoid the hit entirely (capped at 80% so you're never invincible)
         if (p.petDodge && Math.random() < Math.min(0.8, p.petDodge)) {
             p.invincible = 20;
@@ -16378,7 +16507,7 @@ const col = b.color || BLDG_COLORS[0];
     // (stamped where it is created) and gets its own drawing. Every one stands on a GREEN ring so a
     // kid can tell "mine" from "a monster" at a glance. Looks only: size, speed and damage are untouched.
     const SUMMON_KINDS = ['skeleton', 'wolf', 'clone', 'decoy', 'gangster', 'ghost'];
-    const SUMMON_EMOJI = { skeleton: '💀', wolf: '🐺', clone: '🥷', decoy: '🪞', gangster: '🕴️', ghost: '👻', cookiedog: '🍪' };
+    const SUMMON_EMOJI = { skeleton: '💀', wolf: '🐺', clone: '🥷', decoy: '🪞', gangster: '🕴️', ghost: '👻', cookiedog: '🍪', gum: '🧸' };
     const FRIEND_COL = '#26de81';
     function summonKind(a) { return (a && SUMMON_EMOJI[a.kind]) ? a.kind : 'skeleton'; }
     function summonClass(a) {
@@ -16558,6 +16687,13 @@ const col = b.color || BLDG_COLORS[0];
         _friendRing2D(a.x, a.y, r);
         switch (kind) {
             case 'wolf':     _drawWolf2D(a, a.x, a.y, r, ang); break;
+            case 'gum': {   // 🧸 Mr Gum: a red gummy bear
+                ctx.save(); ctx.translate(a.x, a.y); ctx.globalAlpha = 0.9;
+                ctx.fillStyle = '#ff4757'; ctx.strokeStyle = '#a4161a'; ctx.lineWidth = 1.5;
+                for (const [bx, by, br] of [[0, 3, r * 0.75], [0, -r * 0.55, r * 0.5], [-r * 0.4, -r * 0.95, r * 0.2], [r * 0.4, -r * 0.95, r * 0.2]]) { ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+                ctx.fillStyle = '#14181f'; ctx.beginPath(); ctx.arc(-r * 0.18, -r * 0.6, 1.6, 0, Math.PI * 2); ctx.arc(r * 0.18, -r * 0.6, 1.6, 0, Math.PI * 2); ctx.fill();
+                ctx.restore(); break;
+            }
             case 'cookiedog': _drawWolf2D(a, a.x, a.y, r, ang); ctx.font = `${Math.round(r * 1.1)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍪', a.x, a.y); ctx.textBaseline = 'alphabetic'; break;
             case 'clone':    _drawClone2D(a, a.x, a.y, r, ang, false); break;
             case 'decoy':    _drawClone2D(a, a.x, a.y, r, ang, true); break;
@@ -18756,6 +18892,18 @@ const col = b.color || BLDG_COLORS[0];
     function makePetMesh3D(pet) {
         const g = new THREE.Group();
         const r = 7;
+        if (pet && pet.special === 'mrblob') {   // 🍮 Mr Blob: a chocolate pudding with cream and a cherry
+            const choc = _pf('mrblob-choc', () => new THREE.MeshStandardMaterial({ color: 0x6b3a17, roughness: 0.25, metalness: 0.05 }));
+            const cream = _pf('mrblob-cream', () => new THREE.MeshStandardMaterial({ color: 0xf8ecd4, roughness: 0.6 }));
+            const cherry = _pf('mrblob-cherry', () => new THREE.MeshStandardMaterial({ color: 0xe84118, roughness: 0.2 }));
+            const eyeB = _pf('pf-eyeb', () => new THREE.MeshStandardMaterial({ color: 0x14181f, roughness: 0.3 }));
+            const body = new THREE.Mesh(TG.Cylinder(r * 0.55, r * 0.85, r * 1.1, 20), choc); body.position.y = r * 0.55; g.add(body);
+            const top = new THREE.Mesh(TG.Sphere(r * 0.5, 14, 8), cream); top.scale.set(1, 0.4, 1); top.position.y = r * 1.12; g.add(top);
+            const ch = new THREE.Mesh(TG.Sphere(r * 0.16, 10, 8), cherry); ch.position.y = r * 1.35; g.add(ch);
+            for (const sx of [-1, 1]) { const e = new THREE.Mesh(TG.Sphere(r * 0.1, 8, 6), eyeB); e.position.set(sx * r * 0.25, r * 0.7, r * 0.72); g.add(e); }
+            g.userData.head = body;
+            return g;
+        }
         if (pet && pet.special === 'rolly') {   // 🍥 Rolly: a pink candy roll on its edge, white swirl stripes, eyes
             const pink = _pf('rolly-pink', () => new THREE.MeshStandardMaterial({ color: 0xff7eb6, roughness: 0.35 }));
             const white = _pf('rolly-white', () => new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 }));
@@ -19134,6 +19282,7 @@ const col = b.color || BLDG_COLORS[0];
         skeleton: a => makeSkeletonMesh3D(a && a.color),
         wolf:     () => makeWolfMesh3D(),
         cookiedog: () => makeWolfMesh3D('cookie'),
+        gum:      () => makeGummyMesh3D(),
         clone:    a => makeCloneMesh3D(summonClass(a), false),
         decoy:    a => makeCloneMesh3D(summonClass(a), true),
         gangster: () => makeGangsterMesh3D(),
@@ -25402,7 +25551,10 @@ const col = b.color || BLDG_COLORS[0];
         if (k==='t' && gameRunning && !gamePaused && NET.mode !== 'client') { throwCrumble(player); return; }     // 🍪 throw a Crumble
         if (k==='c' && gameRunning && !gamePaused && NET.mode !== 'client') { placeCandyBlock(player); return; }  // 🧱 a Candy Block
         if (k==='v' && gameRunning) { cycleCameraMode(); return; }
-        if (k==='f' && gameRunning) { toggleFullscreen(); return; }
+        if (k==='f' && gameRunning) {
+            if (hasFriendship() && !gamePaused) { if (!e.repeat && fHeld < 0) fHeld = 0; return; }   // 🤝 hold = Mr Gum, tap = fullscreen (on key up)
+            toggleFullscreen(); return;
+        }
         if (k==='m' && gameRunning) { _mpDiagOn = !_mpDiagOn; renderMpDiag(); return; }   // multiplayer diagnostics
         if (gamePaused) return;
         keys[k]=true;
@@ -25423,7 +25575,11 @@ const col = b.color || BLDG_COLORS[0];
         }
         if (player) { if(k==='1'&&player.cls.speedModes)player.speedMode=1; if(k==='2'&&player.cls.speedModes)player.speedMode=2; if(k==='3'&&player.cls.speedModes)player.speedMode=3; }
     });
-    document.addEventListener('keyup', e => { keys[e.key.toLowerCase()]=false; });
+    document.addEventListener('keyup', e => {
+        const k = e.key.toLowerCase();
+        keys[k]=false;
+        if (k === 'f' && fHeld >= 0) { const tap = fHeld < F_HOLD; fHeld = -1; if (tap && gameRunning) toggleFullscreen(); }   // 🤝 a quick tap is still fullscreen
+    });
     canvas.addEventListener('mousemove', e => {
         if (cameraMode !== 'topdown' && document.pointerLockElement === canvas && player) {
             player.angle += (e.movementX || 0) * 0.0035;

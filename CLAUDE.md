@@ -120,6 +120,7 @@ node tools/test-special-maps.js index.html  # ⭐ Special Maps: lock/unlock, Bac
 node tools/test-slimy.js index.html         # 🍮 Slimy's loot: Blue Slime pet, Upgrade Crystals, blood walls
 node tools/test-biscuit.js index.html        # 🍪 Biscuit's loot: Cookie pet, Cookie Dogs, Crumbles, Cookie King
 node tools/test-mrroll.js index.html        # 🍬 Mr Roll's loot: Rolly, Candy Blocks, Master of Rolls (+3% candy)
+node tools/test-mrblob.js index.html        # 🍮 Mr Blob's loot: Mr Blob pet, Candy Grinding, Friendship (hold F), Blobs
 node tools/test-events.js index.html        # 🎉 Halloween + Christmas events: dates, currency, bosses, decorations, pass, shop, codes
 ```
 
@@ -544,3 +545,16 @@ Candy Blocks (`monster_attack_candy_blocks`): [C] placeCandyBlock → a `kind:'c
 Master of Rolls = +3% candy: addEventCur → rollMasterCandy (Halloween only, fractions carried in
 `monster_attack_rollmaster_carry`); the other games get it via ArcadeShop.halloween.winCandy (rollMaster()).
 Tests: tools/test-mrroll.js.
+
+### 🍮 Mr Blob's loot (mrBlobDrops, on the boss kill)
+Each rolls on its own: 🍮 Mr Blob pet 10% · 🏅 Master of Candy Grinding title (`candygrinder`, +10% candy) 30% ·
+🤝 Friendship skill 40% · 🟤 3 Blobs 60%.
+Mr Blob is a pet with `special:'mrblob'` (drawMrBlob / 3D pudding). While out: playerHit → mrBlobEats, 60% he eats
+the hit; then 20% sets `blobJumpNext`, and friendshipTick (start of update, safe outside the monster loop) runs
+mrBlobJump: every monster dies, a boss loses 25% of its max HP; pet._jumpT makes him draw giant.
+Blobs (`monster_attack_blobs`): playerHit → blobBlocks uses one to block the hit; 10% it levels a random pet.
+Friendship (`monster_attack_friendship` = '1'): holding F for F_HOLD (60 frames) summons an ally `kind:'gum'`
+(makeGummyMesh3D / 2D gummy bear) with 20% of Mrs Gum's boss stats at this wave (mrGumStats); 30 s cooldown.
+With the skill, F is handled on keyup: a quick tap is still fullscreen.
+Candy titles stack: rollMasterCandy adds +3% (rollmaster) and +10% (candygrinder); ArcadeShop.halloween.winCandy too.
+Tests: tools/test-mrblob.js.

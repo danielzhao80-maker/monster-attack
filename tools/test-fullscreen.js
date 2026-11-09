@@ -17,7 +17,7 @@ chk(/\.catch\(\(\) => \{\}\)/.test(fn),
 chk(/showStatus\('Fullscreen not supported/.test(fn), 'and it says so instead of doing nothing at all');
 
 // --- three ways in ---
-chk(/k==='f' && gameRunning\) \{ toggleFullscreen\(\)/.test(h), 'keyboard: [F]');
+chk(/k==='f' && gameRunning\) \{[\s\S]{0,260}?toggleFullscreen\(\); return;/.test(h), 'keyboard: [F] (a tap — holding it is the Friendship skill)');
 chk(/id="touch-full"/.test(h) && /fullBtn.*addEventListener\('click'/.test(h.replace(/\n/g, ' ')), 'touch: a ⛶ button');
 const keysF = (h.match(/keys\['f'\]/g) || []).length;
 chk(keysF === 0, 'and [F] was not already doing something else', keysF ? keysF + ' other uses' : 'free');
