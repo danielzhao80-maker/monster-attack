@@ -4015,10 +4015,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             }),
             bullets: bullets.map(b=>({x:_r1(b.x),y:_r1(b.y),z:_r1(b.z||0),color:b.color,owner:b.owner,vx:_r1(b.vx),vy:_r1(b.vy),vz:_r1(b.vz||0),bemoji:b.bemoji,b3d:b.b3d,bsize:b.bsize})),
             pickups: pickups.map(pk=>({x:pk.x,y:pk.y,type:pk.type,life:pk.life})),
-            walls: walls.map(w=>({x:w.x,y:w.y,hp:w.hp,kind:w.kind})),
+            walls: walls.map(w=>({x:w.x,y:w.y,hp:w.hp,maxHp:w.maxHp,kind:w.kind})),
             fireTiles: fireTiles.map(f=>({x:f.x,y:f.y,life:f.life,fromPlayer:f.fromPlayer})),
             poisonTiles: poisonTiles.map(pt=>({x:pt.x,y:pt.y,life:pt.life})),
-            allies: allies.map(a=>({x:a.x,y:a.y,r:a.r,life:a.life,hp:a.hp,maxHp:a.maxHp,kind:a.kind,cls:a.cls,color:a.color})),
+            allies: allies.map(a=>({x:a.x,y:a.y,r:a.r,life:a.life,hp:a.hp,maxHp:a.maxHp,kind:a.kind,cls:a.cls,color:a.color,boss:a.boss,emoji:a.emoji,body:a.body})),
             turrets: turrets.map(t=>({x:t.x,y:t.y,r:t.r,hp:t.hp,maxHp:t.maxHp,angle:t.angle,ammo:t.ammo,kind:t.kind})),
             gorbs: mpSerializeGojoOrbs(),   // Gojo's Red / Blue / Purple, so guests see them in 2D and 3D
             // Buildings and traps are GENERATED, not transmitted — the seed is the whole payload.
@@ -5093,9 +5093,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     // The arcade page adds currency to the same keys while this game is open (play-time, the daily
     // pick), so every change re-reads storage first instead of writing a stale number back.
-    function addEventCur(n, ev) {
+    function addEventCur(n, ev, exact) {
         ev = ev || activeEvent(); if (!ev) return;
-        n = rollMasterCandy(n, ev);
+        if (!exact) n = rollMasterCandy(n, ev);   // exact: admin buttons give exactly what they say
         loadEvent(ev); evWallet += n; evEarned += n; saveEvent(); refreshEventButton();
     }
     // 🍥 The Master of Rolls title (Mr Roll's drop): +3% candy. The leftover fraction is carried over,
@@ -6338,7 +6338,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function cookieDogsPct() { return 0.3 + (ownsPower('cookie') ? 0.2 : 0); }
     function summonCookieDogs(p) {
         p = p || player;
-        if (!p || !gameRunning || !hasCookieDogs()) return false;
+        if (!p || !gameRunning || !hasCookieDogs() || NET.mode === 'client') return false;
         if (cookieDogsCd > 0) { showStatus(`🍪🐕 Cookie Dogs ready in ${Math.ceil(cookieDogsCd / 60)}s`, '#d4a373'); return false; }
         const pct = cookieDogsPct();
         for (let i = 0; i < 5; i++) {
@@ -6357,7 +6357,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     function refreshCookieDogsBtn() {
         const b = document.getElementById('cookiedogs-btn'); if (!b) return;
         const menu = document.getElementById('start-screen');
-        const show = gameRunning && hasCookieDogs() && !(menu && menu.style.display === 'flex');   // never over the menu
+        const show = gameRunning && hasCookieDogs() && NET.mode !== 'client' && !(menu && menu.style.display === 'flex');   // never over the menu
         b.style.display = show ? 'block' : 'none';
         if (show) b.textContent = cookieDogsCd > 0 ? `🍪🐕 ${Math.ceil(cookieDogsCd / 60)}s` : '🍪🐕 Cookie Dogs';
     }
@@ -6471,6 +6471,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     const hasFriendship = () => { try { return localStorage.getItem(FRIENDSHIP_KEY) === '1'; } catch (e) { return false; } };
     let mrGumCd = 0, fHeld = -1;   // fHeld: frames F has been held (-1 = not held)
     let blobJumpNext = null;       // 🍮 Mr Blob decided to jump (it happens at the start of the next update)
+    const blobJumpUntil = new WeakMap();   // pet → when its GIANT look ends (kept off the pet, so it is never saved)
     function giveMrBlob() {
         const pet = { name: 'Mr Blob', nickname: 'Mr Blob', special: 'mrblob', rank: 'S',
                       ability: '🍮 Pudding Gulp', element: 'Earth', level: 1 };
@@ -6480,7 +6481,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         return idx;
     }
     function drawMrBlob(pet, c2, cx, cy, s) {   // a wobbly chocolate pudding with a cream top and a crown
-        const big = pet._jumpT > 0 ? 1 + 1.5 * Math.sin(Math.PI * pet._jumpT / 40) : 1;
+        const left = (blobJumpUntil.get(pet) || 0) - performance.now();   // 0.7 s of being GIANT after a jump
+        const big = left > 0 ? 1 + 1.5 * Math.sin(Math.PI * left / 700) : 1;
         s *= big;
         c2.save(); c2.translate(cx, cy - (big - 1) * 14 * s / big);
         c2.fillStyle = '#6b3a17'; c2.strokeStyle = '#3d1f0a'; c2.lineWidth = 1.3 * s;
@@ -6493,7 +6495,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     // 🍮 Mr Blob's GIANT JUMP: every monster dies (a boss loses a quarter of its HP instead).
     function mrBlobJump(pet) {
-        pet._jumpT = 40;
+        blobJumpUntil.set(pet, performance.now() + 700);
         for (let i = monsters.length - 1; i >= 0; i--) {
             const m = monsters[i]; if (!m || m.hp <= 0) continue;
             m.shieldUp = false;   // a giant pudding landing on you goes straight through a shield
@@ -6539,7 +6541,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     function summonMrGum(p) {
         p = p || player;
-        if (!p || !gameRunning || !hasFriendship()) return false;
+        if (!p || !gameRunning || !hasFriendship() || NET.mode === 'client') return false;
         if (mrGumCd > 0) { showStatus(`🤝 Mr Gum is resting — ${Math.ceil(mrGumCd / 60)}s`, '#ff6b81'); return false; }
         const st = mrGumStats();
         allies.push({ x: p.x + Math.cos(p.angle || 0) * 50, y: p.y + Math.sin(p.angle || 0) * 50, r: 16, speed: 2.6,
@@ -6625,7 +6627,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             equippedPets = equippedPets.filter(i => i !== idx).map(i => (i > idx ? i - 1 : i));
         }
         setItemCount(COMBINE_KEY, itemCount(COMBINE_KEY) - 1);
-        saveEquippedPet();
+        saveEquippedPet(); rebuildPetRuntime();
         givePetSpecial({ name: 'Candy Lord', nickname: 'Candy Lord', special: 'candylord', rank: 'S',
                          ability: '👑 Candy Titan (all powers +80%)', element: 'Fire', level });
         if (player) applyPetAbility(player);
@@ -7460,7 +7462,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (pet.special === 'rolly') { drawRolly(pet, c2, cx, cy, s); return; }             // 🍥 Rolly
         if (pet.special === 'gumdrop') { drawGummyBear(c2, cx, cy, s, '#2ecc71', '#1e8449', false); return; }   // 🐻 Gumdrop
         if (pet.special === 'candylord') { drawGummyBear(c2, cx, cy, s * 1.35, '#a55eea', '#f1c40f', true); return; }   // 👑 the Candy Lord
-        if (pet.special === 'mrblob') { if (pet._jumpT > 0) pet._jumpT--; drawMrBlob(pet, c2, cx, cy, s); return; }   // 🍮 Mr Blob
+        if (pet.special === 'mrblob') { drawMrBlob(pet, c2, cx, cy, s); return; }   // 🍮 Mr Blob
         drawPet(pet.name, c2, cx, cy, s);
         // Element overlay decorations
         if (pet.element) drawPetElementOverlay(pet.element, c2, cx, cy, s);
@@ -23264,7 +23266,7 @@ const col = b.color || BLDG_COLORS[0];
         const say = (t) => { const m = document.getElementById('unlock-msg'); if (m) m.textContent = t; showStatus(t, '#a55eea'); };
         // Currency and pass act on the event that is on now (Halloween outside any event).
         const ev = activeEvent() || EVENTS.halloween;
-        if (kind === 'cur100' || kind === 'cur1000') { const n = kind === 'cur100' ? 100 : 1000; addEventCur(n, ev); say(`${ev.curEmoji} +${n} ${ev.cur} (${evWallet})`); }
+        if (kind === 'cur100' || kind === 'cur1000') { const n = kind === 'cur100' ? 100 : 1000; addEventCur(n, ev, true); say(`${ev.curEmoji} +${n} ${ev.cur} (${evWallet})`); }
         else if (kind === 'pass') {
             // Enough EARNED for every tier, then claim them all (works even outside the event).
             loadEvent(ev);
@@ -25790,6 +25792,7 @@ const col = b.color || BLDG_COLORS[0];
         keys[k]=false;
         if (k === 'f' && fHeld >= 0) { const tap = fHeld < F_HOLD; fHeld = -1; if (tap && gameRunning) toggleFullscreen(); }   // 🤝 a quick tap is still fullscreen
     });
+    window.addEventListener('blur', () => { fHeld = -1; });   // switched windows mid-hold: the key-up never comes
     canvas.addEventListener('mousemove', e => {
         if (cameraMode !== 'topdown' && document.pointerLockElement === canvas && player) {
             player.angle += (e.movementX || 0) * 0.0035;

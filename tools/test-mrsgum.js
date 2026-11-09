@@ -221,6 +221,25 @@ check(/Daily limit/.test(ad.msg), '…then it says the daily limit is reached');
 check(q(`ownerBossLoot('bossitems') && ownerBossLoot('bossitems') && ownerBossLoot('bossitems')`) && q(`itemCount(BOSS_SUMMON_KEY)`) === 20, 'Owner Panel: no limit');
 q(`localStorage.removeItem(ADMIN_LIMITS_KEY)`);
 
+// ---- fixes ----
+reset();
+q(`gameRunning = false; startGame(); waveIntroTimer = 0;`);
+check(/walls: walls\.map\(w=>\(\{[^)]*maxHp:w\.maxHp/.test(code) && /allies: allies\.map\(a=>\(\{[^)]*boss:a\.boss,emoji:a\.emoji,body:a\.body/.test(code), 'multiplayer guests get wall HP bars and the summoned boss\'s look');
+q(`localStorage.setItem(COOKIEDOGS_KEY, '1'); localStorage.setItem(FRIENDSHIP_KEY, '1'); allies = []; NET.mode = 'client';`);
+check(q(`summonCookieDogs()`) === false && q(`summonMrGum()`) === false && q('allies.length') === 0, 'a multiplayer guest cannot summon on their own screen only');
+q(`refreshCookieDogsBtn();`);
+check(q(`document.getElementById('cookiedogs-btn').style.display`) === 'none', '…and does not get the Cookie Dogs button');
+q(`NET.mode = 'single'; mrGumCd = 0; cookieDogsCd = 0;`);
+check(/window\.addEventListener\('blur', \(\) => \{ fHeld = -1; \}\)/.test(code), 'switching windows while holding F does not leave it stuck');
+// combine while 5 OTHER pets are equipped: the runtime still matches
+q(`petsOwned = []; equippedPets = []; for (var k = 0; k < 5; k++) petsOwned.push({ name: 'Rat' + k, rank: 'F', ability: '💪 Damage Boost', element: 'Fire' }); savePets(); equippedPets = [0,1,2,3,4]; saveEquippedPet(); rebuildPetRuntime();
+   giveBlueSlime(); giveCookie(); giveRolly(); giveMrBlob(); equippedPets = [0, 1, 2, 3, 5]; rebuildPetRuntime(); localStorage.setItem(COMBINE_KEY, '1');`);
+const rt = JSON.parse(q(`(function(){ combineCandyLord(); return JSON.stringify({ eq: equippedPets, rt: petRuntime.length, n: petsOwned.length, lord: candyLordIdx() }); })()`));
+check(rt.eq.length === rt.rt && rt.n === 6 && rt.eq.every(i => i < rt.n), 'combining with every slot full keeps the equipped pets and the runtime in step', JSON.stringify(rt));
+q(`localStorage.setItem('daniels-arcade-v1', JSON.stringify({ owned: ['owner', 'rollmaster', 'candygrinder'] }));`);
+check(q(`(function(){ var ev = EVENTS.halloween; loadEvent(ev); var a = evWallet; unlockAction('cur100'); return evWallet - a; })()`) === 100, 'the admin +100 candy button gives exactly 100 (no title bonus)');
+check(q(`(function(){ var ev = EVENTS.halloween; loadEvent(ev); var a = evWallet; addEventCur(100, ev); return evWallet - a; })()`) === 113, '…but candy you earn still gets the title bonus');
+
 // ---- 👑 the owner code: only its hash is in the page ----
 check(!/CROWNKEEPER67/.test(html) && /OWNER_CODE_HASH = '[0-9a-z]+'/.test(code), 'the old public code is gone; only a hash of the owner code is in the page');
 const tryCode = (c) => q(`(function(){ var opened = false; var keep = openOwnerPanel; openOwnerPanel = function(){ opened = true; }; var st = setTimeout; setTimeout = function(f){ f(); return 1; };

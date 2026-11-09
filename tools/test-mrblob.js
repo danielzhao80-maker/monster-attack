@@ -164,8 +164,8 @@ const jump = JSON.parse(q(`(function(){ monsters = []; for (var k = 0; k < 6; k+
   var b = monsters[0]; b.isBoss = true; b.hp = b.maxHp = 4000; monsters.forEach(function(m){ m.hasShield = true; m.shieldUp = true; });
   blobJumpNext = petsOwned[mrBlobIdx()]; update();
   var alive = monsters.filter(function(m){ return m.hp > 0 && !m.isBoss; }).length;
-  return JSON.stringify({ alive: alive, bossHp: b.hp, big: petsOwned[mrBlobIdx()]._jumpT }); })()`));
-check(jump.alive === 0 && jump.bossHp === 3000 && jump.big > 0, 'the giant jump squashes every monster (a boss loses 25%)', JSON.stringify(jump));
+  return JSON.stringify({ alive: alive, bossHp: b.hp, big: (blobJumpUntil.get(petsOwned[mrBlobIdx()]) || 0) - performance.now(), saved: 'blobJumpUntil' in petsOwned[mrBlobIdx()] || /jump/i.test(localStorage.getItem(PETS_KEY)) }); })()`));
+check(jump.alive === 0 && jump.bossHp === 3000 && jump.big > 0 && !jump.saved, 'the giant jump squashes every monster (a boss loses 25%)', JSON.stringify(jump));
 check(q(`(function(){ var c = document.getElementById('x').getContext('2d'); drawPetFull(petsOwned[mrBlobIdx()], c, 30, 30, 1); return true; })()`), 'he draws as a chocolate pudding (and grows when he jumps)');
 q(`equippedPets = []; rebuildPetRuntime();`);
 check(q(`(function(){ var n = 0; for (var k = 0; k < 300; k++) { player.hp = player.maxHp = 1e9; player.invincible = 0; var h = player.hp; playerHit(5, player, 'x'); if (player.hp === h) n++; } return n; })()`) === 0, 'he only eats attacks while he is out with you');
