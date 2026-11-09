@@ -517,7 +517,7 @@ q(`gameRunning=false; startGame(); monsters=[]; pickups=[];`);
 const xd = JSON.parse(q(`(function(){ pickups = []; eventOnKill({ x: 0, y: 0, name: 'Evil Snowman', isBoss: true }); var r = { n: pickups.reduce(function(a,p){ return a + p.n; }, 0), ev: pickups[0] && pickups[0].ev }; pickups = []; return JSON.stringify(r); })()`));
 check(xd.n === 25 && xd.ev === 'christmas', 'the Evil Snowman drops 25 snowflakes');
 const xp = JSON.parse(q(`(function(){ waveIntroTimer = 0; monstersSpawned = 0; monstersToSpawn = 99; monsters = [];
-  pickups = [{ x: player.x, y: player.y, type: 'eventcur', ev: 'christmas', n: 4, life: 600 }]; update();
+  xmPresentWave = wave; pickups = [{ x: player.x, y: player.y, type: 'eventcur', ev: 'christmas', n: 4, life: 600 }]; update();
   return JSON.stringify({ snow: localStorage.getItem('monster_attack_snowflakes'), candy: localStorage.getItem('monster_attack_candy') }); })()`));
 check(xp.snow === '11' && xp.candy === '42', 'walking over a snowflake collects it', JSON.stringify(xp));
 const snowmen = q(`(function(){ wave = 10; var n = 0, kings = 0; for (var i = 0; i < 1000; i++) { var c = rollMonsterClass().name; if (c === 'Evil Snowman') n++; if (c === 'Pumpkin King') kings++; } wave = 1; return n + '/' + kings; })()`);
@@ -525,7 +525,11 @@ check(+snowmen.split('/')[0] > 280 && +snowmen.split('/')[0] < 420 && snowmen.sp
 check(q(`(function(){ var c = MONSTER_CLASSES.find(function(x){ return x.name === 'Evil Snowman'; }); return !!(c && c.isBossOnly && c.habitat === 'ice'); })()`), 'the Evil Snowman is an ice boss');
 check(q(`PROPS_FOR(findWorld('desert')).indexOf('xmastree') > -1 && PROPS_FOR(findWorld('desert')).indexOf('jackolantern') === -1`), '🎄 Christmas trees stand in every world (no jack-o\'-lanterns)');
 check(/case 'xmastree':/.test(code), 'and the tree has a 3D model');
-check(q(`(function(){ evGift = null; tickEvGift(); return evGift && evGift.ev; })()`) === 'christmas' && q(`EVENTS[evGift.ev].gift.emoji`) === '🎁', 'the gift spot is a 🎁 present');
+const xmp = JSON.parse(q(`(function(){ var o = {}; evGift = null; xmPresentWave = 0; wave = 3; loadEvent(); var a = evWallet; tickEvGift(); loadEvent();
+  o.spot = evGift; o.got = evWallet - a; a = evWallet; tickEvGift(); tickEvGift(); loadEvent(); o.again = evWallet - a;
+  wave = 4; a = evWallet; tickEvGift(); loadEvent(); o.next = evWallet - a; wave = 1; return JSON.stringify(o); })()`));
+check(xmp.spot === null && xmp.got >= 3 && xmp.got <= 8, 'Christmas: no door / spot to walk to — the wave hands you a 🎁 present (❄️ 3–8)', JSON.stringify(xmp));
+check(xmp.again === 0 && xmp.next >= 3 && xmp.next <= 8, '…once per wave, and again on every new wave');
 // The Christmas pass.
 q(`loadEvent(); evEarned = 0; evClaimed = []; saveEvent();`);
 setArcade({ owned: [] });

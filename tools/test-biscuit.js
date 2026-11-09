@@ -186,7 +186,7 @@ check(true, 'update + draw with cookie dogs out');
 reset();
 q(`gameRunning = false; startGame(); waveIntroTimer = 0; walls = []; monsters = []; player.angle = 0;`);
 check(q(`throwCrumble(player)`) === false && q('walls.length') === 0, 'no crumbles, nothing to throw');
-q(`localStorage.setItem(CRUMBLE_KEY, '10'); spawnMonster(); monsters[0].x = player.x + 150; monsters[0].y = player.y; monsters[0].hp = monsters[0].maxHp = 1000; monsters[0].hasShield = false; monsters[0].shieldUp = false;`);
+q(`localStorage.setItem(CRUMBLE_KEY, '10'); spawnMonster(); var d = 150, lx, ly; do { lx = player.x + d; ly = player.y; d -= 20; } while (d > 30 && (ptInBld(lx, ly, 15) || ptInWall(lx, ly, 15))); monsters[0].x = lx; monsters[0].y = ly; monsters[0].hp = monsters[0].maxHp = 1000; monsters[0].hasShield = false; monsters[0].shieldUp = false;`);
 const cr = JSON.parse(q(`(function(){ var ok = throwCrumble(player); var w = walls[0]; return JSON.stringify({ ok: ok, kind: w && w.kind, hp: w && w.hp, left: itemCount(CRUMBLE_KEY), mhp: monsters[0] && monsters[0].hp }); })()`));
 check(cr.ok && cr.kind === 'cookie' && cr.hp === 6 && cr.left === 9, '[T] throws a crumble: it becomes a cookie wall (6 HP)', JSON.stringify(cr));
 check(cr.mhp < 1000, '…and the smash hurts the monster where it lands');

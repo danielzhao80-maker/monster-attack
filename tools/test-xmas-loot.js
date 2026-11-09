@@ -211,7 +211,7 @@ reset();
 q(`gameRunning = false; startGame(); waveIntroTimer = 0; walls = []; monsters = []; player.angle = 0;`);
 q(`localStorage.setItem(ICE_KEY, '64');`);
 check(q(`buildBloodWall(player)`) === true && q(`walls[0].kind`) === 'ice' && q(`walls[0].hp`) === 10 && q(`itemCount(ICE_KEY)`) === 0, '[B] with 🧊 64 ice: an ice wall (10 HP)');
-q(`walls = []; localStorage.setItem(SNOWBALL_KEY, '2'); localStorage.setItem(CRUMBLE_KEY, '2'); spawnMonster(); var m = monsters[0]; m.x = player.x + 150; m.y = player.y; m.hp = m.maxHp = 1000; m.hasShield = false; m.shieldUp = false; m.frozen = 0;`);
+q(`walls = []; localStorage.setItem(SNOWBALL_KEY, '2'); localStorage.setItem(CRUMBLE_KEY, '2'); spawnMonster(); var m = monsters[0]; var d = 150, lx, ly; do { lx = player.x + d; ly = player.y; d -= 20; } while (d > 30 && (ptInBld(lx, ly, 15) || ptInWall(lx, ly, 15))); m.x = lx; m.y = ly; m.hp = m.maxHp = 1000; m.hasShield = false; m.shieldUp = false; m.frozen = 0;`);
 const sb = JSON.parse(q(`(function(){ throwCrumble(player); var w = walls[0], m = monsters[0]; return JSON.stringify({ kind: w.kind, hp: w.hp, frozen: m.frozen, mhp: m.hp, snow: itemCount(SNOWBALL_KEY), crumbs: itemCount(CRUMBLE_KEY) }); })()`));
 check(sb.kind === 'snow' && sb.hp === 6 && sb.frozen > 0 && sb.mhp < 1000 && sb.snow === 1 && sb.crumbs === 2, '[T] at Christmas throws a ⛄ Snowball first: it hurts, FREEZES them and leaves a snow wall', JSON.stringify(sb));
 force('halloween');

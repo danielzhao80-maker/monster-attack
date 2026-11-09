@@ -597,3 +597,7 @@ pickSet(hwKey, xmKey): the B/T/C/H keys and blocking use whichever bag you have,
 Every boss pet has rank 'LIMITED' (PET_RANK_COLORS/DAMAGE/COOLDOWN/SUMMON_COOLDOWN, sorted above SSS); loadPets
 turns older saves' special pets into LIMITED. Admin bosspets/bossitems/bossskills give both castles' loot.
 Tests: tools/test-xmas-loot.js.
+
+### 🎁 Christmas wave presents
+At Christmas there is no gift spot / door (evGift stays null): tickEvGift gives a 🎁 present of ❄️ 3–8 snowflakes
+once per wave (xmPresentWave, reset in startGame). Halloween keeps its 🚪 trick-or-treat door spot.

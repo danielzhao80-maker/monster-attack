@@ -5062,7 +5062,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                      soft: '#d9fff0', accent: '#9fe3ff', main: '#e74c3c', dark: '#a93226', edge: '#145a32' },
             title: '🎄 Christmas Event ⛄',
             how: `Monsters drop <b>❄️ snowflakes</b> (bosses drop a bag) · beat the <b>⛄ Evil Snowman</b> on boss waves (25) · clear waves ·
-                  open the glowing <b>🎁 present</b> each wave (watch the minimap!) · the <b>🎁 daily present</b> ·
+                  a <b>🎁 present every wave</b> (❄️ 3–8, given to you) · the <b>🎁 daily present</b> ·
                   <b>Christmas codes</b> on the main menu, each once a day — <b>JINGLEBELLS</b> is one, and there are 5 more to find!`,
         },
     };
@@ -5168,10 +5168,21 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // The GIFT SPOT each wave (🚪 trick-or-treat door / 🎁 present): it appears a walk away, on the
     // minimap, in top-down and in 3D. Usually a treat (3–8), sometimes a trick (a scare/coal, a slow —
     // and still 1).
-    let evGift = null;
+    // 🎄 At Christmas there is no spot to walk to: every new wave hands you a 🎁 present (❄️ 3–8, never coal).
+    let evGift = null, xmPresentWave = 0;
     function tickEvGift() {
         const ev = activeEvent();
         if (!player || NET.mode === 'client' || !ev || usingCustomMap || (currentWorld && currentWorld.id === 'trickstreet')) { evGift = null; return; }
+        if (ev.id === 'christmas') {
+            evGift = null;
+            if (xmPresentWave === wave) return;   // one present per wave
+            xmPresentWave = wave;
+            const n = 3 + Math.floor(Math.random() * 6);
+            addEventCur(n, ev);
+            showStatus(`🎁 Wave ${wave} present! ❄️ +${n} snowflakes`, ev.curColor);
+            SFX.pickup && SFX.pickup();
+            return;
+        }
         if (!evGift || evGift.wave !== wave || evGift.ev !== ev.id) {
             evGift = null;
             for (let k = 0; k < 60; k++) {
@@ -25893,7 +25904,7 @@ const col = b.color || BLDG_COLORS[0];
 
     function startGame() {
         if (!chosenClass) return;
-        brExit = null; evGift = null; cookieDogsCd = 0; gingerMenCd = 0; reindeerCd = 0; setTimeout(refreshCookieDogsBtn, 0);
+        brExit = null; evGift = null; xmPresentWave = 0; cookieDogsCd = 0; gingerMenCd = 0; reindeerCd = 0; setTimeout(refreshCookieDogsBtn, 0);
         ensureWorldAllowed();
         if (isPlayerBanned(playerName)) { alert('You are BANNED! Contact an Admin or Owner.'); return; }
         document.getElementById('roll-screen').style.display = 'none';
