@@ -569,7 +569,8 @@ slime (blueSlimeEats), cookie (cookieEats, Cookie Dogs +20%), rolly (rollyBlocks
 Gumdrop (`special:'gumdrop'`) has all four; the Candy Lord (`special:'candylord'`) has all four with petBoost 1.8:
 chances ×1.8 (capped 90%), XP +36%, corpse/block levels faster, shots (petLevelMult) ×1.8.
 💠 combineCandyLord (the #pets-combine button in 🐾 Pets): uses a crystal, removes the 4 boss pets (blueslime,
-cookie, rolly, mrblob; equippedPets re-indexed like releasePet) and adds the Candy Lord at their best level. One only.
+cookie, rolly, mrblob; equippedPets re-indexed like releasePet) and adds the Candy Lord at their best level. You can make more than one (each needs 4 new boss pets + a crystal).
+The admin 'bosspets' gives the 5 boss pets but NOT the Candy Lord, so admins combine it themselves.
 👑 [H] useBossSummon: an ally `kind:'candyboss'` (a.boss, emoji, makeBossMesh in 3D) with 50% of that castle boss's
 stats this wave, for 30 s. mrBlobJump knocks shields down first (shieldUp = false).
 giveBossLoot(kind) (bosspets, bossitems, bossskills, bosscosmetics) is shared by [U] Admin Unlocks, the 🛠️ Admin Panel

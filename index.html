@@ -595,7 +595,7 @@
         <div style="font-weight:800;color:#c44569;font-size:1.1em;margin-bottom:6px;" id="pets-flesh">🍖 0</div>
         <div style="font-weight:800;color:#6c5ce7;font-size:0.85em;margin-bottom:6px;" id="pets-items"></div>
         <!-- 💠 Mrs Gum's Candy Combination Crystal: the 4 boss pets → the Candy Lord -->
-        <button id="pets-combine" onclick="combineCandyLord()" style="display:none;margin:0 0 8px;background:linear-gradient(180deg,#a55eea,#6c3483);color:#fff;border:2px solid #f1c40f;border-radius:20px;padding:6px 14px;font-family:'Fredoka One',cursive;cursor:pointer;">💠 Combine the 4 boss pets → 👑 Candy Lord</button>
+        <button id="pets-combine" onclick="combineCandyLord()" style="display:none;margin:0 0 8px;background:linear-gradient(180deg,#a55eea,#6c3483);color:#fff;border:2px solid #f1c40f;border-radius:20px;padding:6px 14px;font-family:'Fredoka One',cursive;cursor:pointer;">💠 Combine 💧🐕🍥🍮 → 👑 Candy Lord</button>
         <div style="font-weight:700;color:#6c5ce7;font-size:0.85em;margin-bottom:14px;text-align:center;" id="pets-equipped">No battle pet equipped</div>
         <div style="display:flex;flex-direction:column;gap:10px;align-items:center;">
             <button class="btn" onclick="buyEggs(1)" style="background:linear-gradient(180deg,#fd79a8,#c44569);box-shadow:0 4px 0 #7d1f3d;padding:12px 28px;min-width:240px;">🥚 Buy 1 Egg — 50 🍖</button>
@@ -6166,7 +6166,12 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         const el = document.getElementById('pets-items'); if (!el) return;
         el.textContent = `💎 Upgrade Crystals: ${itemCount(CRYSTAL_KEY)} · 🩸 Blood: ${itemCount(BLOOD_KEY)} (64 = a blood wall — B) · 🍪 Crumbles: ${itemCount(CRUMBLE_KEY)} (T) · 🧱 Candy Blocks: ${itemCount(CANDYBLOCK_KEY)} (C) · 🟤 Blobs: ${itemCount(BLOBS_KEY)} · 💠 Combination Crystals: ${itemCount(COMBINE_KEY)} · 👑 Boss Summons: ${itemCount(BOSS_SUMMON_KEY)} (H)` + (hasCookieDogs() ? ' · 🍪🐕 Cookie Dogs skill' : '') + (hasFriendship() ? ' · 🤝 Friendship skill (hold F)' : '');
         const cb = document.getElementById('pets-combine');
-        if (cb) cb.style.display = itemCount(COMBINE_KEY) > 0 && candyLordIdx() < 0 ? 'inline-block' : 'none';
+        if (cb) {   // 💠 shown whenever you hold a crystal; lit up once you also have the 4 boss pets
+            cb.style.display = itemCount(COMBINE_KEY) > 0 ? 'inline-block' : 'none';
+            const ready = canCombineCandyLord();
+            cb.style.opacity = ready ? '1' : '0.6';
+            cb.title = ready ? 'Fuse 💧 🐕 🍥 🍮 into the 👑 Candy Lord' : 'You need 💧 Little Blue Slime, 🐕 Cookie, 🍥 Rolly and 🍮 Mr Blob';
+        }
     }
     // ---- the Little Blue Slime ----
     const SLIME_COLORS = [['Blue', '#4aa8ff'], ['Teal', '#2ed3c6'], ['Purple', '#a55eea'], ['Green', '#26de81'], ['Pink', '#ff6bcb'], ['Gold', '#f1c40f']];
@@ -6606,7 +6611,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         c2.restore();
     }
     // 💠 The Candy Combination Crystal: the 4 boss pets → the Candy Lord (keeps the highest of their levels).
-    const canCombineCandyLord = () => itemCount(COMBINE_KEY) > 0 && candyLordIdx() < 0 && BOSS_PET_SPECIALS.every(sp => petsOwned.some(p => p && p.special === sp));
+    const canCombineCandyLord = () => itemCount(COMBINE_KEY) > 0 && BOSS_PET_SPECIALS.every(sp => petsOwned.some(p => p && p.special === sp));
     function combineCandyLord() {
         if (!canCombineCandyLord()) {
             showStatus(itemCount(COMBINE_KEY) < 1 ? '💠 You need a Candy Combination Crystal' : '💠 You need all 4 boss pets: 💧 Little Blue Slime, 🐕 Cookie, 🍥 Rolly, 🍮 Mr Blob', '#a55eea');
@@ -23293,11 +23298,11 @@ const col = b.color || BLDG_COLORS[0];
         let msg = '';
         const say = (t) => { msg = t; };
         if (kind === 'bosspets') {
-            const give = { blueslime: giveBlueSlime, cookie: giveCookie, rolly: giveRolly, mrblob: giveMrBlob, gumdrop: giveGumdrop,
-                           candylord: () => givePetSpecial({ name: 'Candy Lord', nickname: 'Candy Lord', special: 'candylord', rank: 'S', ability: '👑 Candy Titan (all powers +80%)', element: 'Fire', level: 1 }) };
+            // Not the Candy Lord — you make that yourself: 💠 Combine in 🐾 Pets (Boss items give a crystal).
+            const give = { blueslime: giveBlueSlime, cookie: giveCookie, rolly: giveRolly, mrblob: giveMrBlob, gumdrop: giveGumdrop };
             const got = Object.keys(give).filter(sp => !petsOwned.some(p => p && p.special === sp));
             got.forEach(sp => give[sp]());
-            say(got.length ? `🐾 +${got.length} boss pet${got.length === 1 ? '' : 's'} — see 🐾 Pets` : '🐾 You already have every boss pet');
+            say(got.length ? `🐾 +${got.length} boss pet${got.length === 1 ? '' : 's'} — see 🐾 Pets (💠 Combine 4 of them into the Candy Lord!)` : '🐾 You already have every boss pet');
         }
         else if (kind === 'bossitems') {
             [[CRYSTAL_KEY, 10], [BLOOD_KEY, 640], [CRUMBLE_KEY, 10], [CANDYBLOCK_KEY, 10], [BLOBS_KEY, 10], [COMBINE_KEY, 1], [BOSS_SUMMON_KEY, 5]]

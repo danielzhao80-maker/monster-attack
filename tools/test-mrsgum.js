@@ -180,7 +180,7 @@ q(`gameRunning = false; startGame(); waveIntroTimer = 0; equippedPets = [candyLo
 check(q(`(function(){ plevel = 1; pxp = 0; addXP(50); return pxp; })()`) === 68, "and Rolly's XP boost +80% (+36% XP)");
 const lordProt = JSON.parse(q(`(function(){ var safe = 0, jumps = 0, n = 3000; for (var k = 0; k < n; k++) { player.hp = player.maxHp = 1e9; player.invincible = 0; player.petDodge = 0; var h = player.hp; playerHit(5, player, 'x'); if (player.hp === h) safe++; if (blobJumpNext) jumps++; blobJumpNext = null; } return JSON.stringify({ rate: safe / n, jumps: jumps }); })()`));
 check(lordProt.rate > 0.97, 'every power +80%: it almost never lets a hit through', JSON.stringify(lordProt));
-check(q(`combineCandyLord()`) === false, 'only one Candy Lord');
+check(q(`combineCandyLord()`) === false, 'the four pets are used up: no second combine without new ones');
 check(q(`(function(){ var c = document.getElementById('x').getContext('2d'); drawPetFull(petsOwned[candyLordIdx()], c, 30, 30, 1); return true; })()`), 'the Candy Lord draws (a big crowned gummy titan)');
 
 // ---- 👑 Boss Summon ----
@@ -197,8 +197,13 @@ check(/k==='h' && gameRunning/.test(code) && q(`SUMMON_EMOJI.candyboss`) === '�
 // ---- 🔓 Admin Unlocks: the boss loot ----
 reset();
 q(`localStorage.setItem('daniels-arcade-v1', JSON.stringify({ owned: ['owner'] }));`);
-check(q(`unlockAction('bosspets')`) === true && q(`petsOwned.length`) === 6, '[U] 🐾 every boss pet (6)');
+check(q(`unlockAction('bosspets')`) === true && q(`petsOwned.length`) === 5 && q(`candyLordIdx()`) === -1, '[U] 🐾 the 5 boss pets (not the Candy Lord — you combine that)');
 check(q(`unlockAction('bossitems')`) === true && q(`itemCount(BOSS_SUMMON_KEY)`) === 5 && q(`itemCount(COMBINE_KEY)`) === 1 && q(`itemCount(BLOBS_KEY)`) === 10, '[U] 🎒 boss items');
+q(`openPetsScreen()`);
+check(q(`document.getElementById('pets-combine').style.opacity`) === '1', '…and the 💠 Combine button is ready in 🐾 Pets');
+check(q(`combineCandyLord()`) === true && q(`petsOwned.map(function(p){ return p.special; }).join()`) === 'gumdrop,candylord', 'admin pets + crystal: you CAN combine the Candy Lord');
+q(`unlockAction('bosspets'); unlockAction('bossitems');`);
+check(q(`combineCandyLord()`) === true && q(`petsOwned.filter(function(p){ return p.special === 'candylord'; }).length`) === 2, 'and again (a second Candy Lord) with 4 new boss pets and another crystal');
 check(q(`unlockAction('bossskills')`) === true && q(`hasCookieDogs() && hasFriendship()`), '[U] ✨ boss skills');
 check(q(`unlockAction('bosscosmetics')`) === true && q(`arcadeOwns('cookieking') && arcadeOwns('rollmaster') && arcadeOwns('candygrinder')`), '[U] 🏅 boss titles & avatar');
 check(/unlockAction\('bosspets'\)/.test(html) && /unlockAction\('bosscosmetics'\)/.test(html), 'the buttons are in the menu');
@@ -211,7 +216,7 @@ reset();
 q(`localStorage.removeItem(ADMIN_LIMITS_KEY)`);
 check(/adminBossLoot\('bosspets'\)/.test(html) && /ownerBossLoot\('bosscosmetics'\)/.test(html) && /id="cap-bossloot"/.test(html), 'both panels have a 🏰 boss loot section');
 const ad = JSON.parse(q(`(function(){ var r = ['bosspets', 'bossitems', 'bossskills', 'bosscosmetics', 'bossitems'].map(adminBossLoot); return JSON.stringify({ r: r, summons: itemCount(BOSS_SUMMON_KEY), pets: petsOwned.length, msg: document.getElementById('admin-msg').textContent }); })()`));
-check(ad.r.join() === 'true,true,true,true,false' && ad.summons === 5 && ad.pets === 6, 'Admin Panel: boss loot, 4 a day', JSON.stringify(ad));
+check(ad.r.join() === 'true,true,true,true,false' && ad.summons === 5 && ad.pets === 5, 'Admin Panel: boss loot, 4 a day', JSON.stringify(ad));
 check(/Daily limit/.test(ad.msg), '…then it says the daily limit is reached');
 check(q(`ownerBossLoot('bossitems') && ownerBossLoot('bossitems') && ownerBossLoot('bossitems')`) && q(`itemCount(BOSS_SUMMON_KEY)`) === 20, 'Owner Panel: no limit');
 q(`localStorage.removeItem(ADMIN_LIMITS_KEY)`);
