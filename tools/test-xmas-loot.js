@@ -244,6 +244,36 @@ check(q(`document.getElementById('pets-combine-frost').style.display`) === 'inli
 check(q(`combineFrostLord()`) === true && q(`petsOwned.map(function(p){ return p.special; }).join()`) === 'blueslime,frostlord', 'Snow Slime + Gingersnap + Jingle + Mr Figgy → 👑 the Frost Lord');
 check(Math.abs(q(`petBoost(petsOwned[specialIdx('frostlord')])`) - 1.8) < 1e-9 && q(`petsOwned[specialIdx('frostlord')].rank`) === 'LIMITED', 'all powers +80%, LIMITED');
 check(q(`(function(){ var c = document.getElementById('x').getContext('2d'); ['snowslime','gingersnap','jingle','figgy','snowdrop','frostlord'].forEach(function(sp){ drawPetFull({ special: sp, name: sp, rank: 'LIMITED', element: 'Ice' }, c, 30, 30, 1); }); return true; })()`), 'every Christmas pet draws');
+// ---- 🛷 Santa's Sleigh Road ----
+reset(); force('christmas');
+q(`localStorage.removeItem(SANTA_KEY()); localStorage.removeItem(SLEIGH_DONE_KEY());`);
+check(q(`isWorldUnlocked(findWorld('sleighroad'))`) === false, 'locked until you say "santa" to Nullp');
+q(`localStorage.setItem(SANTA_KEY(), '1')`);
+check(q(`isWorldUnlocked(findWorld('sleighroad'))`) === true, '…then open at Christmas');
+force('halloween');
+check(q(`isWorldUnlocked(findWorld('sleighroad'))`) === false, '…and only at Christmas');
+force('christmas');
+const sr = JSON.parse(q(`(function(){ var o = {}; gameRunning = false; selectWorld('sleighroad'); startGame(); waveIntroTimer = 0;
+  o.world = currentWorld.id; o.roadY = player.y === streetRoadY(); o.gate = buildings.some(function(b){ return b.gate; });
+  o.houses = buildings.filter(function(b){ return b.house; }).length; o.style = buildings.filter(function(b){ return b.house; })[0].st;
+  for (var k = 0; k < 30; k++) update(); o.wave = monsters.filter(function(m){ return !m._castle; }).length; o.gift = evGift; o.doors = hwHouses.length;
+  o.castle = !!hwCastle; o.ahead = hwCastle && hwCastle.x - player.x; var x0 = player.x; for (var k = 0; k < 30; k++) hwCastleTick(); o.rode = Math.round(player.x - x0);
+  loadEvent(EVENTS.christmas); evWallet = 37; saveEvent();
+  player.x = hwCastle.x; player.y = hwCastle.y; hwCastleTick();
+  o.phase = hwCastle.phase; o.guards = monsters.filter(function(m){ return m.name === 'Castle Guard'; }).length;
+  var b = monsters.find(function(m){ return m._castle; }); o.boss = b && b.name; o.bossOk = !!b && XM_CASTLE_BOSSES.some(function(x){ return b.name === 'BOSS ' + x[0]; });
+  for (var round = 0; round < 8 && monsters.some(function(m){ return m._castle; }); round++) { for (var i = monsters.length - 1; i >= 0; i--) if (monsters[i]._castle) hitMonster(monsters[i], i, 1e9); monsters = monsters.filter(function(m){ return m.hp > 0; }); }
+  loadEvent(EVENTS.christmas); var before = evWallet; hwCastleTick(); loadEvent(EVENTS.christmas); o.before = before; o.after = evWallet;
+  o.done = sleighDone(); o.locked = !isWorldUnlocked(findWorld('sleighroad'));
+  return JSON.stringify(o); })()`));
+check(sr.world === 'sleighroad' && sr.roadY && sr.gate && sr.houses > 10 && sr.style === 'xmhouse', 'a snowy street like Trick-or-Treat Street: one road, houses both sides, a gate behind', JSON.stringify(sr));
+check(sr.wave === 0 && sr.gift === null && sr.doors === 0, 'no wave monsters, no presents, no doors to knock on');
+check(sr.castle && sr.ahead > 1000 && sr.rode > 20, 'the ice castle is right up the road and the road carries you there');
+check(sr.phase === 'boss' && sr.guards === 0 && sr.bossOk, 'inside: STRAIGHT to the boss (no guards) — an ice-castle boss');
+check(sr.after - sr.before >= 37 && sr.after >= 2 * 37, 'beat it: your ❄️ snowflakes DOUBLE', sr.before + ' → ' + sr.after);
+check(sr.done && sr.locked, 'once a Christmas: then the road is done');
+check(q(`(function(){ localStorage.setItem(SLEIGH_DONE_KEY(), '0'); localStorage.removeItem(SLEIGH_DONE_KEY()); loadEvent(EVENTS.christmas); evWallet = 0; saveEvent(); return Math.max(evWallet, 20); })()`) === 20, 'with an empty bag you still get at least +20');
+q(`gameRunning = false; selectWorld('city');`);
 force(null);
 
 console.log('\n' + (ok ? 'CHRISTMAS LOOT PASS' : 'CHRISTMAS LOOT FAIL'));

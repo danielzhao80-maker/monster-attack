@@ -152,7 +152,7 @@ const rows = q(`(function(){
 })()`);
 const data = JSON.parse(rows);
 
-check(data.length === 58 && data.some(d => d.id === 'trickstreet') && data.some(d => d.id === 'backrooms') && data.some(d => d.id === 'backrooms2') && data.some(d => d.id === 'brfloor20'), 'all worlds generate, special maps included', data.length + ' worlds');
+check(data.length === 59 && data.some(d => d.id === 'trickstreet') && data.some(d => d.id === 'sleighroad') && data.some(d => d.id === 'backrooms') && data.some(d => d.id === 'backrooms2') && data.some(d => d.id === 'brfloor20'), 'all worlds generate, special maps included', data.length + ' worlds');
 check(data.every(d => d.n > 100), 'every world fills its chunks', 'min ' + Math.min(...data.map(d=>d.n)) + ' buildings');
 check(data.every(d => d.styled), 'every building carries its style id');
 
@@ -326,7 +326,7 @@ const mons = JSON.parse(q(`(function(){
   currentWorld = ALL_WORLDS[0]; _themedCache.clear();
   return JSON.stringify(out);
 })()`));
-check(mons.length === 58, 'every world themes its monsters', mons.length + ' worlds');
+check(mons.length === 59, 'every world themes its monsters', mons.length + ' worlds');
 check(!mons.some(m => m.names.some(n => n.indexOf('MECHANICS-CHANGED') === 0)),
       'a re-skin changes the name and colour, never the mechanics');
 const allNames = mons.flatMap(m => m.names);
@@ -363,7 +363,7 @@ const spaceSky = skies.find(k => k.id === 'space');
 const citySky  = skies.find(k => k.id === 'city');
 check(spaceSky.top < 0x222222, 'Space is not blue daylight', '#' + spaceSky.top.toString(16).padStart(6,'0'));
 check(spaceSky.stars === true, 'Space has stars');
-check(skies.filter(k => k.stars).length >= 2 && skies.filter(k => k.stars).length <= 6,
+check(skies.filter(k => k.stars).length >= 2 && skies.filter(k => k.stars).length <= 7,
       'stars are reserved for the worlds whose sky IS stars',
       skies.filter(k => k.stars).map(k => k.id).join(', '));
 check(citySky.custom === false, 'an ordinary world keeps the time-of-day sky, so sunrises still work');

@@ -516,7 +516,7 @@ monster_attack_hw_street_done_<year>): beating its castle boss locks it until ne
 lie on the road (no pebbles), no wave gift, no wave intro, the HUD shows the goal, the run pauses when stunned/
 frozen and halves when slowed; splits of castle monsters are castle monsters too. The other games use ArcadeShop.halloween
 (REBUILD first win, Track Run first win — one time each; Buckshot's ☠️ Grim Reaper: +50 once / −60 per loss);
-telling Nullp about "treats" (widget) sets `monster_attack_hw_treat_<year>` = +10% on those wins.
+(The old Nullp "treats" +10% boost was removed; Nullp's word is now "santa" — see Santa's Sleigh Road.)
 
 ### 🍮 Slimy the Jelly's loot (slimyDrops, on the boss kill)
 Each rolls on its own: 💧 Little Blue Slime 25% (owned already → 50% it levels up) · 💎 Upgrade Crystal 10% ·
@@ -601,3 +601,12 @@ Tests: tools/test-xmas-loot.js.
 ### 🎁 Christmas wave presents
 At Christmas there is no gift spot / door (evGift stays null): tickEvGift gives a 🎁 present of ❄️ 3–8 snowflakes
 once per wave (xmPresentWave, reset in startGame). Halloween keeps its 🚪 trick-or-treat door spot.
+
+### 🛷 Santa's Sleigh Road (Christmas) — opened by saying "santa" to Nullp
+World `sleighroad` (event christmas). The Nullp widget's santaCheck sets `monster_attack_xm_santa_<xmas year>`;
+isWorldUnlocked needs that + Christmas + not sleighDone() (`monster_attack_xm_sleigh_done_<year>`, once a Christmas).
+Built like Trick-or-Treat Street (STREET_WORLDS / onStreetMap(): road, gate, no wave monsters, no gift spot) with
+'xmhouse' houses (body 'xmwall': the brwall wall + coloured Christmas lights on the road side; snowy cap).
+No houses to knock: hwCastleTick places the ice castle up the road at once and rides you there. enterCastle on the
+sleigh road skips the guards — an XM_CASTLE_BOSSES boss straight away; beating it DOUBLES your snowflakes
+(+max(wallet, 20), exact — no title bonus).
