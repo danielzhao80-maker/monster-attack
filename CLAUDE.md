@@ -117,6 +117,7 @@ node tools/test-ultimates.js index.html     # ultimate forms: enter, transform, 
 node tools/test-world-styles.js index.html  # per-world architecture across all 30 worlds
 node tools/test-summons-look.js index.html  # summons: one 2D+3D look per kind, mechanics unchanged
 node tools/test-special-maps.js index.html  # ⭐ Special Maps: lock/unlock, Backrooms run, save, City fallback
+node tools/test-slimy.js index.html         # 🍮 Slimy's loot: Blue Slime pet, Upgrade Crystals, blood walls
 node tools/test-events.js index.html        # 🎉 Halloween + Christmas events: dates, currency, bosses, decorations, pass, shop, codes
 ```
 
@@ -511,3 +512,12 @@ lie on the road (no pebbles), no wave gift, no wave intro, the HUD shows the goa
 frozen and halves when slowed; splits of castle monsters are castle monsters too. The other games use ArcadeShop.halloween
 (REBUILD first win, Track Run first win — one time each; Buckshot's ☠️ Grim Reaper: +50 once / −60 per loss);
 telling Nullp about "treats" (widget) sets `monster_attack_hw_treat_<year>` = +10% on those wins.
+
+### 🍮 Slimy the Jelly's loot (slimyDrops, on the boss kill)
+Each rolls on its own: 💧 Little Blue Slime 25% (owned already → 50% it levels up) · 💎 Upgrade Crystal 10% ·
+🩸 64 blood 30% · 🍖 500 flesh + 🏆 5 points 60%. Pets now have `level` (petLevel, cap PET_MAX_LEVEL 100; shots
++15%/level, petLevelMult); a crystal (`monster_attack_upgrade_crystals`) levels any pet from the Pets screen.
+The slime is a pet with `special:'blueslime'`, `nickname`, `color`, `hat` (slime-modal; drawBlueSlime / its own
+3D blob); while equipped, playerHit → blueSlimeEats: 20% it eats the hit, levels up and fires it back.
+Blood (`monster_attack_blood`): [B] builds a `kind:'blood'` wall with 10 HP for 64 blood (buildBloodWall).
+
