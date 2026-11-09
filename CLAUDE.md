@@ -122,6 +122,7 @@ node tools/test-biscuit.js index.html        # 🍪 Biscuit's loot: Cookie pet, 
 node tools/test-mrroll.js index.html        # 🍬 Mr Roll's loot: Rolly, Candy Blocks, Master of Rolls (+3% candy)
 node tools/test-mrblob.js index.html        # 🍮 Mr Blob's loot: Mr Blob pet, Candy Grinding, Friendship (hold F), Blobs
 node tools/test-mrsgum.js index.html        # 🐻 Mrs Gum's loot: Gumdrop, Candy Lord, Boss Summons; [U] boss loot
+node tools/test-xmas-loot.js index.html     # ❄️ the ice castle (Christmas) and its loot; LIMITED rarity
 node tools/test-events.js index.html        # 🎉 Halloween + Christmas events: dates, currency, bosses, decorations, pass, shop, codes
 ```
 
@@ -580,3 +581,19 @@ redeemCode checks it after CODES and never saves it to the used-codes list. Run 
 check the real code. Never write the code itself into this repo (it is public).
 The arcade's own Admin Panel lists every catalog item, so the boss titles/avatar are there already.
 Tests: tools/test-mrsgum.js.
+
+### ❄️ The ICE CASTLE (Christmas) + LIMITED rarity
+castleEventId() is 'halloween' or 'christmas': the castle (5% find on any map) works at Christmas too, with
+XM_CASTLE_BOSSES (same 50/25/14/10/1 slots): Sleety the Slush, Ginger the Cerberus, Mr Candy Cane, Mr Figgy, Mrs Frost.
+The boss reward is +100 of the event's currency. Each drop function handles both twins (xm = the Christmas name):
+the same chances, flesh, points, Upgrade Crystals, arcade points, titles and avatar; Christmas pets/skills/items:
+  pets  snowslime (slime power; uses the slime look + ✏️ window), gingersnap (cookie), jingle (rolly), figgy (blob),
+        snowdrop (all), frostlord (all ×1.8, from combineFrostLord with a 💠 Frost crystal; LORDS table)
+  skills Gingerbread Men (GINGERMEN_KEY, #gingermen-btn, allies 'gingerman'), Reindeer Call (REINDEER_KEY, hold F →
+        Rudolph, ally 'reindeer', 20% of Mrs Frost's stats; F hold summons Mr Gum and/or Rudolph)
+  items ICE_KEY (B: 'ice' wall), SNOWBALL_KEY (T: freezes + 'snow' wall), ICEBLOCK_KEY (C: 'iceblock'),
+        STOCKING_KEY (blocks 1 hit), FROST_COMBINE_KEY, XM_SUMMON_KEY (H: an ice-castle boss)
+pickSet(hwKey, xmKey): the B/T/C/H keys and blocking use whichever bag you have, the current event's first.
+Every boss pet has rank 'LIMITED' (PET_RANK_COLORS/DAMAGE/COOLDOWN/SUMMON_COOLDOWN, sorted above SSS); loadPets
+turns older saves' special pets into LIMITED. Admin bosspets/bossitems/bossskills give both castles' loot.
+Tests: tools/test-xmas-loot.js.

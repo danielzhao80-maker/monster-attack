@@ -197,11 +197,11 @@ check(/k==='h' && gameRunning/.test(code) && q(`SUMMON_EMOJI.candyboss`) === '�
 // ---- 🔓 Admin Unlocks: the boss loot ----
 reset();
 q(`localStorage.setItem('daniels-arcade-v1', JSON.stringify({ owned: ['owner'] }));`);
-check(q(`unlockAction('bosspets')`) === true && q(`petsOwned.length`) === 5 && q(`candyLordIdx()`) === -1, '[U] 🐾 the 5 boss pets (not the Candy Lord — you combine that)');
+check(q(`unlockAction('bosspets')`) === true && q(`petsOwned.length`) === 10 && q(`candyLordIdx()`) === -1, '[U] 🐾 the 10 boss pets of both castles (not the Lords — you combine those)');
 check(q(`unlockAction('bossitems')`) === true && q(`itemCount(BOSS_SUMMON_KEY)`) === 5 && q(`itemCount(COMBINE_KEY)`) === 1 && q(`itemCount(BLOBS_KEY)`) === 10, '[U] 🎒 boss items');
 q(`openPetsScreen()`);
 check(q(`document.getElementById('pets-combine').style.opacity`) === '1', '…and the 💠 Combine button is ready in 🐾 Pets');
-check(q(`combineCandyLord()`) === true && q(`petsOwned.map(function(p){ return p.special; }).join()`) === 'gumdrop,candylord', 'admin pets + crystal: you CAN combine the Candy Lord');
+check(q(`combineCandyLord()`) === true && q(`petsOwned.map(function(p){ return p.special; }).join()`) === 'gumdrop,snowslime,gingersnap,jingle,figgy,snowdrop,candylord', 'admin pets + crystal: you CAN combine the Candy Lord', q(`petsOwned.map(function(p){ return p.special; }).join()`));
 q(`unlockAction('bosspets'); unlockAction('bossitems');`);
 check(q(`combineCandyLord()`) === true && q(`petsOwned.filter(function(p){ return p.special === 'candylord'; }).length`) === 2, 'and again (a second Candy Lord) with 4 new boss pets and another crystal');
 check(q(`unlockAction('bossskills')`) === true && q(`hasCookieDogs() && hasFriendship()`), '[U] ✨ boss skills');
@@ -216,7 +216,7 @@ reset();
 q(`localStorage.removeItem(ADMIN_LIMITS_KEY)`);
 check(/adminBossLoot\('bosspets'\)/.test(html) && /ownerBossLoot\('bosscosmetics'\)/.test(html) && /id="cap-bossloot"/.test(html), 'both panels have a 🏰 boss loot section');
 const ad = JSON.parse(q(`(function(){ var r = ['bosspets', 'bossitems', 'bossskills', 'bosscosmetics', 'bossitems'].map(adminBossLoot); return JSON.stringify({ r: r, summons: itemCount(BOSS_SUMMON_KEY), pets: petsOwned.length, msg: document.getElementById('admin-msg').textContent }); })()`));
-check(ad.r.join() === 'true,true,true,true,false' && ad.summons === 5 && ad.pets === 5, 'Admin Panel: boss loot, 4 a day', JSON.stringify(ad));
+check(ad.r.join() === 'true,true,true,true,false' && ad.summons === 5 && ad.pets === 10, 'Admin Panel: boss loot, 4 a day', JSON.stringify(ad));
 check(/Daily limit/.test(ad.msg), '…then it says the daily limit is reached');
 check(q(`ownerBossLoot('bossitems') && ownerBossLoot('bossitems') && ownerBossLoot('bossitems')`) && q(`itemCount(BOSS_SUMMON_KEY)`) === 20, 'Owner Panel: no limit');
 q(`localStorage.removeItem(ADMIN_LIMITS_KEY)`);
