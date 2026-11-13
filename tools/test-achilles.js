@@ -147,5 +147,17 @@ q(`gameRunning = false; startGame(); waveIntroTimer = 0; player.maxHp = 100; pla
 check(owns(), 'ONE hit from full health: 🦶 Achilles Heel unlocked');
 check(JSON.parse(q(`localStorage.getItem('daniels-arcade-v1')`)).owned.filter(x => x === 'achilles').length === 1, 'given once');
 check(/'achilles'/.test(code), 'the game grants the arcade title');
+// ---- 🏛️ a god from the arcade's 🏆 Achievements box ----
+q(`petsOwned = []; equippedPets = []; savePets(); saveEquippedPet(); rebuildPetRuntime();
+   localStorage.setItem('daniels-arcade-v1', JSON.stringify({ owned: [], godPet: 'Odin', pendingPets: ['Odin'] }));`);
+const god = JSON.parse(q(`JSON.stringify(claimArcadePets())`));
+const odin = JSON.parse(q(`JSON.stringify(petsOwned.find(function(p){ return p.name === 'Odin'; }) || null)`));
+check(god.length === 1 && odin && odin.rank === 'SSS' && odin.god && odin.exclusive && odin.element === 'Shadow', 'the arcade\'s god pet arrives in your pets (🦅 Odin, SSS)', JSON.stringify(odin));
+check(q(`equippedPets.indexOf(petsOwned.length - 1) > -1`), '…and goes out with you if there is room');
+check(JSON.parse(q(`localStorage.getItem('daniels-arcade-v1')`)).pendingPets.length === 0 && q(`claimArcadePets().length`) === 0 && q(`petsOwned.length`) === 1, 'only once (the arcade\'s note is cleared)');
+check(q(`(function(){ for (var i = 0; i < 300; i++) { var r = hatchOneEgg(); if (['Zeus','Achilles','Odin'].indexOf(r.name) > -1) return false; } return true; })()`), 'the gods never come out of eggs');
+check(/claimArcadePets\(\);   \/\/ 🏛️/.test(code) && /function openPetsScreen\(\) \{\s*claimArcadePets\(\);/.test(code), 'checked when the game loads and when 🐾 Pets opens');
+check(q(`(function(){ var c = document.getElementById('x').getContext('2d'); ['Zeus','Achilles','Odin'].forEach(function(n){ drawPetFull({ name: n, rank: 'SSS', element: 'Holy', ability: '🛡️ Defense' }, c, 30, 30, 1); }); return true; })()`), 'all three draw');
+
 console.log('\n' + (ok ? 'ACHILLES PASS' : 'ACHILLES FAIL'));
 process.exit(ok ? 0 : 1);

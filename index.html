@@ -5882,6 +5882,11 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // ===== EXCLUSIVE class pets — NOT hatchable, admin-panel only. Buff their class's abilities =====
         { name:'Lightning', emoji:'⚡', rank:'SSS', exclusive:true, buffClass:'Flash' },
         { name:'Omega',     emoji:'🌌', rank:'SSS', exclusive:true, buffClass:'Admin' },
+        // 🏛️ The gods: one of them comes from the secret button in the arcade's 🏆 Achievements box
+        // (arcade save .pendingPets → claimArcadePets). Never from eggs (exclusive).
+        { name:'Zeus',      emoji:'🌩️', rank:'SSS', exclusive:true, god:true, ability:'🎯 Crit Chance', element:'Lightning' },
+        { name:'Achilles',  emoji:'⚔️', rank:'SSS', exclusive:true, god:true, ability:'🛡️ Defense',     element:'Holy' },
+        { name:'Odin',      emoji:'🦅', rank:'SSS', exclusive:true, god:true, ability:'🍀 Lucky Drops', element:'Shadow' },
     ];
     const PET_RANK_WEIGHTS = { F:50, C:9, B:25, A:10, S:5, SSS:1 };
     // LIMITED: the candy/ice-castle boss pets only (never from eggs) — shown above SSS.
@@ -5979,6 +5984,32 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // The runtime entry carries its pet, so the 3D renderer can build the right creature without
     // re-deriving which equipped slot it belongs to every frame.
     function rebuildPetRuntime() { petRuntime = equippedPets.map(i => ({ x:0, y:0, bulletCd:0, summonCd:0, _pet: petsOwned[i] || null })); }
+    // 🏛️ Pets the arcade hands over (its save's pendingPets — e.g. a god from the 🏆 Achievements box):
+    // move them into your collection, once each. Checked when the pets load, the Pets screen opens and a run starts.
+    function claimArcadePets() {
+        let pending = [];
+        try { pending = ((window.ArcadeShop && ArcadeShop.load) ? ArcadeShop.load() : JSON.parse(localStorage.getItem('daniels-arcade-v1') || '{}')).pendingPets || []; } catch (e) {}
+        if (!Array.isArray(pending) || !pending.length) return [];
+        const got = [];
+        for (const name of pending) {
+            const def = PETS.find(p => p.name === name && p.god);
+            if (!def || petsOwned.some(p => p && p.name === name && p.god)) continue;
+            petsOwned.push({ name: def.name, rank: def.rank, ability: def.ability, element: def.element, exclusive: true, god: true });
+            const idx = petsOwned.length - 1;
+            if (typeof equippedPets !== 'undefined' && equippedPets.filter(i => !(petsOwned[i] && petsOwned[i].rank === 'LIMITED')).length < 5) equippedPets.push(idx);
+            got.push(`${def.emoji} ${def.name}`);
+        }
+        const clear = (sv) => { sv.pendingPets = []; };
+        try {
+            if (window.ArcadeShop && ArcadeShop.update) ArcadeShop.update(clear);
+            else { const sv = JSON.parse(localStorage.getItem('daniels-arcade-v1') || '{}'); clear(sv); localStorage.setItem('daniels-arcade-v1', JSON.stringify(sv)); }
+        } catch (e) {}
+        if (got.length) {
+            savePets(); saveEquippedPet(); rebuildPetRuntime();
+            if (typeof showStatus === 'function') setTimeout(() => showStatus(`🏛️ A god joins you: ${got.join(', ')}! (🐾 Pets)`, '#feca57'), 800);
+        }
+        return got;
+    }
     function loadEquippedPet() {
         try {
             const d = JSON.parse(localStorage.getItem(EQUIPPED_PET_KEY));
@@ -6900,6 +6931,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
 
     loadPets();
     loadEquippedPet();
+    claimArcadePets();   // 🏛️ a god from the arcade's 🏆 Achievements box, if one is waiting
 
     // ======================== WEAPONS / EQUIPMENT ========================
     // Guns are for RANGED classes, melee weapons for MELEE classes. A melee class can't equip a gun
@@ -7892,6 +7924,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
 
     function openPetsScreen() {
+        claimArcadePets();
         document.getElementById('start-screen').style.display = 'none';
         document.getElementById('pets-screen').style.display = 'flex';
         document.getElementById('pets-flesh').textContent = '🍖 ' + coinStr();
@@ -26027,6 +26060,7 @@ const col = b.color || BLDG_COLORS[0];
 
     function startGame() {
         if (!chosenClass) return;
+        claimArcadePets();
         brExit = null; evGift = null; xmPresentWave = 0; cookieDogsCd = 0; gingerMenCd = 0; reindeerCd = 0; setTimeout(refreshCookieDogsBtn, 0);
         ensureWorldAllowed();
         if (isPlayerBanned(playerName)) { alert('You are BANNED! Contact an Admin or Owner.'); return; }

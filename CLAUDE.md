@@ -619,3 +619,7 @@ clears the once-a-year done flag — [U] unlockAction, 🛠️ Admin Panel (admi
 ### 🏆 Achievements
 🦶 Achilles Heel (arcade title `achilles`): playerHit grants it when ONE hit takes the local player from full health
 to 0. The arcade home's 🏆 Achievements box (ACHIEVEMENTS in arcade/index.html) lists the challenge titles. Tests: tools/test-achilles.js.
+🏛️ The arcade's 🏆 Achievements box has an invisible top-left button (#godBtn): once per save it sets sv.godPet and
+sv.pendingPets = [Zeus|Achilles|Odin]; claimArcadePets() (load, Pets screen, startGame) turns it into an exclusive SSS
+god pet (PETS entries with god:true — never from eggs). Achievements are PERMANENT: arcade-shop.js keeps earned
+ACHIEVEMENT_IDS in 'daniels-arcade-achievements:<account|guest>' and load() always adds them back (Take away refuses).
