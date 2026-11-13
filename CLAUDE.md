@@ -627,8 +627,10 @@ ACHIEVEMENT_IDS in 'daniels-arcade-achievements:<account|guest>' and load() alwa
 
 ### 🔮 Forbidden Spell + 🐍 Typhon
 Forbidden Spell is an arcade ⚡ ability (`monster-city:forbidden`, single: one level, cost 30; abilityMax/costFor in
-arcade-shop.js). Switched on → _AB.forbidden; HOLD K for K_HOLD (60 frames, letting go cancels) → castForbiddenSpell:
-every monster dies (shields dropped, monster shots cleared) and the player dies too (reviveUsed forced). Once a run.
+arcade-shop.js). Switched on → _AB.forbidden; HOLD K for K_HOLD (60 frames, letting go cancels) → castForbiddenSpell
+summons a GOD (ally kind 'god', makeGodMesh3D: your god pet, else a random one of Zeus / Achilles / Odin); 90 frames
+later forbiddenSmite: every monster dies (shields dropped, shots cleared), every remote player is struck, and the
+caster dies (reviveUsed forced). Once a run.
 Typhon (MONSTER_CLASSES, body serpent, hp 400, dmg 45, canSwallow + poisonTrail + every boss flag): rollMonsterClass gives him on 5% (TYPHON_CHANCE) of boss waves
 from wave 20; typhonTick (in friendshipTick) calls TYPHON_BOLTS (8) lightning bolts around the player every 2 s (1.2 s under half
 HP) with 0.75 s of warning sparks; typhonDrops: 100,000 flesh + 25 points + the `typhonslayer` arcade title.
