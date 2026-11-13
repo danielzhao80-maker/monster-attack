@@ -629,7 +629,7 @@ ACHIEVEMENT_IDS in 'daniels-arcade-achievements:<account|guest>' and load() alwa
 Forbidden Spell is an arcade ⚡ ability (`monster-city:forbidden`, single: one level, cost 30; abilityMax/costFor in
 arcade-shop.js). Switched on → _AB.forbidden; HOLD K for K_HOLD (60 frames, letting go cancels) → castForbiddenSpell:
 every monster dies (shields dropped, monster shots cleared) and the player dies too (reviveUsed forced). Once a run.
-Typhon (MONSTER_CLASSES, body titan, every boss flag): rollMonsterClass gives him on 5% (TYPHON_CHANCE) of boss waves
-from wave 20; typhonTick (in friendshipTick) calls 5 lightning bolts around the player every 3 s (1.8 s under half
+Typhon (MONSTER_CLASSES, body serpent, hp 400, dmg 45, canSwallow + poisonTrail + every boss flag): rollMonsterClass gives him on 5% (TYPHON_CHANCE) of boss waves
+from wave 20; typhonTick (in friendshipTick) calls TYPHON_BOLTS (8) lightning bolts around the player every 2 s (1.2 s under half
 HP) with 0.75 s of warning sparks; typhonDrops: 100,000 flesh + 25 points + the `typhonslayer` arcade title.
 summonTyphon(): Owner Panel (🏆 section) and [U] 'typhon'. Tests: tools/test-forbidden.js, tools/test-typhon.js.

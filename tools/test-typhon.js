@@ -136,15 +136,15 @@ q(`chosenClass = CLASSES[0]; playerName='T'; gameRunning=false; cameraMode='topd
 q(`chosenClass = CLASSES[0]; playerName='T'; gameRunning=false; cameraMode='topdown';`);
 const ty = JSON.parse(q(`JSON.stringify(MONSTER_CLASSES.find(function(c){ return c.name === 'Typhon'; }))`));
 const gum = JSON.parse(q(`JSON.stringify(MONSTER_CLASSES.find(function(c){ return c.name === 'Mrs Gum'; }))`));
-check(ty && ty.isBossOnly && ty.hp > gum.hp && ty.damage > gum.damage && ty.breathesFire && ty.enrage && ty.teleports && ty.hasShield && ty.canScream, 'Typhon: the strongest boss — more HP and damage than any other, and every boss power', JSON.stringify({ hp: ty.hp, dmg: ty.damage }));
+check(ty && ty.isBossOnly && ty.body === 'serpent' && ty.canSwallow && ty.poisonTrail && ty.hp >= 4 * gum.hp && ty.damage >= 2 * gum.damage && ty.breathesFire && ty.enrage && ty.teleports && ty.hasShield && ty.canScream, 'Typhon: a colossal SERPENT — 4× Mrs Gum\'s HP, 2.5× her damage, swallows, poison trail and every boss power', JSON.stringify({ hp: ty.hp, dmg: ty.damage }));
 const rate = JSON.parse(q(`(function(){ var n = 0, low = 0, k = 4000; currentWorld = WORLDS[0]; wave = 20; for (var i = 0; i < k; i++) if (rollMonsterClass().name === 'Typhon') n++; wave = 10; for (var i = 0; i < 1000; i++) if (rollMonsterClass().name === 'Typhon') low++; wave = 21; var notBoss = 0; for (var i = 0; i < 500; i++) if (rollMonsterClass().name === 'Typhon') notBoss++; wave = 1; return JSON.stringify({ pct: n / k * 100, low: low, notBoss: notBoss }); })()`));
 check(Math.abs(rate.pct - 5) < 1.5 && rate.low === 0 && rate.notBoss === 0, 'rare: ~5% of boss waves from wave 20 (never before, never on normal waves)', JSON.stringify(rate));
 q(`localStorage.setItem('daniels-arcade-v1', JSON.stringify({ owned: [] })); gameRunning = false; startGame(); waveIntroTimer = 0; monsters = []; coins = 0n; points = 0; savePoints(); summonTyphon();`);
 const t = JSON.parse(q(`(function(){ var m = monsters.find(function(x){ return /Typhon/.test(x.name); }); return JSON.stringify({ boss: m && m.isBoss, hp: m && m.maxHp }); })()`));
-check(t.boss && t.hp > 2 * 90 * 7 * 6.3, 'summoned (Owner Panel / [U]) he is a real boss — over twice Mrs Gum', JSON.stringify(t));
+check(t.boss && t.hp > 4 * 90 * 7 * 6.3, 'summoned (Owner Panel / [U]) he is a real boss — over 4× Mrs Gum', JSON.stringify(t));
 const storm = JSON.parse(q(`(function(){ player.hp = player.maxHp = 1e9; var m = monsters.find(function(x){ return /Typhon/.test(x.name); }); m.x = player.x + 3000; m._stormCd = 1; typhonTick(); var n = typhonStrikes.length, h = player.hp; player.invincible = 0;
   for (var k = 0; k < 50; k++) { player.invincible = 0; typhonTick(); } return JSON.stringify({ bolts: n, hurt: player.hp < h }); })()`));
-check(storm.bolts === 5 && storm.hurt, 'LIGHTNING STORM: 5 bolts around you; one lands where you stand and hits you', JSON.stringify(storm));
+check(storm.bolts === 8 && storm.hurt, 'LIGHTNING STORM: 8 bolts around you; one lands where you stand and hits you', JSON.stringify(storm));
 q(`player.x += 0; typhonStrikes = []; var m = monsters.find(function(x){ return /Typhon/.test(x.name); }); m._stormCd = 1; typhonTick(); player.x += 400; player.y += 400; var h = player.hp; for (var k = 0; k < 50; k++) { player.invincible = 0; typhonTick(); }`);
 check(q(`player.hp`) === q(`h`), 'step out of the sparks and the bolts miss');
 const win = JSON.parse(q(`(function(){ var i = monsters.findIndex(function(x){ return /Typhon/.test(x.name); }); var m = monsters[i];
