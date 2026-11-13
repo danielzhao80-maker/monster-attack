@@ -272,7 +272,7 @@ const sr = JSON.parse(q(`(function(){ var o = {}; gameRunning = false; selectWor
   o.world = currentWorld.id; o.roadY = player.y === streetRoadY(); o.gate = buildings.some(function(b){ return b.gate; });
   o.houses = buildings.filter(function(b){ return b.house; }).length; o.style = buildings.filter(function(b){ return b.house; })[0].st;
   for (var k = 0; k < 30; k++) update(); o.wave = monsters.filter(function(m){ return !m._castle; }).length; o.gift = evGift; o.doors = hwHouses.length;
-  o.castle = !!hwCastle; o.ahead = hwCastle && hwCastle.x - player.x; var x0 = player.x; for (var k = 0; k < 30; k++) hwCastleTick(); o.rode = Math.round(player.x - x0);
+  o.castle = !!hwCastle; o.ahead = hwCastle && hwCastle.x - player.x; traps = []; player.stunned = 0; player.frozen = 0; player.slow = 0; var x0 = player.x; for (var k = 0; k < 30; k++) hwCastleTick(); o.rode = Math.round(player.x - x0);
   loadEvent(EVENTS.christmas); evWallet = 37; saveEvent();
   player.x = hwCastle.x; player.y = hwCastle.y; hwCastleTick();
   o.phase = hwCastle.phase; o.guards = monsters.filter(function(m){ return m.name === 'Castle Guard'; }).length;
