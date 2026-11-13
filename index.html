@@ -376,6 +376,7 @@
         <div style="font-weight:800;color:#8854d0;font-size:0.85em;margin-top:6px;">🗺️ Event maps</div>
         <button class="god-btn" onclick="unlockAction('sleighroad')">🛷 Santa's Sleigh Road (open / ride again)</button>
         <button class="god-btn" onclick="unlockAction('trickstreet')">🏚️ Trick-or-Treat Street (ride again)</button>
+        <button class="god-btn" onclick="unlockAction('achievements')">🏆 All achievements (🦶 🏆 ⚡ ⚔️ 🌀)</button>
         <div id="unlock-msg" style="min-height:1.2em;font-weight:800;color:#8854d0;font-size:0.85em;"></div>
     </div>
     <!-- 🍪🐕 The Cookie Dogs skill (Biscuit the Cerberus drops it): click to summon 5 cookie dogs -->
@@ -877,6 +878,18 @@
             </div>
         </div>
         <div class="admin-section">
+            <h3>🏆 Achievements <span class="cap-badge" id="cap-ach"></span></h3>
+            <div style="color:#aaa;font-size:0.72em;font-weight:700;margin-bottom:6px;">Unlock an achievement title (arcade). Achievements are permanent once you have them.</div>
+            <div class="admin-row" style="flex-wrap:wrap;">
+                <button class="admin-btn gold" onclick="adminAchievement('all')">🏆 All achievements</button>
+                <button class="admin-btn" onclick="adminAchievement('achilles')">🦶 Achilles Heel</button>
+                <button class="admin-btn" onclick="adminAchievement('champion')">🏆 Champion</button>
+                <button class="admin-btn" onclick="adminAchievement('comeback')">⚡ Fast Comebacker</button>
+                <button class="admin-btn" onclick="adminAchievement('revenge')">⚔️ Revenge</button>
+                <button class="admin-btn" onclick="adminAchievement('dimension')">🌀 Dimension Opener</button>
+            </div>
+        </div>
+        <div class="admin-section">
             <h3>🗺️ Event Maps <span class="cap-badge" id="cap-maps"></span></h3>
             <div style="color:#aaa;font-size:0.72em;font-weight:700;margin-bottom:6px;">Open a one-time event map (again). They show in Worlds while their event is on.</div>
             <div class="admin-row" style="flex-wrap:wrap;">
@@ -1061,6 +1074,18 @@
                 <button class="admin-btn" onclick="ownerBossLoot('bossitems')">🎒 Boss items</button>
                 <button class="admin-btn green" onclick="ownerBossLoot('bossskills')">✨ Boss skills</button>
                 <button class="admin-btn" onclick="ownerBossLoot('bosscosmetics')">🏅 Boss titles &amp; avatar</button>
+            </div>
+        </div>
+        <div class="admin-section">
+            <h3>🏆 Achievements <span class="nocap-badge">no limit</span></h3>
+            <div style="color:#aaa;font-size:0.72em;font-weight:700;margin-bottom:6px;">Unlock an achievement title (arcade). Achievements are permanent once you have them.</div>
+            <div class="admin-row" style="flex-wrap:wrap;">
+                <button class="admin-btn gold" onclick="ownerAchievement('all')">🏆 All achievements</button>
+                <button class="admin-btn" onclick="ownerAchievement('achilles')">🦶 Achilles Heel</button>
+                <button class="admin-btn" onclick="ownerAchievement('champion')">🏆 Champion</button>
+                <button class="admin-btn" onclick="ownerAchievement('comeback')">⚡ Fast Comebacker</button>
+                <button class="admin-btn" onclick="ownerAchievement('revenge')">⚔️ Revenge</button>
+                <button class="admin-btn" onclick="ownerAchievement('dimension')">🌀 Dimension Opener</button>
             </div>
         </div>
         <div class="admin-section">
@@ -23636,6 +23661,7 @@ const col = b.color || BLDG_COLORS[0];
         else if (kind === 'points') { points += 100; savePoints(); say('🏆 +100 points'); }
         else if (BOSS_LOOT_KINDS.indexOf(kind) > -1) say(giveBossLoot(kind));
         else if (EVENT_MAP_KINDS.indexOf(kind) > -1) say(openEventMap(kind));
+        else if (kind === 'achievements') say(giveAchievement('all'));
         else return false;
         SFX.pickup && SFX.pickup();
         refreshEventButton();
@@ -23682,6 +23708,27 @@ const col = b.color || BLDG_COLORS[0];
         return kind === 'sleighroad'
             ? "🛷 Santa's Sleigh Road is open and ready to ride — Worlds → 🛷" + (isEventOn('christmas') ? '' : ' (it shows at Christmas)')
             : '🏚️ Trick-or-Treat Street is ready to ride again — Worlds → 🏚️' + (isEventOn('halloween') ? '' : ' (it shows at Halloween)');
+    }
+    // 🏆 The achievement titles (arcade; permanent once you have them).
+    const ACHIEVEMENT_NAMES = { achilles: '🦶 Achilles Heel', champion: '🏆 Champion', comeback: '⚡ Fast Comebacker', revenge: '⚔️ Revenge', dimension: '🌀 Dimension Opener' };
+    function giveAchievement(id) {
+        const ids = id === 'all' ? Object.keys(ACHIEVEMENT_NAMES) : (ACHIEVEMENT_NAMES[id] ? [id] : []);
+        if (!ids.length) return '';
+        const fresh = ids.filter(x => !arcadeOwns(x));
+        ids.forEach(grantArcadeItem);
+        return fresh.length ? `🏆 Achievement unlocked: ${fresh.map(x => ACHIEVEMENT_NAMES[x]).join(', ')} — yours for good`
+                            : `🏆 You already have ${ids.length > 1 ? 'every achievement' : ACHIEVEMENT_NAMES[id]}`;
+    }
+    function adminAchievement(id) {   // 🛠️ Admin Panel: 1 a day (ADMIN_CAPS.ach)
+        if (id !== 'all' && !ACHIEVEMENT_NAMES[id]) return false;
+        if (!adminTrySpend('ach', 1)) return false;
+        adminMsg(giveAchievement(id) + ` · ${adminLeftToday('ach')} left today`);
+        SFX.pickup && SFX.pickup(); return true;
+    }
+    function ownerAchievement(id) {   // 👑 Owner Panel: no limit
+        if (id !== 'all' && !ACHIEVEMENT_NAMES[id]) return false;
+        adminMsg(giveAchievement(id));
+        SFX.pickup && SFX.pickup(); return true;
     }
     function adminEventMap(kind) {   // 🛠️ Admin Panel: 2 a day (ADMIN_CAPS.maps)
         if (EVENT_MAP_KINDS.indexOf(kind) < 0 || !adminTrySpend('maps', 1)) return false;
@@ -25329,8 +25376,8 @@ const col = b.color || BLDG_COLORS[0];
     // The Admin Panel is rate-limited per day. The Owner Panel runs the SAME actions with no cap —
     // every owner*() function below is just the admin one called with unlimited=true.
     const ADMIN_LIMITS_KEY = 'monster_city_admin_limits';
-    const ADMIN_CAPS   = { flesh:500, points:500, classes:25, xp:100, abilities:1, pets:50, bossloot:4, maps:2 };
-    const ADMIN_CAP_LBL= { flesh:'🍖 Flesh', points:'🏆 Points', classes:'Class unlocks', xp:'Season XP', abilities:'Ability upgrades', pets:'Pets', bossloot:'🏰 Boss loot', maps:'🗺️ Event maps' };
+    const ADMIN_CAPS   = { flesh:500, points:500, classes:25, xp:100, abilities:1, pets:50, bossloot:4, maps:2, ach:1 };
+    const ADMIN_CAP_LBL= { flesh:'🍖 Flesh', points:'🏆 Points', classes:'Class unlocks', xp:'Season XP', abilities:'Ability upgrades', pets:'Pets', bossloot:'🏰 Boss loot', maps:'🗺️ Event maps', ach:'🏆 Achievements' };
     function loadAdminLimits() {
         try {
             const d = JSON.parse(localStorage.getItem(ADMIN_LIMITS_KEY) || '{}');

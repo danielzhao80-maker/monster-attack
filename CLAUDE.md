@@ -623,3 +623,4 @@ to 0. The arcade home's 🏆 Achievements box (ACHIEVEMENTS in arcade/index.html
 sv.pendingPets = [Zeus|Achilles|Odin]; claimArcadePets() (load, Pets screen, startGame) turns it into an exclusive SSS
 god pet (PETS entries with god:true — never from eggs). Achievements are PERMANENT: arcade-shop.js keeps earned
 ACHIEVEMENT_IDS in 'daniels-arcade-achievements:<account|guest>' and load() always adds them back (Take away refuses).
+🏆 giveAchievement(id|'all'): Admin Panel (adminAchievement, 1 a day: ADMIN_CAPS.ach), Owner Panel (ownerAchievement, no limit), [U] 'achievements'.

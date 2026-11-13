@@ -159,5 +159,16 @@ check(q(`(function(){ for (var i = 0; i < 300; i++) { var r = hatchOneEgg(); if 
 check(/claimArcadePets\(\);   \/\/ 🏛️/.test(code) && /function openPetsScreen\(\) \{\s*claimArcadePets\(\);/.test(code), 'checked when the game loads and when 🐾 Pets opens');
 check(q(`(function(){ var c = document.getElementById('x').getContext('2d'); ['Zeus','Achilles','Odin'].forEach(function(n){ drawPetFull({ name: n, rank: 'SSS', element: 'Holy', ability: '🛡️ Defense' }, c, 30, 30, 1); }); return true; })()`), 'all three draw');
 
+// ---- 🏆 in the Admin Panel, the Owner Panel and [U] ----
+check(/adminAchievement\('achilles'\)/.test(html) && /ownerAchievement\('all'\)/.test(html) && /unlockAction\('achievements'\)/.test(html), 'the Admin Panel, the Owner Panel and [U] all have 🏆 Achievements');
+q(`localStorage.setItem('daniels-arcade-v1', JSON.stringify({ owned: [] })); localStorage.removeItem(ADMIN_LIMITS_KEY);`);
+check(q(`ownerAchievement('achilles')`) === true && q(`arcadeOwns('achilles')`), '👑 Owner Panel: 🦶 Achilles Heel');
+check(q(`ownerAchievement('all')`) && ['achilles','champion','comeback','revenge','dimension'].every(id => q(`arcadeOwns('${id}')`)), '👑 …and all of them at once');
+q(`localStorage.setItem('daniels-arcade-v1', JSON.stringify({ owned: [] }));`);
+check(JSON.stringify([q(`adminAchievement('champion')`), q(`adminAchievement('revenge')`)]) === '[true,false]' && q(`arcadeOwns('champion')`) && !q(`arcadeOwns('revenge')`), '🛠️ Admin Panel: 1 a day');
+q(`localStorage.setItem('daniels-arcade-v1', JSON.stringify({ owned: ['owner'] }));`);
+check(q(`unlockAction('achievements')`) === true && q(`arcadeOwns('dimension')`), '[U] Admin Unlocks: all achievements');
+q(`localStorage.removeItem(ADMIN_LIMITS_KEY);`);
+
 console.log('\n' + (ok ? 'ACHILLES PASS' : 'ACHILLES FAIL'));
 process.exit(ok ? 0 : 1);
