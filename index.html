@@ -377,6 +377,7 @@
         <button class="god-btn" onclick="unlockAction('sleighroad')">🛷 Santa's Sleigh Road (open / ride again)</button>
         <button class="god-btn" onclick="unlockAction('trickstreet')">🏚️ Trick-or-Treat Street (ride again)</button>
         <button class="god-btn" onclick="unlockAction('achievements')">🏆 All achievements (🦶 🏆 ⚡ ⚔️ 🌀)</button>
+        <button class="god-btn" onclick="unlockAction('typhon')">🐍 Summon Typhon (the OP boss)</button>
         <div id="unlock-msg" style="min-height:1.2em;font-weight:800;color:#8854d0;font-size:0.85em;"></div>
     </div>
     <!-- 🍪🐕 The Cookie Dogs skill (Biscuit the Cerberus drops it): click to summon 5 cookie dogs -->
@@ -1087,6 +1088,7 @@
                 <button class="admin-btn" onclick="ownerAchievement('revenge')">⚔️ Revenge</button>
                 <button class="admin-btn" onclick="ownerAchievement('dimension')">🌀 Dimension Opener</button>
             </div>
+            <div class="admin-row" style="margin-top:6px;"><button class="admin-btn red" onclick="closeOwnerPanel(); setTimeout(summonTyphon, 300)">🐍 Summon Typhon (in a game)</button></div>
         </div>
         <div class="admin-section">
             <h3>🗺️ Event Maps <span class="nocap-badge">no limit</span></h3>
@@ -1554,7 +1556,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // All zero without the shop, which makes every hook below a no-op: the game plays exactly as before.
     // Everything here applies to the LOCAL player only; a co-op guest is simulated by the host.
     if (window.ArcadeShop && window.ArcadeShop.setGame) window.ArcadeShop.setGame('monster-city');
-    const _AB = { tough: 0, power: 0, swift: 0, greed: 0, regen: 0, reload: 0 };
+    const _AB = { tough: 0, power: 0, swift: 0, greed: 0, regen: 0, reload: 0, forbidden: 0 };   // forbidden: 🔮 the spell is learned and ON
     let _dmgByLocal = false;   // true while the local player's bullet/ability is dealing damage
     function refreshArcadeAbilities(startup) {
         if (!window.ArcadeShop || !window.ArcadeShop.abilityValue) return;
@@ -2544,6 +2546,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         { name:'Leviathan', emoji:'🐋', accessory:'👑', armorColor:'#0984e3', rarity:'legendary', rarityColor:'#f1c40f', color:'#0984e3', hp:58, speed:1.05, damage:15, score:98, isBossOnly:true, body:'serpent', habitat:'water', canSwallow:true, enrage:true, desc:'Boss only!' },
         { name:'Void Devourer', emoji:'🌌', accessory:'👑', armorColor:'#6c5ce7', rarity:'legendary', rarityColor:'#f1c40f', color:'#6c5ce7', hp:54, speed:1.05, damage:16, score:110, isBossOnly:true, body:'kraken', habitat:'void', canSwallow:true, phasing:true, desc:'Boss only!' },
         { name:'Star Titan', emoji:'⭐', accessory:'👑', armorColor:'#feca57', rarity:'legendary', rarityColor:'#f1c40f', color:'#feca57', hp:80, speed:0.72, damage:18, score:112, isBossOnly:true, body:'titan', habitat:'void', hasShield:true, isRanged:true, desc:'Boss only!' },
+        // 🐍 TYPHON — Greek mythology's Father of Monsters (even Zeus feared him). The OP boss: a rare 5% of any
+        // boss wave from wave 20, every boss power at once + LIGHTNING STORMS (typhonTick). Beat him: typhonDrops.
+        { name:'Typhon', emoji:'🐍', accessory:'🔱', armorColor:'#1e3d2f', rarity:'legendary', rarityColor:'#f1c40f', color:'#2d6a4f', hp:220, speed:1.3, damage:30, score:500, isBossOnly:true, body:'titan', habitat:'lava', breathesFire:true, enrage:true, canScream:true, teleports:true, hasShield:true, desc:'Greek mythology: the Father of Monsters' },
         { name:'Reaper', emoji:'☠️', accessory:'👑', armorColor:'#00ffe0', rarity:'legendary', rarityColor:'#f1c40f', color:'#00ffe0', hp:38, speed:1.25, damage:15, score:100, isBossOnly:true, body:'reaper', habitat:'graveyard', phasing:true, teleports:true, canScream:true, desc:'Boss only!' },
         { name:'Bone Colossus', emoji:'🦴', accessory:'👑', armorColor:'#e9e3d0', rarity:'legendary', rarityColor:'#f1c40f', color:'#e9e3d0', hp:76, speed:0.75, damage:17, score:104, isBossOnly:true, body:'golem', habitat:'graveyard', hasShield:true, splits:true, desc:'Boss only!' },
         { name:'Gumdrop Blob', emoji:'🍬', accessory:'👑', armorColor:'#fd79a8', rarity:'legendary', rarityColor:'#f1c40f', color:'#fd79a8', hp:60, speed:0.95, damage:13, score:96, isBossOnly:true, body:'blob', habitat:'toxic', splits:true, canSwallow:true, desc:'Boss only!' },
@@ -2881,10 +2886,12 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         return themed;
     }
 
+    const TYPHON_CHANCE = 0.05;
     function rollMonsterClass() {
         // Boss waves summon one of the CURRENT WORLD's two bosses — a straight 50/50 coin flip,
         // so you never know which of the pair is waiting for you.
         if (typeof wave !== 'undefined' && wave > 0 && wave % 10 === 0) {
+            if (wave >= 20 && Math.random() < TYPHON_CHANCE) return MONSTER_CLASSES.find(c => c.name === 'Typhon');   // 🐍 the OP boss
             const _ev = activeEvent();   // 🎉 the event's own boss may take any boss wave
             if (_ev && Math.random() < 0.35) return MONSTER_CLASSES.find(c => c.name === _ev.boss);
             const pool = (currentWorld && currentWorld.bosses) || ['Dragon', 'Crane Titan'];
@@ -6814,11 +6821,84 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         return true;
     }
     const hasHoldF = () => hasFriendship() || hasReindeer();
-    function friendshipTick() {   // in update(): the F-hold timer, Mr Gum's / Rudolph's / Gingerbread Men's cooldowns, Mr Blob's jump
+    // 🔮 FORBIDDEN SPELL (arcade ⚡ ability): once a run, HOLD K for 1 second — every monster on the map is
+    // wiped out (bosses and shields too, monster shots gone)… and so are you: no revive, no possession escape.
+    let kHeld = -1, forbiddenUsed = false;
+    const K_HOLD = 60;
+    function castForbiddenSpell() {
+        if (!player || !gameRunning || NET.mode === 'client' || forbiddenUsed || !(_AB.forbidden > 0)) return false;
+        forbiddenUsed = true;
+        const n = monsters.filter(m => m && m.hp > 0).length;
+        _asLocalDamage(true, () => {
+            for (let i = monsters.length - 1; i >= 0; i--) {
+                const m = monsters[i]; if (!m || m.hp <= 0) continue;
+                m.shieldUp = false;
+                hitMonster(m, i, m.hp + 1e9, true);
+            }
+        });
+        bullets = bullets.filter(b => b.owner !== 'monster');
+        for (let i = 0; i < 60; i++) { const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 9; particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 40, maxLife: 40, color: i % 3 ? '#8e44ad' : '#ffffff', r: 4 }); }
+        addShake(30); SFX.scream && SFX.scream();
+        showStatus(`🔮 THE FORBIDDEN SPELL! ${n} monster${n === 1 ? '' : 's'} wiped out… and you with them.`, '#8e44ad');
+        // …and the caster. Nothing saves you from this one.
+        player.reviveUsed = true; player.possessing = null; player.originalBody = null; player.invincible = 0;
+        player.hp = 0;
+        playerDie();
+        return true;
+    }
+    // 🐍 Typhon's LIGHTNING STORM: every ~3 s (faster when he is hurt) 5 bolts are called down around you —
+    // a crackle of sparks marks each spot for 0.75 s, then it strikes (dodge out of the sparks!).
+    let typhonStrikes = [];
+    function typhonTick() {
+        const ty = monsters.find(m => m && m.hp > 0 && m.isBoss && /Typhon/.test(m.name || ''));
+        if (ty && player && player.hp > 0) {
+            ty._stormCd = (ty._stormCd || 120) - 1;
+            if (ty._stormCd <= 0) {
+                ty._stormCd = ty.hp < ty.maxHp / 2 ? 110 : 180;
+                for (let k = 0; k < 5; k++) {
+                    const a = Math.random() * Math.PI * 2, d = k === 0 ? 0 : 40 + Math.random() * 150;
+                    typhonStrikes.push({ x: player.x + Math.cos(a) * d, y: player.y + Math.sin(a) * d, t: 45, dmg: Math.round(ty.damage * 1.2) });
+                }
+                if (!ty._warned) { ty._warned = true; showStatus('🐍 TYPHON calls down the storm — get out of the sparks!', '#feca57'); }
+            }
+        }
+        for (const st of typhonStrikes) {
+            st.t--;
+            if (st.t > 0) {   // the warning: sparks crackling on the spot
+                if (st.t % 3 === 0) particles.push({ x: st.x + (Math.random() - 0.5) * 50, y: st.y + (Math.random() - 0.5) * 50, vx: 0, vy: -0.6, life: 10, maxLife: 10, color: st.t % 2 ? '#feca57' : '#ffffff', r: 3 });
+            } else {          // the bolt
+                for (let i = 0; i < 18; i++) { const a = Math.random() * Math.PI * 2; particles.push({ x: st.x, y: st.y, vx: Math.cos(a) * 6, vy: Math.sin(a) * 6, life: 16, maxLife: 16, color: i % 2 ? '#fff7a8' : '#74b9ff', r: 4 }); }
+                if (player && player.hp > 0 && Math.hypot(player.x - st.x, player.y - st.y) < 48 && !(player.invincible > 0)) playerHit(st.dmg, player, 'Typhon');
+                addShake(6);
+            }
+        }
+        typhonStrikes = typhonStrikes.filter(st => st.t > 0);
+    }
+    // Beating Typhon: 🍖 100,000 flesh, 🏆 25 points and the 🐍 Typhon Slayer title (arcade).
+    // 👑 Owner Panel / [U]: bring Typhon in now (in a game) to fight him.
+    function summonTyphon() {
+        if (!player || !gameRunning || NET.mode === 'client') { adminMsg && adminMsg('🐍 Start a game first, then summon Typhon'); return false; }
+        const m = spawnCastleMonster('Typhon', true, player.x + Math.cos(player.angle || 0) * 420, player.y + Math.sin(player.angle || 0) * 420);
+        if (!m) return false;
+        m._castle = false;
+        showStatus('🐍 TYPHON, FATHER OF MONSTERS, RISES!', '#feca57'); addShake(18); SFX.scream && SFX.scream();
+        return true;
+    }
+    function typhonDrops(m) {
+        if (!m || !m.isBoss || !/Typhon/.test(m.name || '')) return false;
+        addCoins(100000); points += 25; savePoints();
+        const fresh = !arcadeOwns('typhonslayer'); grantArcadeItem('typhonslayer');
+        typhonStrikes = [];
+        setTimeout(() => showStatus(`🐍 TYPHON IS DEFEATED! 🍖 +100,000 flesh · 🏆 +25 points${fresh ? ' · 🐍 Typhon Slayer title!' : ''}`, '#feca57'), 900);
+        return true;
+    }
+    function friendshipTick() {   // in update(): the F-hold timer, Mr Gum's / Rudolph's / Gingerbread Men's cooldowns, Mr Blob's jump, Typhon's storm
+        typhonTick();
         if (mrGumCd > 0) mrGumCd--;
         if (reindeerCd > 0) reindeerCd--;
         if (gingerMenCd > 0 && --gingerMenCd % 60 === 0) refreshCookieDogsBtn();
         if (blobJumpNext) { const pet = blobJumpNext; blobJumpNext = null; mrBlobJump(pet); }
+        if (kHeld >= 0 && ++kHeld === K_HOLD) { kHeld = -1; castForbiddenSpell(); }   // 🔮 held K long enough
         if (fHeld >= 0 && ++fHeld === F_HOLD) { if (hasFriendship()) summonMrGum(player); if (hasReindeer()) summonRudolph(player); }
     }
     function makeGummyMesh3D(col) {   // 🧸 Mr Gum: a see-through red gummy bear (Gumdrop green, the Candy Lord purple)
@@ -10009,6 +10089,7 @@ const col = b.color || BLDG_COLORS[0];
             biscuitDrops(m);  // 🍪 Biscuit the Cerberus's loot (Cookie, Cookie Dogs, Crumbles, Cookie King)
             mrRollDrops(m);   // 🍬 Mr Roll's loot (Rolly, Candy Blocks, flesh, Master of Rolls)
             mrBlobDrops(m);   // 🍮 Mr Blob's loot (Mr Blob, Candy Grinding, Friendship, Blobs)
+            typhonDrops(m);   // 🐍 Typhon, the OP Greek boss
             mrsGumDrops(m);   // 🐻 Mrs Gum's loot (Gumdrop, Combination Crystal, crystals, Boss Summon, flesh)
             cookieEats(m);    // 🦴 Cookie the Cerberus eats the corpse (if it is out and close)
             revengeOnKill(m);   // ⚔️ the Reaper that killed you last match — after the XP, so its banner wins
@@ -23662,6 +23743,7 @@ const col = b.color || BLDG_COLORS[0];
         else if (BOSS_LOOT_KINDS.indexOf(kind) > -1) say(giveBossLoot(kind));
         else if (EVENT_MAP_KINDS.indexOf(kind) > -1) say(openEventMap(kind));
         else if (kind === 'achievements') say(giveAchievement('all'));
+        else if (kind === 'typhon') { document.getElementById('unlock-menu').style.display = 'none'; say(summonTyphon() ? '🐍 Typhon is here — good luck!' : '🐍 Start a game first'); }
         else return false;
         SFX.pickup && SFX.pickup();
         refreshEventButton();
@@ -26108,7 +26190,7 @@ const col = b.color || BLDG_COLORS[0];
     function startGame() {
         if (!chosenClass) return;
         claimArcadePets();
-        brExit = null; evGift = null; xmPresentWave = 0; cookieDogsCd = 0; gingerMenCd = 0; reindeerCd = 0; setTimeout(refreshCookieDogsBtn, 0);
+        brExit = null; evGift = null; xmPresentWave = 0; forbiddenUsed = false; kHeld = -1; typhonStrikes = []; cookieDogsCd = 0; gingerMenCd = 0; reindeerCd = 0; setTimeout(refreshCookieDogsBtn, 0);
         ensureWorldAllowed();
         if (isPlayerBanned(playerName)) { alert('You are BANNED! Contact an Admin or Owner.'); return; }
         document.getElementById('roll-screen').style.display = 'none';
@@ -26191,6 +26273,11 @@ const col = b.color || BLDG_COLORS[0];
         if (k==='t' && gameRunning && !gamePaused && NET.mode !== 'client') { throwCrumble(player); return; }     // 🍪 throw a Crumble
         if (k==='c' && gameRunning && !gamePaused && NET.mode !== 'client') { placeCandyBlock(player); return; }  // 🧱 a Candy Block
         if (k==='h' && gameRunning && !gamePaused && NET.mode !== 'client') { useBossSummon(player); return; }    // 👑 a Boss Summon
+        if (k==='k' && gameRunning && !gamePaused && NET.mode !== 'client' && _AB.forbidden > 0) {   // 🔮 hold K: the Forbidden Spell
+            if (forbiddenUsed) { if (!e.repeat) showStatus('🔮 The Forbidden Spell is spent for this run', '#8e44ad'); return; }
+            if (!e.repeat && kHeld < 0) { kHeld = 0; showStatus('🔮 Keep holding K… the Forbidden Spell takes YOU too!', '#8e44ad'); }
+            return;
+        }
         if (k==='v' && gameRunning) { cycleCameraMode(); return; }
         if (k==='f' && gameRunning) {
             if (hasHoldF() && !gamePaused) { if (!e.repeat && fHeld < 0) fHeld = 0; return; }   // 🤝🦌 hold = Mr Gum / Rudolph, tap = fullscreen (on key up)
@@ -26219,9 +26306,10 @@ const col = b.color || BLDG_COLORS[0];
     document.addEventListener('keyup', e => {
         const k = e.key.toLowerCase();
         keys[k]=false;
+        if (k === 'k') kHeld = -1;   // 🔮 let go of K before the spell: cancelled
         if (k === 'f' && fHeld >= 0) { const tap = fHeld < F_HOLD; fHeld = -1; if (tap && gameRunning) toggleFullscreen(); }   // 🤝 a quick tap is still fullscreen
     });
-    window.addEventListener('blur', () => { fHeld = -1; });   // switched windows mid-hold: the key-up never comes
+    window.addEventListener('blur', () => { fHeld = -1; kHeld = -1; });   // switched windows mid-hold: the key-up never comes
     canvas.addEventListener('mousemove', e => {
         if (cameraMode !== 'topdown' && document.pointerLockElement === canvas && player) {
             player.angle += (e.movementX || 0) * 0.0035;

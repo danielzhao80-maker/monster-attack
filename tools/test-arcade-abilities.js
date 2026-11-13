@@ -145,12 +145,12 @@ console.log('load: OK');
 check('setGame("monster-city") limits the Abilities tab', run('ArcadeShop.abilityValue("tough")') === 20);
 // Only 3 abilities can be switched on at once (the ⚡ bar). Nothing chosen yet = the first three learned.
 check('cached values: first 3 learned are on (tough 20, power 24, swift 5), the rest off',
-  run('JSON.stringify(_AB)') === JSON.stringify({ tough: 20, power: 24, swift: 5, greed: 0, regen: 0, reload: 0 }), run('JSON.stringify(_AB)'));
+  run('JSON.stringify(_AB)') === JSON.stringify({ tough: 20, power: 24, swift: 5, greed: 0, regen: 0, reload: 0, forbidden: 0 }), run('JSON.stringify(_AB)'));
 // Switch to the other three through the shop's own save, as the ⚡ bar does.
 run(`ArcadeShop.update(function(s){ s.active = { 'monster-city': ['monster-city:greed', 'monster-city:regen', 'monster-city:reload'] }; });
      window.applyArcadeAbilities();`);
 check('switching the loadout updates the cache (greed 20, regen 1, reload 12 on; tough/power/swift off)',
-  run('JSON.stringify(_AB)') === JSON.stringify({ tough: 0, power: 0, swift: 0, greed: 20, regen: 1, reload: 12 }), run('JSON.stringify(_AB)'));
+  run('JSON.stringify(_AB)') === JSON.stringify({ tough: 0, power: 0, swift: 0, greed: 20, regen: 1, reload: 12, forbidden: 0 }), run('JSON.stringify(_AB)'));
 // The hook tests below exercise every effect, so give them all six values directly.
 run(`ArcadeShop.update(function(s){ delete s.active; }); window.applyArcadeAbilities();
      _AB.greed = 20; _AB.regen = 1; _AB.reload = 12;`);

@@ -230,7 +230,7 @@ check(q(`summonCookieDogs()`) === false && q(`summonMrGum()`) === false && q('al
 q(`refreshCookieDogsBtn();`);
 check(q(`document.getElementById('cookiedogs-btn').style.display`) === 'none', '…and does not get the Cookie Dogs button');
 q(`NET.mode = 'single'; mrGumCd = 0; cookieDogsCd = 0;`);
-check(/window\.addEventListener\('blur', \(\) => \{ fHeld = -1; \}\)/.test(code), 'switching windows while holding F does not leave it stuck');
+check(/window\.addEventListener\('blur', \(\) => \{ fHeld = -1;/.test(code), 'switching windows while holding F does not leave it stuck');
 // combine while 5 OTHER pets are equipped: the runtime still matches
 q(`petsOwned = []; equippedPets = []; for (var k = 0; k < 5; k++) petsOwned.push({ name: 'Rat' + k, rank: 'F', ability: '💪 Damage Boost', element: 'Fire' }); savePets(); equippedPets = [0,1,2,3,4]; saveEquippedPet(); rebuildPetRuntime();
    giveBlueSlime(); giveCookie(); giveRolly(); giveMrBlob(); equippedPets = [0, 1, 2, 3, 5]; rebuildPetRuntime(); localStorage.setItem(COMBINE_KEY, '1');`);
