@@ -150,7 +150,7 @@ check(JSON.stringify([0, 0.6, 0.8, 0.9, 0.995].map(r => q(`rollCastleBoss(${r})`
 check(['Sleety the Slush', 'Ginger the Cerberus', 'Mr Candy Cane', 'Mr Figgy', 'Mrs Frost'].every(n => q(`!!MONSTER_CLASSES.find(function(c){ return c.name === ${JSON.stringify(n)} && c.isBossOnly; })`)), 'they are real boss-only monsters');
 const run = JSON.parse(q(`(function(){ gameRunning = false; currentWorld = WORLDS[0]; startGame(); waveIntroTimer = 0; monsters = [];
   hwCastle = { x: player.x + 30, y: player.y, phase: 'closed' }; player.x = hwCastle.x; player.y = hwCastle.y; hwCastleTick();
-  var kill = function(){ for (var round = 0; round < 8 && monsters.some(function(m){ return m._castle; }); round++) { for (var i = monsters.length - 1; i >= 0; i--) if (monsters[i]._castle) hitMonster(monsters[i], i, 1e9); monsters = monsters.filter(function(m){ return m.hp > 0; }); } };
+  var kill = function(){ for (var round = 0; round < 30 && monsters.some(function(m){ return m._castle; }); round++) { for (var i = monsters.length - 1; i >= 0; i--) if (monsters[i]._castle) hitMonster(monsters[i], i, 1e9); monsters = monsters.filter(function(m){ return m.hp > 0; }); } };
   kill(); hwCastleTick();
   var b = monsters.find(function(m){ return m._castle; }); var name = b && b.name;
   loadEvent(EVENTS.christmas); var before = evWallet;
@@ -277,7 +277,7 @@ const sr = JSON.parse(q(`(function(){ var o = {}; gameRunning = false; selectWor
   player.x = hwCastle.x; player.y = hwCastle.y; hwCastleTick();
   o.phase = hwCastle.phase; o.guards = monsters.filter(function(m){ return m.name === 'Castle Guard'; }).length;
   var b = monsters.find(function(m){ return m._castle; }); o.boss = b && b.name; o.bossOk = !!b && XM_CASTLE_BOSSES.some(function(x){ return b.name === 'BOSS ' + x[0]; });
-  for (var round = 0; round < 8 && monsters.some(function(m){ return m._castle; }); round++) { for (var i = monsters.length - 1; i >= 0; i--) if (monsters[i]._castle) hitMonster(monsters[i], i, 1e9); monsters = monsters.filter(function(m){ return m.hp > 0; }); }
+  for (var round = 0; round < 30 && monsters.some(function(m){ return m._castle; }); round++) { for (var i = monsters.length - 1; i >= 0; i--) if (monsters[i]._castle) hitMonster(monsters[i], i, 1e9); monsters = monsters.filter(function(m){ return m.hp > 0; }); }
   loadEvent(EVENTS.christmas); var before = evWallet; hwCastleTick(); loadEvent(EVENTS.christmas); o.before = before; o.after = evWallet;
   o.done = sleighDone(); o.locked = !isWorldUnlocked(findWorld('sleighroad'));
   return JSON.stringify(o); })()`));

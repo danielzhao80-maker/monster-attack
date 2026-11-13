@@ -14803,7 +14803,13 @@ const col = b.color || BLDG_COLORS[0];
         }
         // God Survivor DEF reduces damage
         if (p.gsDef) dmg = Math.max(1, dmg - p.gsDef);
+        const wasFull = p.hp >= p.maxHp;
         p.hp -= dmg; p.invincible = 30; p.flashTimer = 10;
+        // 🏆 Achievement — 🦶 Achilles Heel: knocked out by ONE hit from full health.
+        if (p === player && wasFull && p.hp <= 0 && !arcadeOwns('achilles')) {
+            grantArcadeItem('achilles');
+            setTimeout(() => showStatus('🏆 ACHIEVEMENT: 🦶 Achilles Heel — one hit from full health! (new title in the arcade)', '#feca57'), 600);
+        }
         if (p === player) addShake(6);
         SFX.playerHit();
         for (let i=0;i<3;i++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:15,maxLife:15,color:'#ff0000',r:3});

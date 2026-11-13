@@ -615,3 +615,7 @@ roomToEquip); every LIMITED pet can be out on top. loadEquippedPet keeps 5 norma
 🗺️ Event maps in the panels: openEventMap('sleighroad' | 'trickstreet') opens the sleigh road (SANTA_KEY) and/or
 clears the once-a-year done flag — [U] unlockAction, 🛠️ Admin Panel (adminEventMap, 2 a day: ADMIN_CAPS.maps),
 👑 Owner Panel (ownerEventMap, no limit). The maps still only show while their event is on.
+
+### 🏆 Achievements
+🦶 Achilles Heel (arcade title `achilles`): playerHit grants it when ONE hit takes the local player from full health
+to 0. The arcade home's 🏆 Achievements box (ACHIEVEMENTS in arcade/index.html) lists the challenge titles. Tests: tools/test-achilles.js.
