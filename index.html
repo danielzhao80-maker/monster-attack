@@ -2548,7 +2548,8 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         { name:'Star Titan', emoji:'⭐', accessory:'👑', armorColor:'#feca57', rarity:'legendary', rarityColor:'#f1c40f', color:'#feca57', hp:80, speed:0.72, damage:18, score:112, isBossOnly:true, body:'titan', habitat:'void', hasShield:true, isRanged:true, desc:'Boss only!' },
         // 🐍 TYPHON — Greek mythology's Father of Monsters (even Zeus feared him). The OP boss: a rare 5% of any
         // boss wave from wave 20, every boss power at once + LIGHTNING STORMS (typhonTick). Beat him: typhonDrops.
-        { name:'Typhon', emoji:'🐍', accessory:'🔱', armorColor:'#1e3d2f', rarity:'legendary', rarityColor:'#f1c40f', color:'#2d6a4f', hp:400, speed:1.5, damage:45, score:900, isBossOnly:true, body:'serpent', habitat:'lava', canSwallow:true, poisonTrail:true, breathesFire:true, enrage:true, canScream:true, teleports:true, hasShield:true, desc:'Greek mythology: the Father of Monsters — a colossal serpent' },
+        // ×50 HP and damage (the owner asked for it): a hit or a bolt is a one-shot for almost anyone.
+        { name:'Typhon', emoji:'🐍', accessory:'🔱', armorColor:'#1e3d2f', rarity:'legendary', rarityColor:'#f1c40f', color:'#2d6a4f', hp:20000, speed:1.5, damage:2250, score:900, isBossOnly:true, body:'serpent', habitat:'lava', canSwallow:true, poisonTrail:true, breathesFire:true, enrage:true, canScream:true, teleports:true, hasShield:true, desc:'Greek mythology: the Father of Monsters — a colossal serpent' },
         { name:'Reaper', emoji:'☠️', accessory:'👑', armorColor:'#00ffe0', rarity:'legendary', rarityColor:'#f1c40f', color:'#00ffe0', hp:38, speed:1.25, damage:15, score:100, isBossOnly:true, body:'reaper', habitat:'graveyard', phasing:true, teleports:true, canScream:true, desc:'Boss only!' },
         { name:'Bone Colossus', emoji:'🦴', accessory:'👑', armorColor:'#e9e3d0', rarity:'legendary', rarityColor:'#f1c40f', color:'#e9e3d0', hp:76, speed:0.75, damage:17, score:104, isBossOnly:true, body:'golem', habitat:'graveyard', hasShield:true, splits:true, desc:'Boss only!' },
         { name:'Gumdrop Blob', emoji:'🍬', accessory:'👑', armorColor:'#fd79a8', rarity:'legendary', rarityColor:'#f1c40f', color:'#fd79a8', hp:60, speed:0.95, damage:13, score:96, isBossOnly:true, body:'blob', habitat:'toxic', splits:true, canSwallow:true, desc:'Boss only!' },
@@ -6461,6 +6462,45 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         c2.fillStyle = '#14181f'; c2.beginPath(); c2.arc(-3.5 * s, 0, 1.2 * s, 0, Math.PI * 2); c2.arc(3.5 * s, 0, 1.2 * s, 0, Math.PI * 2); c2.fill();
         c2.restore();
     }
+    // 🏛️ The god pets in 3D: little figures (about a pet's height), each with its own gear.
+    function makeGodPetMesh3D(name, g) {
+        const M = (key, col, extra) => _pf('godpet-' + key, () => new THREE.MeshStandardMaterial(Object.assign({ color: col, roughness: 0.55 }, extra || {})));
+        const add = (geo, mat, x, y, z, rx, rz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (rx) m.rotation.x = rx; if (rz) m.rotation.z = rz; m.castShadow = true; g.add(m); return m; };
+        const skin = M('skin', 0xf0c8a0), eye = M('eye', 0x14181f);
+        const body = (col) => add(TG.Cone(4.2, 9, 14), M('robe' + col, col), 0, 4.5, 0);
+        const head = () => { const h = add(TG.Sphere(2.7, 14, 12), skin, 0, 11, 0); for (const sx of [-1, 1]) add(TG.Sphere(0.35, 6, 5), eye, sx * 0.9, 11.3, 2.4); return h; };
+        let h;
+        if (name === 'Zeus') {
+            body(0xffffff); h = head();
+            add(TG.Sphere(2.2, 12, 10), M('beard', 0xf5f6fa), 0, 9.6, 1.6).scale.set(1, 1.3, 0.7);
+            add(TG.Torus(2.6, 0.45, 6, 16), M('laurel', 0x2ecc71), 0, 13, 0, Math.PI / 2);
+            const bolt = M('bolt', 0xfeca57, { emissive: 0xffd32a, emissiveIntensity: 1.2 });
+            add(TG.Box(0.7, 3.2, 0.7), bolt, 5, 8, 0, 0, 0.5); add(TG.Box(0.7, 3.2, 0.7), bolt, 5.6, 5.4, 0, 0, -0.5);
+        } else if (name === 'Achilles') {
+            body(0xc0392b); h = head();
+            add(TG.Sphere(3, 14, 10), M('bronze', 0xcd7f32, { metalness: 0.7, roughness: 0.3 }), 0, 11.6, -0.2).scale.set(1, 1.05, 1);
+            add(TG.Box(0.8, 2.2, 5), M('crest', 0xe74c3c), 0, 14.6, 0);
+            add(TG.Box(3, 0.5, 0.3), eye, 0, 11.2, 2.9);
+            add(TG.Cylinder(3, 3, 0.5, 16), M('bronze', 0xcd7f32, { metalness: 0.7, roughness: 0.3 }), -4.5, 6, 0.5, Math.PI / 2);
+            add(TG.Cylinder(0.25, 0.25, 15, 6), M('wood', 0x8d6e3f), 4.5, 7, 0);
+            add(TG.Cone(0.7, 2, 6), M('steel', 0xd4d4d4, { metalness: 0.8, roughness: 0.3 }), 4.5, 15.5, 0);
+        } else {   // Odin
+            body(0x4a5568); h = head();
+            add(TG.Sphere(2.3, 12, 10), M('greybeard', 0xb2bec3), 0, 9.3, 1.6).scale.set(1, 1.5, 0.7);
+            add(TG.Box(1.4, 1.2, 0.4), eye, 0.9, 11.3, 2.5);
+            const hat = M('hat', 0x2d3436);
+            add(TG.Cylinder(4.5, 4.5, 0.4, 18), hat, 0, 13.3, 0); add(TG.Cone(2.3, 3.6, 14), hat, 0, 15.2, 0);
+            add(TG.Cylinder(0.25, 0.25, 15, 6), M('ash', 0x5d4037), 4.5, 7, 0);
+            add(TG.Cone(0.7, 2, 6), M('gold', 0xfeca57, { metalness: 0.8, roughness: 0.3 }), 4.5, 15.5, 0);
+            for (const sx of [-1, 1]) {   // the two ravens on his shoulders
+                const raven = M('raven', 0x111111);
+                add(TG.Sphere(1.1, 10, 8), raven, sx * 3.2, 9.6, 0).scale.set(1, 0.8, 1.5);
+                add(TG.Sphere(0.6, 8, 6), raven, sx * 3.2, 10.5, 1.2);
+            }
+        }
+        g.userData.head = h;
+        return g;
+    }
     function makeGodMesh3D(col) {   // 🏛️ a towering glowing god: robe, head, beard, crown, a halo
         col = _hex(col || '#feca57');
         const g = new THREE.Group(), add = _summonParts(g);
@@ -7865,13 +7905,86 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (pet.special === 'gumdrop') { drawGummyBear(c2, cx, cy, s, '#2ecc71', '#1e8449', false); return; }   // 🐻 Gumdrop
         if (pet.special === 'candylord') { drawGummyBear(c2, cx, cy, s * 1.35, '#a55eea', '#f1c40f', true); return; }   // 👑 the Candy Lord
         if (pet.special === 'mrblob') { drawMrBlob(pet, c2, cx, cy, s); return; }   // 🍮 Mr Blob
-        drawPet(pet.name, c2, cx, cy, s);
+        if (GOD_NAMES.indexOf(pet.name) > -1) drawGodPet(pet.name, c2, cx, cy, s);   // 🏛️ Zeus / Achilles / Odin: their own figures
+        else if (pet.name === 'Lightning' || pet.name === 'Omega') drawExclusivePet(pet.name, c2, cx, cy, s);   // ⚡ 🌌
+        else drawPet(pet.name, c2, cx, cy, s);
         // Element overlay decorations
         if (pet.element) drawPetElementOverlay(pet.element, c2, cx, cy, s);
         // Ability badge (top-right)
         if (pet.ability) drawPetAbilityBadge(pet.ability, c2, cx, cy, s);
     }
 
+    // 🏛️ The god pets, drawn as little figures. Zeus: white beard, gold laurel, a lightning bolt. Achilles: bronze
+    // helmet with a red crest, round shield, spear. Odin: grey beard, eye patch, wide hat, spear and two ravens.
+    const GOD_NAMES = ['Zeus', 'Achilles', 'Odin'];
+    function drawGodPet(name, c2, cx, cy, s) {
+        c2.save(); c2.translate(cx, cy); c2.lineCap = 'round'; c2.lineJoin = 'round';
+        const P = (x, y) => [x * s, y * s];
+        const circle = (x, y, r, col) => { c2.fillStyle = col; c2.beginPath(); c2.arc(x * s, y * s, r * s, 0, Math.PI * 2); c2.fill(); };
+        const robe = (col, edge) => { c2.fillStyle = col; c2.strokeStyle = edge; c2.lineWidth = 1 * s; c2.beginPath(); c2.moveTo(...P(-9, 14)); c2.lineTo(...P(-6, -1)); c2.lineTo(...P(6, -1)); c2.lineTo(...P(9, 14)); c2.closePath(); c2.fill(); c2.stroke(); };
+        const face = (skin) => { circle(0, -6, 5.5, skin); c2.fillStyle = '#14181f'; c2.beginPath(); c2.arc(-2 * s, -7 * s, 0.8 * s, 0, Math.PI * 2); c2.arc(2 * s, -7 * s, 0.8 * s, 0, Math.PI * 2); c2.fill(); };
+        if (name === 'Zeus') {
+            robe('#ffffff', '#d0d6e0');
+            c2.strokeStyle = '#feca57'; c2.lineWidth = 1.4 * s; c2.beginPath(); c2.moveTo(...P(-6, 3)); c2.lineTo(...P(6, 8)); c2.stroke();   // gold sash
+            face('#f5d0a9');
+            c2.fillStyle = '#f5f6fa'; c2.beginPath(); c2.moveTo(...P(-5, -5)); c2.quadraticCurveTo(...P(0, 6), ...P(5, -5)); c2.closePath(); c2.fill();   // beard
+            c2.fillStyle = '#f5f6fa'; c2.beginPath(); c2.arc(0, -8 * s, 5.8 * s, Math.PI, 0); c2.fill();   // hair
+            c2.fillStyle = '#2ecc71'; for (let k = -2; k <= 2; k++) { c2.beginPath(); c2.ellipse(k * 2.4 * s, -12.5 * s, 1.4 * s, 0.8 * s, k * 0.4, 0, Math.PI * 2); c2.fill(); }   // laurel
+            c2.fillStyle = '#feca57'; c2.strokeStyle = '#fff7a8'; c2.lineWidth = 0.6 * s;   // the bolt
+            c2.beginPath(); c2.moveTo(...P(10, -9)); c2.lineTo(...P(14, -3)); c2.lineTo(...P(11.5, -3)); c2.lineTo(...P(15, 5)); c2.lineTo(...P(9.5, -1)); c2.lineTo(...P(12, -1)); c2.closePath(); c2.fill(); c2.stroke();
+        } else if (name === 'Achilles') {
+            robe('#c0392b', '#7b1d14');
+            c2.strokeStyle = '#8d6e3f'; c2.lineWidth = 1.2 * s; c2.beginPath(); c2.moveTo(...P(11, -14)); c2.lineTo(...P(11, 14)); c2.stroke();   // spear
+            c2.fillStyle = '#d4d4d4'; c2.beginPath(); c2.moveTo(...P(11, -17)); c2.lineTo(...P(9.5, -13)); c2.lineTo(...P(12.5, -13)); c2.closePath(); c2.fill();
+            face('#e0ac69');
+            c2.fillStyle = '#cd7f32'; c2.beginPath(); c2.arc(0, -7 * s, 6.2 * s, Math.PI * 1.05, Math.PI * 1.95 + Math.PI); c2.fill();   // bronze helmet
+            c2.fillStyle = '#14181f'; c2.fillRect(-3.5 * s, -8 * s, 7 * s, 2.2 * s);   // the eye slit
+            c2.fillStyle = '#e74c3c'; c2.beginPath(); c2.ellipse(0, -13.5 * s, 6 * s, 2.2 * s, 0, Math.PI, 0); c2.fill();   // red crest
+            c2.fillStyle = '#cd7f32'; c2.strokeStyle = '#8a5a1e'; c2.lineWidth = 1 * s;   // round shield
+            c2.beginPath(); c2.arc(-8 * s, 5 * s, 6 * s, 0, Math.PI * 2); c2.fill(); c2.stroke();
+            circle(-8, 5, 2, '#f1c40f');
+        } else {   // Odin
+            robe('#4a5568', '#2d3748');
+            c2.strokeStyle = '#5d4037'; c2.lineWidth = 1.2 * s; c2.beginPath(); c2.moveTo(...P(11, -14)); c2.lineTo(...P(11, 14)); c2.stroke();   // Gungnir
+            c2.fillStyle = '#feca57'; c2.beginPath(); c2.moveTo(...P(11, -18)); c2.lineTo(...P(9.5, -13)); c2.lineTo(...P(12.5, -13)); c2.closePath(); c2.fill();
+            face('#e8c4a0');
+            c2.fillStyle = '#b2bec3'; c2.beginPath(); c2.moveTo(...P(-5.5, -5)); c2.quadraticCurveTo(...P(0, 8), ...P(5.5, -5)); c2.closePath(); c2.fill();   // long grey beard
+            c2.fillStyle = '#14181f'; c2.beginPath(); c2.arc(2 * s, -7 * s, 1.6 * s, 0, Math.PI * 2); c2.fill();   // eye patch
+            c2.strokeStyle = '#14181f'; c2.lineWidth = 0.6 * s; c2.beginPath(); c2.moveTo(...P(-5, -9.5)); c2.lineTo(...P(5.5, -5)); c2.stroke();
+            c2.fillStyle = '#2d3436'; c2.beginPath(); c2.ellipse(0, -10.5 * s, 9 * s, 2 * s, 0, 0, Math.PI * 2); c2.fill();   // wide hat
+            c2.beginPath(); c2.moveTo(...P(-4.5, -10.5)); c2.lineTo(...P(0, -17)); c2.lineTo(...P(4.5, -10.5)); c2.closePath(); c2.fill();
+            for (const sx of [-1, 1]) {   // Huginn and Muninn
+                c2.fillStyle = '#111'; c2.beginPath(); c2.ellipse(sx * 8 * s, -1 * s, 2.6 * s, 1.8 * s, 0, 0, Math.PI * 2); c2.fill();
+                c2.beginPath(); c2.arc(sx * 9.8 * s, -2.4 * s, 1.3 * s, 0, Math.PI * 2); c2.fill();
+                c2.fillStyle = '#feca57'; c2.beginPath(); c2.moveTo(sx * 11 * s, -2.4 * s); c2.lineTo(sx * 12.6 * s, -2 * s); c2.lineTo(sx * 11 * s, -1.8 * s); c2.fill();
+            }
+        }
+        c2.restore();
+    }
+    // ⚡ Lightning: a crackling yellow spirit with a zig-zag bolt body. 🌌 Omega: a dark cosmic orb, a galaxy
+    // swirling inside, a glowing ring round it.
+    function drawExclusivePet(name, c2, cx, cy, s) {
+        const t = Date.now() / 300;
+        c2.save(); c2.translate(cx, cy); c2.lineCap = 'round'; c2.lineJoin = 'round';
+        if (name === 'Lightning') {
+            const gl = c2.createRadialGradient(0, 0, 2 * s, 0, 0, 16 * s); gl.addColorStop(0, 'rgba(255,240,150,0.9)'); gl.addColorStop(1, 'rgba(255,210,40,0)');
+            c2.fillStyle = gl; c2.beginPath(); c2.arc(0, 0, 16 * s, 0, Math.PI * 2); c2.fill();
+            c2.fillStyle = '#feca57'; c2.strokeStyle = '#fff7a8'; c2.lineWidth = 1 * s;
+            c2.beginPath(); c2.moveTo(2 * s, -14 * s); c2.lineTo(-6 * s, 1 * s); c2.lineTo(0, 1 * s); c2.lineTo(-3 * s, 14 * s); c2.lineTo(7 * s, -3 * s); c2.lineTo(1 * s, -3 * s); c2.lineTo(5 * s, -14 * s); c2.closePath(); c2.fill(); c2.stroke();
+            c2.fillStyle = '#14181f'; c2.beginPath(); c2.arc(-1 * s, -5 * s, 1 * s, 0, Math.PI * 2); c2.arc(3 * s, -5 * s, 1 * s, 0, Math.PI * 2); c2.fill();
+            c2.strokeStyle = '#ffffff'; c2.lineWidth = 0.8 * s;
+            for (let k = 0; k < 3; k++) { const a = t * 2 + k * 2.1; c2.beginPath(); c2.moveTo(Math.cos(a) * 10 * s, Math.sin(a) * 10 * s); c2.lineTo(Math.cos(a + 0.2) * 14 * s, Math.sin(a + 0.2) * 14 * s); c2.stroke(); }
+        } else {   // Omega
+            const gl = c2.createRadialGradient(-3 * s, -3 * s, 1 * s, 0, 0, 12 * s); gl.addColorStop(0, '#6c5ce7'); gl.addColorStop(0.6, '#2d1b69'); gl.addColorStop(1, '#0b0620');
+            c2.fillStyle = gl; c2.beginPath(); c2.arc(0, 0, 11 * s, 0, Math.PI * 2); c2.fill();
+            c2.strokeStyle = 'rgba(162,155,254,0.9)'; c2.lineWidth = 1.1 * s;   // the galaxy's arms
+            for (let k = 0; k < 2; k++) { c2.beginPath(); for (let u = 0; u < 3.2; u += 0.2) { const r = u * 2.6 * s, a = u + t + k * Math.PI; const x = Math.cos(a) * r, y = Math.sin(a) * r * 0.8; u ? c2.lineTo(x, y) : c2.moveTo(x, y); } c2.stroke(); }
+            c2.fillStyle = '#fff'; for (let k = 0; k < 6; k++) { const a = k * 1.9 + t * 0.5; c2.beginPath(); c2.arc(Math.cos(a) * 7 * s, Math.sin(a) * 6 * s, 0.5 * s, 0, Math.PI * 2); c2.fill(); }
+            c2.strokeStyle = '#00d2d3'; c2.lineWidth = 1.4 * s; c2.beginPath(); c2.ellipse(0, 0, 16 * s, 4.5 * s, -0.35, 0, Math.PI * 2); c2.stroke();   // the ring
+            c2.fillStyle = '#ffffff'; c2.beginPath(); c2.arc(-3 * s, -2 * s, 1.1 * s, 0, Math.PI * 2); c2.arc(3 * s, -2 * s, 1.1 * s, 0, Math.PI * 2); c2.fill();
+        }
+        c2.restore();
+    }
     function drawPetElementOverlay(elementName, c2, cx, cy, scale) {
         const s = scale || 1;
         const t = Date.now() / 200;
@@ -19499,6 +19612,25 @@ const col = b.color || BLDG_COLORS[0];
     function makePetMesh3D(pet) {
         const g = new THREE.Group();
         const r = 7;
+        if (pet && GOD_NAMES.indexOf(pet.name) > -1) return makeGodPetMesh3D(pet.name, g);   // 🏛️ Zeus / Achilles / Odin
+        if (pet && pet.name === 'Lightning') {   // ⚡ a floating glowing bolt with eyes
+            const bolt = _pf('pet-lightning', () => new THREE.MeshStandardMaterial({ color: 0xfeca57, emissive: 0xffd32a, emissiveIntensity: 1.3, roughness: 0.3 }));
+            const eyeB = _pf('pf-eyeb', () => new THREE.MeshStandardMaterial({ color: 0x14181f, roughness: 0.3 }));
+            for (const [y, z] of [[12, 0.5], [7, -0.5], [2, 0.5]]) { const b = new THREE.Mesh(TG.Box(2.2, 6, 2.2), bolt); b.position.set(0, y, 0); b.rotation.z = z; g.add(b); }
+            for (const sx of [-1, 1]) { const e = new THREE.Mesh(TG.Sphere(0.45, 6, 5), eyeB); e.position.set(sx * 0.8, 12.5, 1.2); g.add(e); }
+            g.userData.head = g.children[0]; g.userData.float = true;
+            return g;
+        }
+        if (pet && pet.name === 'Omega') {   // 🌌 a dark cosmic orb with a glowing ring
+            const orb = new THREE.Mesh(TG.Sphere(5, 18, 14), _pf('pet-omega', () => new THREE.MeshStandardMaterial({ color: 0x2d1b69, emissive: 0x6c5ce7, emissiveIntensity: 0.6, roughness: 0.2, metalness: 0.3 })));
+            orb.position.y = 9; g.add(orb);
+            const ring = new THREE.Mesh(TG.Torus(8, 0.5, 6, 32), _pf('pet-omega-ring', () => new THREE.MeshStandardMaterial({ color: 0x00d2d3, emissive: 0x00d2d3, emissiveIntensity: 1.1 })));
+            ring.position.y = 9; ring.rotation.x = Math.PI / 2.4; g.add(ring);
+            const eyeW = _pf('pf-eyew', () => new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 }));
+            for (const sx of [-1, 1]) { const e = new THREE.Mesh(TG.Sphere(0.7, 8, 6), eyeW); e.position.set(sx * 1.8, 10, 4.6); g.add(e); }
+            g.userData.head = orb; g.userData.float = true;
+            return g;
+        }
         if (pet && ['gumdrop', 'candylord', 'snowdrop', 'frostlord'].indexOf(pet.special) > -1) {   // 🐻 a gummy bear (the Lords: big, with a gold crown)
             const lord = pet.special === 'candylord' || pet.special === 'frostlord';
             const col = { gumdrop: 0x2ecc71, candylord: 0xa55eea, snowdrop: 0xe6f7ff, frostlord: 0x74b9ff }[pet.special];

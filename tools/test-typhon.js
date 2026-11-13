@@ -136,6 +136,7 @@ q(`chosenClass = CLASSES[0]; playerName='T'; gameRunning=false; cameraMode='topd
 q(`chosenClass = CLASSES[0]; playerName='T'; gameRunning=false; cameraMode='topdown';`);
 const ty = JSON.parse(q(`JSON.stringify(MONSTER_CLASSES.find(function(c){ return c.name === 'Typhon'; }))`));
 const gum = JSON.parse(q(`JSON.stringify(MONSTER_CLASSES.find(function(c){ return c.name === 'Mrs Gum'; }))`));
+check(ty.hp === 20000 && ty.damage === 2250, 'buffed ×50: 20,000 HP and 2,250 damage (base)', JSON.stringify({ hp: ty.hp, dmg: ty.damage }));
 check(ty && ty.isBossOnly && ty.body === 'serpent' && ty.canSwallow && ty.poisonTrail && ty.hp >= 4 * gum.hp && ty.damage >= 2 * gum.damage && ty.breathesFire && ty.enrage && ty.teleports && ty.hasShield && ty.canScream, 'Typhon: a colossal SERPENT — 4× Mrs Gum\'s HP, 2.5× her damage, swallows, poison trail and every boss power', JSON.stringify({ hp: ty.hp, dmg: ty.damage }));
 const rate = JSON.parse(q(`(function(){ var n = 0, low = 0, k = 4000; currentWorld = WORLDS[0]; wave = 20; for (var i = 0; i < k; i++) if (rollMonsterClass().name === 'Typhon') n++; wave = 10; for (var i = 0; i < 1000; i++) if (rollMonsterClass().name === 'Typhon') low++; wave = 21; var notBoss = 0; for (var i = 0; i < 500; i++) if (rollMonsterClass().name === 'Typhon') notBoss++; wave = 1; return JSON.stringify({ pct: n / k * 100, low: low, notBoss: notBoss }); })()`));
 check(Math.abs(rate.pct - 5) < 1.5 && rate.low === 0 && rate.notBoss === 0, 'rare: ~5% of boss waves from wave 20 (never before, never on normal waves)', JSON.stringify(rate));

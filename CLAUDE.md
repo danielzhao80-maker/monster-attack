@@ -635,3 +635,6 @@ Typhon (MONSTER_CLASSES, body serpent, hp 400, dmg 45, canSwallow + poisonTrail 
 from wave 20; typhonTick (in friendshipTick) calls TYPHON_BOLTS (8) lightning bolts around the player every 2 s (1.2 s under half
 HP) with 0.75 s of warning sparks; typhonDrops: 100,000 flesh + 25 points + the `typhonslayer` arcade title.
 summonTyphon(): Owner Panel (🏆 section) and [U] 'typhon'. Tests: tools/test-forbidden.js, tools/test-typhon.js.
+Pet looks: every PETS name has a figure — drawPet's cases, drawGodPet (Zeus / Achilles / Odin) and drawExclusivePet
+(Lightning / Omega) on cards; makePetMesh3D → makeGodPetMesh3D and its own Lightning / Omega branches in 3D.
+Typhon was buffed ×50 on request (base hp 20000, damage 2250).

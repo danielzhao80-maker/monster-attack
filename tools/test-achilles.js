@@ -157,7 +157,8 @@ check(q(`equippedPets.indexOf(petsOwned.length - 1) > -1`), '…and goes out wit
 check(JSON.parse(q(`localStorage.getItem('daniels-arcade-v1')`)).pendingPets.length === 0 && q(`claimArcadePets().length`) === 0 && q(`petsOwned.length`) === 1, 'only once (the arcade\'s note is cleared)');
 check(q(`(function(){ for (var i = 0; i < 300; i++) { var r = hatchOneEgg(); if (['Zeus','Achilles','Odin'].indexOf(r.name) > -1) return false; } return true; })()`), 'the gods never come out of eggs');
 check(/claimArcadePets\(\);   \/\/ 🏛️/.test(code) && /function openPetsScreen\(\) \{\s*claimArcadePets\(\);/.test(code), 'checked when the game loads and when 🐾 Pets opens');
-check(q(`(function(){ var c = document.getElementById('x').getContext('2d'); ['Zeus','Achilles','Odin'].forEach(function(n){ drawPetFull({ name: n, rank: 'SSS', element: 'Holy', ability: '🛡️ Defense' }, c, 30, 30, 1); }); return true; })()`), 'all three draw');
+check(q(`(function(){ var c = document.getElementById('x').getContext('2d'); ['Zeus','Achilles','Odin','Lightning','Omega'].forEach(function(n){ drawPetFull({ name: n, rank: 'SSS', element: 'Holy', ability: '🛡️ Defense' }, c, 30, 30, 1); }); return true; })()`), 'all three gods (and Lightning, Omega) draw');
+check(/GOD_NAMES\.indexOf\(pet\.name\) > -1\) drawGodPet/.test(code) && /drawExclusivePet\(pet\.name/.test(code) && /makeGodPetMesh3D\(pet\.name, g\)/.test(code), 'each has its own figure on the card and in 3D');
 
 // ---- 🏆 in the Admin Panel, the Owner Panel and [U] ----
 check(/adminAchievement\('achilles'\)/.test(html) && /ownerAchievement\('all'\)/.test(html) && /unlockAction\('achievements'\)/.test(html), 'the Admin Panel, the Owner Panel and [U] all have 🏆 Achievements');
