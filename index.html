@@ -378,6 +378,7 @@
         <button class="god-btn" onclick="unlockAction('trickstreet')">🏚️ Trick-or-Treat Street (ride again)</button>
         <button class="god-btn" onclick="unlockAction('achievements')">🏆 All achievements (🦶 🏆 ⚡ ⚔️ 🌀)</button>
         <button class="god-btn" onclick="unlockAction('typhon')">🐍 Summon Typhon (the OP boss)</button>
+        <button class="god-btn" onclick="unlockAction('daniel')">👑 Daniel the God (pet)</button>
         <div id="unlock-msg" style="min-height:1.2em;font-weight:800;color:#8854d0;font-size:0.85em;"></div>
     </div>
     <!-- 🍪🐕 The Cookie Dogs skill (Biscuit the Cerberus drops it): click to summon 5 cookie dogs -->
@@ -877,6 +878,7 @@
                 <button class="admin-btn green" onclick="adminBossLoot('bossskills')">✨ Boss skills</button>
                 <button class="admin-btn" onclick="adminBossLoot('bosscosmetics')">🏅 Boss titles &amp; avatar</button>
             </div>
+            <div class="admin-row" style="margin-top:6px;"><button class="admin-btn gold" onclick="adminDaniel()">👑 Daniel the God (pet — owner &amp; admin only)</button></div>
         </div>
         <div class="admin-section">
             <h3>🏆 Achievements <span class="cap-badge" id="cap-ach"></span></h3>
@@ -1076,6 +1078,7 @@
                 <button class="admin-btn green" onclick="ownerBossLoot('bossskills')">✨ Boss skills</button>
                 <button class="admin-btn" onclick="ownerBossLoot('bosscosmetics')">🏅 Boss titles &amp; avatar</button>
             </div>
+            <div class="admin-row" style="margin-top:6px;"><button class="admin-btn gold" onclick="ownerDaniel()">👑 Daniel the God (pet — owner &amp; admin only)</button></div>
         </div>
         <div class="admin-section">
             <h3>🏆 Achievements <span class="nocap-badge">no limit</span></h3>
@@ -5923,7 +5926,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     ];
     const PET_RANK_WEIGHTS = { F:50, C:9, B:25, A:10, S:5, SSS:1 };
     // LIMITED: the candy/ice-castle boss pets only (never from eggs) — shown above SSS.
-    const PET_RANK_COLORS  = { F:'#888', C:'#8d6e63', B:'#3498db', A:'#9b59b6', S:'#feca57', SSS:'#ff2d55', LIMITED:'#ff9f1a' };
+    const PET_RANK_COLORS  = { F:'#888', C:'#8d6e63', B:'#3498db', A:'#9b59b6', S:'#feca57', SSS:'#ff2d55', LIMITED:'#ff9f1a', GOD:'#f9ca24' };   // GOD: 👑 Daniel the God only
     const EGG_BUNDLES = { 1: 50, 3: 140, 5: 220 };
     const PET_ABILITIES = [
         '💪 Damage Boost', '⚡ Speed Boost', '❤️ Max HP Up', '🔫 Fast Shot',
@@ -5994,15 +5997,15 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         }
     }
 
-    const PET_RANK_DAMAGE   = { F:3,   C:5,   B:8,   A:12,  S:18,  SSS:30, LIMITED:32 };
-    const PET_RANK_COOLDOWN = { F:120, C:100, B:80,  A:60,  S:45,  SSS:30, LIMITED:28 };
-    const PET_SUMMON_COOLDOWN = { F:720, C:660, B:600, A:540, S:480, SSS:360, LIMITED:330 };
+    const PET_RANK_DAMAGE   = { F:3,   C:5,   B:8,   A:12,  S:18,  SSS:30, LIMITED:32, GOD:200 };
+    const PET_RANK_COOLDOWN = { F:120, C:100, B:80,  A:60,  S:45,  SSS:30, LIMITED:28, GOD:10 };
+    const PET_SUMMON_COOLDOWN = { F:720, C:660, B:600, A:540, S:480, SSS:360, LIMITED:330, GOD:120 };
     const PET_SUMMON_POWER    = { F:1,   C:1.4, B:1.8, A:2.4, S:3.2, SSS:5    };
     const PETS_KEY = 'monster_city_pets';
     const EQUIPPED_PET_KEY = 'monster_city_equipped_pet';
     let petsOwned = []; // array of { name, rank, ability, element }
     const MAX_EQUIPPED_PETS = 5;   // normal pets — LIMITED (boss) pets don't count toward it
-    const isLimitedPet = (p) => !!p && p.rank === 'LIMITED';
+    const isLimitedPet = (p) => !!p && (p.rank === 'LIMITED' || p.rank === 'GOD');   // free slots: LIMITED boss pets and 👑 Daniel
     const normalEquippedCount = () => equippedPets.filter(i => !isLimitedPet(petsOwned[i])).length;
     const roomToEquip = (idx) => isLimitedPet(petsOwned[idx]) || normalEquippedCount() < MAX_EQUIPPED_PETS;
     const PET_OFFSETS = [
@@ -6029,7 +6032,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
             if (!def || petsOwned.some(p => p && p.name === name && p.god)) continue;
             petsOwned.push({ name: def.name, rank: def.rank, ability: def.ability, element: def.element, exclusive: true, god: true });
             const idx = petsOwned.length - 1;
-            if (typeof equippedPets !== 'undefined' && equippedPets.filter(i => !(petsOwned[i] && petsOwned[i].rank === 'LIMITED')).length < 5) equippedPets.push(idx);
+            if (typeof equippedPets !== 'undefined' && equippedPets.filter(i => !isLimitedPet(petsOwned[i])).length < 5) equippedPets.push(idx);
             got.push(`${def.emoji} ${def.name}`);
         }
         const clear = (sv) => { sv.pendingPets = []; };
@@ -6252,7 +6255,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
                 for (const inst of petsOwned) {
                     if (!inst.element) inst.element = ELEMENTS[Math.floor(Math.random()*ELEMENTS.length)].name;
                     if (inst.level > 10) inst.level = 10;   // the pet level cap is 10 now (it used to be 100)
-                    if (inst.special) inst.rank = 'LIMITED';   // boss pets are LIMITED (older saves had them as S)
+                    if (inst.special && inst.special !== 'danielgod') inst.rank = 'LIMITED';   // boss pets are LIMITED (older saves had them as S)
                 }
                 return;
             }
@@ -6293,8 +6296,9 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     // jingle = rolly, figgy = blob, snowdrop = all, frostlord = all +80%.
     const ALL_POWERS = ['slime', 'cookie', 'rolly', 'blob'];
     const PET_POWERS = { blueslime: ['slime'], cookie: ['cookie'], rolly: ['rolly'], mrblob: ['blob'], gumdrop: ALL_POWERS, candylord: ALL_POWERS,
-                         snowslime: ['slime'], gingersnap: ['cookie'], jingle: ['rolly'], figgy: ['blob'], snowdrop: ALL_POWERS, frostlord: ALL_POWERS };
-    const petBoost = (p) => (p && (p.special === 'candylord' || p.special === 'frostlord')) ? 1.8 : 1;
+                         snowslime: ['slime'], gingersnap: ['cookie'], jingle: ['rolly'], figgy: ['blob'], snowdrop: ALL_POWERS, frostlord: ALL_POWERS,
+                         danielgod: ALL_POWERS };   // 👑 Daniel the God: every power ×3
+    const petBoost = (p) => !p ? 1 : p.special === 'danielgod' ? 3 : (p.special === 'candylord' || p.special === 'frostlord') ? 1.8 : 1;
     const hasPower = (p, power) => !!(p && PET_POWERS[p.special] && PET_POWERS[p.special].indexOf(power) > -1);
     // The strongest EQUIPPED pet with this power: { idx, slot, pet, boost } (or null).
     function petWithPower(power) {
@@ -6966,8 +6970,39 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         setTimeout(() => showStatus(`🐍 TYPHON IS DEFEATED! 🍖 +100,000 flesh · 🏆 +25 points${fresh ? ' · 🐍 Typhon Slayer title!' : ''}`, '#feca57'), 900);
         return true;
     }
+    // 👑 DANIEL THE GOD (owner / admin only): every boss-pet power ×3 (PET_POWERS / petBoost), shots ×3, and a
+    // DIVINE SMITE every 4 s: 5,000 × his level bonus on the strongest monster within 650 px, chaining to 4 more.
+    const DANIEL_SMITE = 5000, DANIEL_SMITE_CD = 240;
+    let danielSmiteCd = 60;
+    const danielIdx = () => petsOwned.findIndex(p => p && p.special === 'danielgod');
+    function giveDanielGod() {   // the Owner Panel, the Admin Panel and [U] only
+        if (danielIdx() > -1) return false;
+        givePetSpecial({ name: 'Daniel the God', nickname: 'Daniel', special: 'danielgod', rank: 'GOD', ability: '👑 Divine Smite', element: 'Holy', level: 1 });
+        return true;
+    }
+    function danielTick() {
+        if (!player || player.hp <= 0) return;
+        const pw = equippedPets.map((i, slot) => ({ pet: petsOwned[i], slot })).find(x => x.pet && x.pet.special === 'danielgod');
+        if (!pw) return;
+        if (--danielSmiteCd > 0) return;
+        danielSmiteCd = DANIEL_SMITE_CD;
+        const rt = petRuntime[pw.slot] || player;
+        const near = monsters.filter(m => m && m.hp > 0 && Math.hypot(m.x - player.x, m.y - player.y) < 650).sort((a, b) => b.hp - a.hp).slice(0, 5);
+        if (!near.length) return;
+        const dmg = Math.round(DANIEL_SMITE * petLevelMult(pw.pet) / 3);   // petLevelMult already has his ×3
+        _asLocalDamage(true, () => {
+            for (const m of near) {
+                const i = monsters.indexOf(m); if (i < 0) continue;
+                zaps.push({ x1: rt.x, y1: rt.y, x2: m.x, y2: m.y, life: 14, color: '#f9ca24' });
+                m.shieldUp = false;
+                hitMonster(m, i, Math.max(DANIEL_SMITE, dmg));
+            }
+        });
+        for (let i = 0; i < 10; i++) particles.push({ x: near[0].x, y: near[0].y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, life: 18, maxLife: 18, color: i % 2 ? '#f9ca24' : '#ffffff', r: 4 });
+    }
     function friendshipTick() {   // in update(): the F-hold timer, Mr Gum's / Rudolph's / Gingerbread Men's cooldowns, Mr Blob's jump, Typhon's storm
         typhonTick();
+        danielTick();   // 👑 Daniel the God's divine smite
         if (mrGumCd > 0) mrGumCd--;
         if (reindeerCd > 0) reindeerCd--;
         if (gingerMenCd > 0 && --gingerMenCd % 60 === 0) refreshCookieDogsBtn();
@@ -7901,6 +7936,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         if (pet.special === 'gumdrop') { drawGummyBear(c2, cx, cy, s, '#2ecc71', '#1e8449', false); return; }   // 🐻 Gumdrop
         if (pet.special === 'candylord') { drawGummyBear(c2, cx, cy, s * 1.35, '#a55eea', '#f1c40f', true); return; }   // 👑 the Candy Lord
         if (pet.special === 'mrblob') { drawMrBlob(pet, c2, cx, cy, s); return; }   // 🍮 Mr Blob
+        if (pet.special === 'danielgod') { drawDanielGod(c2, cx, cy, s); if (pet.ability) drawPetAbilityBadge(pet.ability, c2, cx, cy, s); return; }   // 👑
         if (GOD_NAMES.indexOf(pet.name) > -1) drawGodPet(pet.name, c2, cx, cy, s);   // 🏛️ Zeus / Achilles / Odin: their own figures
         else if (pet.name === 'Lightning' || pet.name === 'Omega') drawExclusivePet(pet.name, c2, cx, cy, s);   // ⚡ 🌌
         else drawPet(pet.name, c2, cx, cy, s);
@@ -7959,6 +7995,26 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
     }
     // ⚡ Lightning: a crackling yellow spirit with a zig-zag bolt body. 🌌 Omega: a dark cosmic orb, a galaxy
     // swirling inside, a glowing ring round it.
+    // 👑 Daniel the God: a golden figure in a white-and-gold robe, a crown, a spinning rainbow halo, a gold aura.
+    function drawDanielGod(c2, cx, cy, s) {
+        const t = Date.now() / 400;
+        c2.save(); c2.translate(cx, cy); c2.lineCap = 'round'; c2.lineJoin = 'round';
+        const gl = c2.createRadialGradient(0, 0, 2 * s, 0, 0, 19 * s); gl.addColorStop(0, 'rgba(255,236,140,0.95)'); gl.addColorStop(1, 'rgba(255,200,0,0)');
+        c2.fillStyle = gl; c2.beginPath(); c2.arc(0, 0, 19 * s, 0, Math.PI * 2); c2.fill();
+        const cols = ['#ff4757', '#ffa502', '#feca57', '#2ed573', '#1e90ff', '#a55eea'];   // rainbow halo
+        for (let k = 0; k < 6; k++) { c2.strokeStyle = cols[k]; c2.lineWidth = 1.6 * s; c2.beginPath(); c2.arc(0, -8 * s, 8.5 * s, t + k * Math.PI / 3, t + (k + 1) * Math.PI / 3); c2.stroke(); }
+        c2.fillStyle = '#ffffff'; c2.strokeStyle = '#f9ca24'; c2.lineWidth = 1.2 * s;   // robe
+        c2.beginPath(); c2.moveTo(-10 * s, 15 * s); c2.lineTo(-6 * s, -1 * s); c2.lineTo(6 * s, -1 * s); c2.lineTo(10 * s, 15 * s); c2.closePath(); c2.fill(); c2.stroke();
+        c2.strokeStyle = '#f9ca24'; c2.lineWidth = 1.6 * s; c2.beginPath(); c2.moveTo(0, -1 * s); c2.lineTo(0, 15 * s); c2.stroke();
+        c2.fillStyle = '#f9ca24'; c2.beginPath(); c2.arc(0, -6 * s, 5.5 * s, 0, Math.PI * 2); c2.fill();   // golden face
+        c2.fillStyle = '#14181f'; c2.beginPath(); c2.arc(-2 * s, -6.5 * s, 0.9 * s, 0, Math.PI * 2); c2.arc(2 * s, -6.5 * s, 0.9 * s, 0, Math.PI * 2); c2.fill();
+        c2.strokeStyle = '#14181f'; c2.lineWidth = 0.7 * s; c2.beginPath(); c2.arc(0, -5 * s, 2 * s, 0.2, Math.PI - 0.2); c2.stroke();   // smile
+        c2.fillStyle = '#feca57'; c2.strokeStyle = '#b8860b'; c2.lineWidth = 0.7 * s;   // crown
+        c2.beginPath(); c2.moveTo(-5 * s, -10.5 * s); c2.lineTo(-5 * s, -14.5 * s); c2.lineTo(-2.5 * s, -12 * s); c2.lineTo(0, -16 * s); c2.lineTo(2.5 * s, -12 * s); c2.lineTo(5 * s, -14.5 * s); c2.lineTo(5 * s, -10.5 * s); c2.closePath(); c2.fill(); c2.stroke();
+        c2.fillStyle = '#ff4757'; c2.beginPath(); c2.arc(0, -12.5 * s, 0.9 * s, 0, Math.PI * 2); c2.fill();
+        c2.fillStyle = '#b8860b'; c2.font = `bold ${Math.round(7 * s)}px sans-serif`; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText('D', 0, 7 * s); c2.textBaseline = 'alphabetic';
+        c2.restore();
+    }
     function drawExclusivePet(name, c2, cx, cy, s) {
         const t = Date.now() / 300;
         c2.save(); c2.translate(cx, cy); c2.lineCap = 'round'; c2.lineJoin = 'round';
@@ -8243,7 +8299,7 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         // Show the best pets first. A 59-pet collection in hatch order is unusable — you can't find
         // the SSS you just pulled. Sorting only the VIEW keeps the underlying indices (and therefore
         // equippedPets) untouched, so each card carries its real index.
-        const RANK_ORDER = { LIMITED:7, SSS:6, S:5, A:4, B:3, C:2, F:1 };
+        const RANK_ORDER = { GOD:8, LIMITED:7, SSS:6, S:5, A:4, B:3, C:2, F:1 };
         const view = petsOwned
             .map((p, idx) => ({ p, idx }))
             .filter(({ p }) => _petMatches(p))
@@ -19608,6 +19664,7 @@ const col = b.color || BLDG_COLORS[0];
     function makePetMesh3D(pet) {
         const g = new THREE.Group();
         const r = 7;
+        if (pet && pet.special === 'danielgod') { const d = makeGodMesh3D('#f9ca24'); d.scale.setScalar(0.17); g.add(d); g.userData.head = d; g.userData.float = true; return g; }   // 👑 Daniel the God
         if (pet && GOD_NAMES.indexOf(pet.name) > -1) return makeGodPetMesh3D(pet.name, g);   // 🏛️ Zeus / Achilles / Odin
         if (pet && pet.name === 'Lightning') {   // ⚡ a floating glowing bolt with eyes
             const bolt = _pf('pet-lightning', () => new THREE.MeshStandardMaterial({ color: 0xfeca57, emissive: 0xffd32a, emissiveIntensity: 1.3, roughness: 0.3 }));
@@ -23919,6 +23976,7 @@ const col = b.color || BLDG_COLORS[0];
         else if (BOSS_LOOT_KINDS.indexOf(kind) > -1) say(giveBossLoot(kind));
         else if (EVENT_MAP_KINDS.indexOf(kind) > -1) say(openEventMap(kind));
         else if (kind === 'achievements') say(giveAchievement('all'));
+        else if (kind === 'daniel') say(giveDanielMsg());
         else if (kind === 'typhon') { document.getElementById('unlock-menu').style.display = 'none'; say(summonTyphon() ? '🐍 Typhon is here — good luck!' : '🐍 Start a game first'); }
         else return false;
         SFX.pickup && SFX.pickup();
@@ -23977,6 +24035,13 @@ const col = b.color || BLDG_COLORS[0];
         return fresh.length ? `🏆 Achievement unlocked: ${fresh.map(x => ACHIEVEMENT_NAMES[x]).join(', ')} — yours for good`
                             : `🏆 You already have ${ids.length > 1 ? 'every achievement' : ACHIEVEMENT_NAMES[id]}`;
     }
+    function giveDanielMsg() {
+        const ok = giveDanielGod();
+        if (ok && typeof renderPetsCollection === 'function') try { renderPetsCollection(); } catch (e) {}
+        return ok ? '👑 Daniel the God is your pet — every power ×3 and a divine smite (🐾 Pets)' : '👑 You already have Daniel the God';
+    }
+    function adminDaniel() { adminMsg(giveDanielMsg()); SFX.pickup && SFX.pickup(); }
+    function ownerDaniel() { adminMsg(giveDanielMsg()); SFX.pickup && SFX.pickup(); }
     function adminAchievement(id) {   // 🛠️ Admin Panel: 1 a day (ADMIN_CAPS.ach)
         if (id !== 'all' && !ACHIEVEMENT_NAMES[id]) return false;
         if (!adminTrySpend('ach', 1)) return false;

@@ -637,3 +637,7 @@ summonTyphon(): Owner Panel (🏆 section) and [U] 'typhon'. Tests: tools/test-f
 Pet looks: every PETS name has a figure — drawPet's cases, drawGodPet (Zeus / Achilles / Odin) and drawExclusivePet
 (Lightning / Omega) on cards; makePetMesh3D → makeGodPetMesh3D and its own Lightning / Omega branches in 3D.
 Typhon was buffed ×50 on request (base hp 20000, damage 2250).
+👑 Daniel the God: owner / admin-only pet (giveDanielGod via ownerDaniel / adminDaniel / [U] 'daniel'; never from
+eggs). special 'danielgod', rank 'GOD' (own colour/damage/cooldown, sorted first, a free slot like LIMITED, kept GOD on
+load), every boss-pet power ×3 (petBoost 3), danielTick DIVINE SMITE every 4 s (DANIEL_SMITE 5000 > Typhon's 2250 on the
+5 strongest monsters within 650 px). drawDanielGod / makeGodMesh3D. Tests: tools/test-daniel.js.
