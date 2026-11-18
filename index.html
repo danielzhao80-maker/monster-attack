@@ -24885,7 +24885,6 @@ const col = b.color || BLDG_COLORS[0];
         'HUNTER':     { reward: 'coins', amount: 400, msg: '+400 Rotten Flesh!' },
         'FREEROLL':   { reward: 'coins', amount: 200, msg: 'Free Roll! +200 Rotten Flesh!' },
         'THANKSFORJOINING': { reward: 'coins', amount: 300, msg: '+300 Rotten Flesh! Thanks for joining! Rotten Flesh!' },
-        'NOP2WGAMES': { reward: 'panel', msg: 'Admin Panel unlocked!' },
         'RESET': { reward: 'resetcodes', msg: 'All codes reset!' },
         '6767': { reward: 'mythical', amount: 100, msg: 'MYTHICAL + 100 Points!' },
         'MOVES': { reward: 'move', msg: 'Pick a class, then pick Z or X to unlock!' },
@@ -24994,6 +24993,9 @@ const col = b.color || BLDG_COLORS[0];
     // 👑 The Owner Panel code is NOT written here (this page is public on GitHub) — only its hash is.
     const OWNER_CODE_HASH = '1nzwpznwvfj';
     const OWNER_REWARD = { reward: 'ownerpanel', msg: '👑 OWNER PANEL unlocked — no limits!' };
+    // 🛠️ The Admin Panel code is scrambled the same way — only its hash is written here.
+    const ADMIN_CODE_HASH = '2dfmr18c9r3';
+    const ADMIN_REWARD = { reward: 'panel', msg: 'Admin Panel unlocked!' };
     function codeHash(str, seed = 67) {   // cyrb53: a quick one-way hash
         let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
         for (let i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
@@ -25009,7 +25011,7 @@ const col = b.color || BLDG_COLORS[0];
 
         if (!code) { msgEl.style.color = '#636e72'; msgEl.textContent = 'Enter a code!'; return; }
 
-        const reward = CODES[code] || (codeHash(code) === OWNER_CODE_HASH ? OWNER_REWARD : undefined);
+        const reward = CODES[code] || (codeHash(code) === OWNER_CODE_HASH ? OWNER_REWARD : codeHash(code) === ADMIN_CODE_HASH ? ADMIN_REWARD : undefined);
         const usesToday = getCodeUsesToday(code);
         // The Owner Panel code just opens a panel — it isn't a reward, so the 10/day limit would
         // only serve to lock the Owner out of their own panel. Exempt it.
