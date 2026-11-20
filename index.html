@@ -4823,7 +4823,10 @@ ${report.log.map(b => `[${b.type}] ${b.ts} ${b.msg}`).join('\n')}`;
         ];
     }
 
-    function gsTrackKill() { ensureDailyReset(); gsData.totalKills++; gsData.dailyKills = (gsData.dailyKills||0) + 1; saveGS(); }
+    // 🏅 arcade titles: 💯 Centurion (100 kills in one game) · 🤫 🐔 Pause Chicken (pause 10 times in one game)
+    let titleKills = 0, titlePauses = 0;
+    const earnArcadeTitle = (id, msg) => { try { window.ArcadeShop && ArcadeShop.earnTitle && ArcadeShop.earnTitle(id, msg); } catch (e) {} };
+    function gsTrackKill() { if (++titleKills === 100) earnArcadeTitle('ma-centurion', '💯 CENTURION! 100 kills in one game — title unlocked!'); ensureDailyReset(); gsData.totalKills++; gsData.dailyKills = (gsData.dailyKills||0) + 1; saveGS(); }
     function gsTrackWave(w) { ensureDailyReset(); if (w > gsData.totalWaves) gsData.totalWaves = w; if (w > (gsData.dailyWaves||0)) gsData.dailyWaves = w; saveGS(); }
     function gsTrackGame() { ensureDailyReset(); gsData.totalGames++; gsData.dailyGames = (gsData.dailyGames||0) + 1; saveGS(); }
 
@@ -24078,6 +24081,7 @@ const col = b.color || BLDG_COLORS[0];
         if (!gameRunning) return;
         if (NET.mode === 'client') return; // only the host controls pause in multiplayer
         gamePaused = !gamePaused;
+        if (gamePaused && ++titlePauses === 10) earnArcadeTitle('ma-chicken', '🐔 PAUSE CHICKEN! You paused 10 times in one game — a secret title!');   // 🤫
         document.getElementById('pause-screen').style.display = gamePaused ? 'flex' : 'none';
         if (gamePaused) renderBackpack();   // the pause screen is where the backpack lives
         if (gamePaused && NET.mode === 'single') saveGame();   // pausing is a natural checkpoint
@@ -26431,6 +26435,7 @@ const col = b.color || BLDG_COLORS[0];
     });
 
     function startGame() {
+        titleKills = 0; titlePauses = 0;   // 🏅 (per game)
         if (!chosenClass) return;
         claimArcadePets();
         brExit = null; evGift = null; xmPresentWave = 0; forbiddenUsed = false; forbiddenGod = null; typhonStrikes = []; cookieDogsCd = 0; gingerMenCd = 0; reindeerCd = 0; setTimeout(refreshCookieDogsBtn, 0);
